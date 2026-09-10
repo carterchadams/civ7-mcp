@@ -92,8 +92,8 @@ Population split observed: pop 4 = rural 3 + urban 1 (`pendingPopulation` 0). To
 | id | `unit.id` | P | ComponentID `{owner, id, type}` | | `{owner:0,id:131072,type:26}` |
 | type | `unit.type` → `GameInfo.Units.lookup(h).UnitType`; also `unit.typeName`, `typeHash` | P | hash | | `UNIT_SCOUT` |
 | name | `unit.name` (`Locale.compose` in 5 sites) | P | string | | `Scout` |
-| location | `unit.location` | P | `{x, y}`; **invalid = `x == -1 \|\| y == -1`** | `world-input.js:378` | `{63,15}` |
-| on map | `unit.isOnMap` | P | boolean; false for packed/off-map units | 5 sites | true |
+| location | `unit.location` | P | `{x, y}`; invalid per `world-input.js` is `x == -1 \|\| y == -1`; **a packed unit reports `{-9999, -9999}`** so treat any negative coordinate as not-a-tile | `world-input.js:378` | `{63,15}`; packed hoplite `{-9999,-9999}` |
+| on map | `unit.isOnMap` | P | boolean; **false for a unit packed into a commander**; the unit stays in `getUnits()`, keeps its ComponentID, `isValid true`, `isDead false`, its `Movement` (1/2 observed) and carries the commander's `armyId` | 5 sites | true; packed hoplite false |
 | `isDead`, `isValid`, `isEmbarked`, `isFortified`, `hasMoved`, `canMove` | P | boolean | | |
 | movement | `Movement.movementMovesRemaining`, `Movement.maxMoves` | P | int; UI reads `Movement?.` (component may be absent) | 7 / 3 sites | 2 / 2, 0 / 2 after moving |
 | health | `Health.damage`, `Health.maxDamage` | P | int; health = maxDamage − damage | 14 / 11 sites | 0 / 100; **32 / 100 after combat** |
@@ -102,7 +102,7 @@ Population split observed: pop 4 = rural 3 + urban 1 (`pendingPopulation` 0). To
 | commander | `unit.isCommanderUnit`, `unit.armyId` | P | boolean; ComponentID with `owner -1, id -1` = no army | 13 / 14 sites | false, none; **turn 16: `UNIT_ARMY_COMMANDER` has `isCommanderUnit true` and `armyId {owner:1,id:65536,type:29}`**; an unpacked hoplite next to it has no army |
 | combat (optional) | `Combat.getMeleeStrength()` | M | | | deferred |
 
-Observed on turn 14 (seat 1): four units, one damaged (32/100), one embarked scout at (60, 39) that still reports `isOnMap true`, one galley. A commander with an army is now observed (turn 16). Still not observed: an off-map/packed unit (`isOnMap false`). Embarkation is **not** the off-map case; packing into a commander is the remaining candidate.
+Observed on turn 14 (seat 1): four units, one damaged (32/100), one embarked scout at (60, 39) that still reports `isOnMap true`, one galley. A commander with an army and a packed unit are both observed (turn 16): hoplite 458757 packed into commander 393220 → `isOnMap false`, location `{-9999,-9999}`, `armyId {owner:1,id:65536,type:29}` (same as the commander's), still listed by `getUnits()`. `player.Armies` exposes `getArmyIds`, `getUnitsReinforcingCommander`, and reinforcement path/ETA readers (not used). Embarkation is **not** the off-map case.
 
 ## Technology: `player.Techs`
 
@@ -174,7 +174,7 @@ FULLY_UNLOCKED node.
 |---|---|
 | context, mode, seat identity | verified (SP + both hotseat seats) |
 | settlement id/name/location/isTown/isCapital/population | verified incl. rural/urban split and a town (`isTown true`) |
-| unit id/type/name/location/isOnMap/movement/health | verified incl. damage and embarkation; `isOnMap false` known from shipped scripts, not yet seen live (commander packing) |
+| unit id/type/name/location/isOnMap/movement/health | verified incl. damage, embarkation, commander/army and a packed (`isOnMap false`) unit |
 | tech current/completed/target/turns | verified incl. sentinel and state decoding |
 | civic current/completed/tree/turns | verified incl. completed node, civ-specific tree, node→tree mapping |
 | visibility + tile keys + adjacency | verified |
