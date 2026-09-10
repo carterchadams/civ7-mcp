@@ -12,11 +12,13 @@ from pathlib import Path
 from civ7_observer import __version__
 from civ7_observer.doctor import run_doctor
 from civ7_observer.probe import run_probe
+from civ7_observer.schema import MODES
 from civ7_observer.service import ObserverError
+from civ7_observer.snapshot import run_snapshot
 
 DEFAULT_PORT = 9444
 DEFAULT_TIMEOUT = 5.0
-_STUBS = ("snapshot", "serve")
+_STUBS = ("serve",)
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -39,6 +41,16 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--out", type=Path, default=Path("runs/capabilities.json"))
     p.add_argument("--json", action="store_true")
     p.add_argument("-v", "--verbose", action="store_true")
+
+    sn = sub.add_parser("snapshot", help="write one validated observation of the bound player")
+    sn.add_argument("--port", type=int, default=DEFAULT_PORT)
+    sn.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    sn.add_argument("--target-id", default=None)
+    sn.add_argument("--player", type=int, default=None, help="engine player id to bind (default: the local seat)")
+    sn.add_argument("--mode", choices=MODES, default="singleplayer", help="session type the capture is allowed in")
+    sn.add_argument("--out", type=Path, default=Path("runs/observation.json"))
+    sn.add_argument("--json", action="store_true")
+    sn.add_argument("-v", "--verbose", action="store_true")
 
     for name in _STUBS:
         s = sub.add_parser(name, help=f"{name} (not implemented in Change 1)")
@@ -82,6 +94,23 @@ def _run_probe(args) -> int:
     return 0
 
 
+def _run_snapshot(args) -> int:
+    try:
+        result = run_snapshot(port=args.port, timeout=args.timeout, out=args.out, player=args.player, mode=args.mode, target_id=args.target_id)
+    except ObserverError as exc:
+        if args.json:
+            print(json.dumps({"ok": False, "error": exc.to_dict()}, indent=2))
+        else:
+            print(f"snapshot failed: {exc.code}: {exc.message}")
+        return 1
+    if args.json:
+        print(json.dumps({"ok": True, **result.to_dict()}, indent=2))
+    else:
+        print(f"observation written: {result.path} (player {result.player_id}, turn {result.turn}, "
+              f"{result.settlement_count} settlements, {result.unit_count} units, id {result.observation_id})")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command in _STUBS:
@@ -91,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
                         format="%(levelname)s %(name)s: %(message)s")
     if args.command == "probe":
         return _run_probe(args)
+    if args.command == "snapshot":
+        return _run_snapshot(args)
     result = run_doctor(port=args.port, timeout=args.timeout, target_id=args.target_id)
     if args.json:
         print(result.to_json())

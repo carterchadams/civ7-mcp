@@ -136,3 +136,14 @@ exported; only presence of the API will be noted). Swap seats and re-run `probe`
 | town | Sevilla id 131073 at (60, 14) `isTown true`, `isCapital false`, pop 2; Madrid remains capital pop 6, `getCapital()` still Madrid |
 | roster | 2 settlements (1 town), 6 units (5 scouts, 1 warrior), one scout damaged 45/100, none embarked, none off-map |
 | resources / notifications | APIs present (member names recorded in the contract); not read, not exported |
+
+## Change 3: snapshot (seat 1 = player 0 Isabella, turn 15)
+
+| test | result |
+|---|---|
+| `snapshot --mode local-hotseat` | PASS: player 0, turn 15, 2 settlements, 6 units, 0 warnings; observation id `e58292da…`, session id `8d150a07…` |
+| own roster vs probe | identical ids, locations, populations, damage (scout 131072 at (50, 24) damage 45), Sevilla `isTown true` |
+| serialized keys | only the schema's keys; no `ws://`, no resources, no foreign units, no yields, no seed |
+| `--mode singleplayer` in the hotseat game (negative) | `UNSUPPORTED_GAME_MODE: game is local-hotseat but the service allows only singleplayer`, no file |
+| `--player 1` from seat 0 (negative) | `WRONG_PLAYER`, no file |
+| movement read-back | pending: move an owned unit, capture again, compare id/location/movement/observation id |

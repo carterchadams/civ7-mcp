@@ -45,7 +45,7 @@ def test_target_id_flag(monkeypatch, capsys):
     assert seen["target_id"] == "abc"
 
 
-@pytest.mark.parametrize("cmd", ["snapshot", "serve"])
+@pytest.mark.parametrize("cmd", ["serve"])
 def test_stub_commands_exit_2(cmd, capsys):
     code = cli.main([cmd])
     _, err = capsys.readouterr()
@@ -87,3 +87,23 @@ def test_probe_command_reports_typed_error(monkeypatch, capsys):
     out, err = capsys.readouterr()
     assert code == 1
     assert json.loads(out)["error"]["code"] == "WRONG_PLAYER"
+
+
+def test_snapshot_command_wires_flags(monkeypatch, capsys, tmp_path):
+    from civ7_observer import snapshot as snap_mod
+    seen = {}
+
+    def fake(**kw):
+        seen.update(kw)
+        return snap_mod.SnapshotResult(path=kw["out"], session_id="s", observation_id="o", turn=2, player_id=1, settlement_count=1, unit_count=1, size_bytes=5)
+
+    monkeypatch.setattr(cli, "run_snapshot", fake)
+    code = cli.main(["snapshot", "--player", "1", "--mode", "local-hotseat", "--out", str(tmp_path / "o.json"), "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 0 and seen["player"] == 1 and seen["mode"] == "local-hotseat"
+    assert json.loads(out)["observationId"] == "o"
+
+
+def test_snapshot_command_rejects_unknown_mode(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["snapshot", "--mode", "network"])

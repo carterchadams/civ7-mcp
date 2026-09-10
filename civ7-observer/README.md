@@ -4,9 +4,10 @@ Read-only local observer for **one** Civilization VII player, reached through th
 game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
 
 Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
-**connection doctor**) and Change 2 (the developer **capability probe** and the
-runtime contract in `docs/runtime-contract.md`). `snapshot` and `serve` are
-registered but not implemented.
+**connection doctor**), Change 2 (the developer **capability probe** and the runtime
+contract in `docs/runtime-contract.md`), and Change 3 (**snapshot** of owned settlements
+and units). Technology, civics, and the map are reported as `unsupported` until
+Changes 4 and 5. `serve` is registered but not implemented.
 
 ## Install (Linux, this repo)
 
@@ -83,6 +84,21 @@ Or separately: `.venv/bin/python -m pytest civ7-observer/tests -q` and
 
 The Python suite runs a fake Cohtml debugger (HTTP `/json` plus a minimal RFC 6455
 server) on an ephemeral port; no game installation is needed.
+
+## Take an observation snapshot
+
+```bash
+.venv/bin/python -m civ7_observer snapshot --mode singleplayer --out civ7-observer/runs/observation.json
+.venv/bin/python -m civ7_observer snapshot --mode local-hotseat --player 0 --json
+```
+
+`snapshot` binds one engine player id (default: the local seat), refuses `WRONG_PLAYER`,
+`UNSUPPORTED_GAME_MODE` (the game's mode flags must match `--mode`), `TURN_NOT_READY`,
+and `CONTEXT_CHANGED` (turn or seat moved during the read), validates the payload
+against a strict schema (`schema.py`: exact key sets, finite ints, size limits, owner
+checks), and writes the observation atomically. Each observation carries a fresh
+`observationId`; the `sessionId` is fixed for the process, so restart the service after
+loading another save. `omittedFeatures` lists what is deliberately not exported.
 
 ## Seat-binding rule (enforced by tests)
 
