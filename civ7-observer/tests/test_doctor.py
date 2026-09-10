@@ -115,3 +115,10 @@ def test_failure_reports_never_contain_ws_urls():
 def test_contract_issue_beats_menu():
     r = run([("a", True), ("b", True)], {"a": [reply(1, json.dumps(MENU))], "b": [reply(1, json.dumps(INCONSISTENT))]})
     assert r.status is doctor.DoctorStatus.API_CONTRACT_MISMATCH
+
+
+def test_null_context_never_yields_in_game():
+    nulls = {**GAME, "turn": None, "localPlayerId": None, "localObserverId": None}
+    r = run([("a", True)], {"a": [reply(1, json.dumps(nulls))]})
+    assert r.status is doctor.DoctorStatus.API_CONTRACT_MISMATCH
+    assert r.ok is False and r.exit_code() == 1 and r.context is None

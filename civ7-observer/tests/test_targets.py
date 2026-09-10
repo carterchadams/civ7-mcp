@@ -167,3 +167,15 @@ def test_probe_records_duration():
     f = Factory({"a": [reply(1, json.dumps(GAME))]})
     (p,) = targets.select_game_target([target("a")], timeout=1, session_factory=f).probes
     assert isinstance(p.duration_ms, int) and p.duration_ms >= 0
+
+
+@pytest.mark.parametrize("field", ["turn", "localPlayerId", "localObserverId"])
+def test_game_realm_with_null_context_field_is_inconsistent(field):
+    probe = targets.parse_realm_probe(json.dumps({**GAME, field: None}))
+    assert targets.classify(probe) == targets.RealmKind.INCONSISTENT
+
+
+@pytest.mark.parametrize("field, value", [("localPlayerId", -1), ("localObserverId", -1), ("turn", -3)])
+def test_game_realm_with_negative_identity_is_inconsistent(field, value):
+    probe = targets.parse_realm_probe(json.dumps({**GAME, field: value}))
+    assert targets.classify(probe) == targets.RealmKind.INCONSISTENT

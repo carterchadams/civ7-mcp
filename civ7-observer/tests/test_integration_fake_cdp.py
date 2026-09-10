@@ -120,3 +120,25 @@ def test_session_direct_multiple_calls(server):
         assert s.evaluate_readonly("1") == "one"
         assert s.evaluate_readonly("2") == "two"
     assert [r["id"] for r in server.received] == [1, 2]
+
+
+def test_ws_redirect_is_not_followed(server):
+    server.targets = [server.target("g", "/p/g")]
+    server.ws_scripts = {"/p/g": [echo_value(json.dumps(GAME))]}
+    server.redirect_to = f"ws://127.0.0.1:{server.port}/p/g"   # even a loopback redirect must be refused
+    server.targets = lambda: (200, json.dumps([{"id": "g", "type": "page", "title": "g", "url": "x", "webSocketDebuggerUrl": server.ws_url("/p/g")}]).encode())
+    # discovery itself must not redirect, so serve /json normally and redirect only the upgrade
+    server.redirect_to = None
+    server.ws_redirect_to = f"ws://127.0.0.1:{server.port}/p/g"
+    r = run(server)
+    assert r.status is doctor.DoctorStatus.TARGET_PROBE_FAILED
+    assert r.targets[0]["error"]["code"] == "TARGET_CONNECT_FAILED"
+    assert server.connections == ["/p/g"], "client must not have followed the redirect"
+
+
+def test_invalid_ws_frame_is_malformed_not_a_crash(server):
+    server.targets = [server.target("g", "/p/g")]
+    server.ws_scripts = {"/p/g": [SendRaw(b"\x8f\x05hello")]}   # reserved opcode 0xF
+    r = run(server)
+    assert r.status is doctor.DoctorStatus.TARGET_PROBE_FAILED
+    assert r.targets[0]["error"]["code"] == "CDP_MALFORMED"

@@ -1,0 +1,51 @@
+{
+  "schemaVersion": 1,
+  "status": "IN_GAME",
+  "ok": true,
+  "summary": "in-game realm found (target 0): turn 2, localPlayerId 0, localObserverId 0",
+  "discovery": {
+    "url": "http://127.0.0.1:9444/json",
+    "targetCount": 1,
+    "error": null
+  },
+  "targets": [
+    {
+      "index": 0,
+      "id": "0",
+      "title": "127.0.0.1:9444/json",
+      "type": "page",
+      "url": "fs://game/root-game.html",
+      "kind": "game",
+      "probe": {
+        "inGame": true,
+        "hasUI": true,
+        "hasGameContext": true,
+        "hasGame": true,
+        "hasPlayers": true,
+        "hasMap": true,
+        "localPlayerId": 0,
+        "localObserverId": 0,
+        "turn": 2,
+        "href": "fs://game/root-game.html"
+      },
+      "error": null,
+      "contractIssue": false,
+      "durationMs": 32
+    }
+  ],
+  "selected": {
+    "index": 0,
+    "id": "0",
+    "title": "127.0.0.1:9444/json",
+    "type": "page",
+    "url": "fs://game/root-game.html"
+  },
+  "context": {
+    "turn": 2,
+    "localPlayerId": 0,
+    "localObserverId": 0
+  },
+  "gameProcess": "detected",
+  "adapterVersion": "0.1.0",
+  "durationMs": 50
+}

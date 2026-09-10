@@ -86,3 +86,16 @@ def test_too_many_targets_raises_invalid(server):
     server.targets = [server.target(str(i), f"/p/{i}") for i in range(cdp.MAX_TARGETS + 1)]
     with pytest.raises(cdp.DiscoveryInvalid):
         cdp.discover_targets(server.port, timeout=2)
+
+
+def test_discovery_redirect_is_not_followed(server):
+    server.redirect_to = "http://10.0.0.5:9444/json"
+    with pytest.raises(cdp.DiscoveryInvalid) as ei:
+        cdp.discover_targets(server.port, timeout=2)
+    assert "redirect" in ei.value.message.lower()
+
+
+def test_discovery_entry_with_unparseable_ws_url_is_kept_with_error(server):
+    server.targets = [server.target("a", webSocketDebuggerUrl="ws://[::1/x")]
+    (t,) = cdp.discover_targets(server.port, timeout=2)
+    assert t.ws_url is None and t.ws_url_error

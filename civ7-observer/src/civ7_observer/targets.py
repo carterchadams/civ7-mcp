@@ -97,9 +97,15 @@ class RealmKind(StrEnum):
     ERROR = "error"
 
 
+def _valid_context(probe: RealmProbe) -> bool:
+    """A loaded game must report a non-negative turn and non-negative seat ids."""
+    return all(_is_int(v) and v >= 0 for v in (probe.turn, probe.local_player_id, probe.local_observer_id))
+
+
 def classify(probe: RealmProbe) -> RealmKind:
     if probe.in_game is True:
-        if probe.has_players and probe.has_map and probe.has_game_context and probe.has_game:
+        if (probe.has_players and probe.has_map and probe.has_game_context and probe.has_game
+                and _valid_context(probe)):
             return RealmKind.GAME
         return RealmKind.INCONSISTENT
     if probe.has_ui:

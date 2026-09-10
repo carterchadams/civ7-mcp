@@ -236,3 +236,22 @@ def test_deadline_includes_time_spent_waiting_for_mutex():
         t.join(2)
     assert isinstance(outcome.get("error"), cdp.CdpDeadlineExceeded)
     assert sock.sent == []
+
+
+@pytest.mark.parametrize("bad", ["ws://[::1/x", "ws://[::1]]:1/x", "ws://127.0.0.1:notaport/x"])
+def test_unparseable_ws_url_is_invalid_not_a_crash(bad):
+    with pytest.raises(cdp.InvalidTargetUrl):
+        cdp.validate_ws_url(bad)
+
+
+def test_ws_protocol_exception_is_malformed():
+    sock, session = make_session([websocket.WebSocketProtocolException("Invalid frame")])
+    with session, pytest.raises(cdp.CdpMalformedResponse):
+        session.evaluate_readonly("x")
+    assert sock.closed == 1
+
+
+def test_other_websocket_exceptions_are_closed():
+    sock, session = make_session([websocket.WebSocketException("weird")])
+    with session, pytest.raises(cdp.CdpConnectionClosed):
+        session.evaluate_readonly("x")

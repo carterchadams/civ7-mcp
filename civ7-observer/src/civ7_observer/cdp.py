@@ -129,7 +129,10 @@ def discovery_url(port: int) -> str:
 def validate_ws_url(raw: object) -> str:
     if not isinstance(raw, str) or not raw:
         raise InvalidTargetUrl("webSocketDebuggerUrl missing or not a string")
-    parts = urlsplit(raw)
+    try:
+        parts = urlsplit(raw)
+    except ValueError as exc:
+        raise InvalidTargetUrl(f"webSocketDebuggerUrl is not a parseable URL: {exc}") from exc
     if parts.scheme != "ws":
         raise InvalidTargetUrl(f"webSocketDebuggerUrl scheme must be ws://, got {parts.scheme!r}")
     host = parts.hostname
@@ -179,11 +182,21 @@ def parse_target_list(body: bytes) -> list[CdpTarget]:
     return targets
 
 
+class _NoRedirect(urllib.request.HTTPRedirectHandler):
+    """Refuse every redirect: only the validated loopback URL may be contacted."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):  # noqa: D401
+        raise DiscoveryInvalid(f"discovery answered with a redirect (HTTP {code}); redirects are not followed")
+
+
+_opener = urllib.request.build_opener(_NoRedirect)
+
+
 def discover_targets(port: int, timeout: float) -> list[CdpTarget]:
     url = discovery_url(port)
     req = urllib.request.Request(url, headers={"Accept": "application/json"}, method="GET")
     try:
-        with urllib.request.urlopen(req, timeout=timeout) as resp:  # noqa: S310 (loopback only)
+        with _opener.open(req, timeout=timeout) as resp:  # noqa: S310 (loopback only, no redirects)
             status = getattr(resp, "status", 200)
             if status != 200:
                 raise DiscoveryInvalid(f"discovery returned HTTP {status}")
@@ -210,7 +223,8 @@ ConnectFn = Callable[[str, float], WebSocketLike]
 
 
 def _default_connect(url: str, timeout: float) -> WebSocketLike:
-    return websocket.create_connection(url, timeout=timeout, suppress_origin=True)
+    # redirect_limit=0: a redirect response is an error, never a new destination.
+    return websocket.create_connection(url, timeout=timeout, suppress_origin=True, redirect_limit=0)
 
 
 class CdpSession:
@@ -292,6 +306,9 @@ class CdpSession:
             except CdpConnectionClosed as exc:
                 self._poison(exc.message)
                 raise
+            except CdpMalformedResponse as exc:
+                self._poison(f"stream corrupted: {exc.message}")
+                raise
 
     def _await_response(self, ws: WebSocketLike, request_id: int, deadline: float) -> Any:
         while True:
@@ -305,6 +322,10 @@ class CdpSession:
                 raise CdpDeadlineExceeded(f"no response to request {request_id} within {self.timeout}s") from exc
             except (websocket.WebSocketConnectionClosedException, OSError) as exc:
                 raise CdpConnectionClosed(f"connection closed while waiting: {exc!r}") from exc
+            except (websocket.WebSocketProtocolException, websocket.WebSocketPayloadException) as exc:
+                raise CdpMalformedResponse(f"invalid WebSocket frame: {exc}") from exc
+            except websocket.WebSocketException as exc:
+                raise CdpConnectionClosed(f"WebSocket failure while waiting: {exc!r}") from exc
             if frame == "" or frame is None:
                 raise CdpConnectionClosed("connection closed by peer")
             if not isinstance(frame, str):

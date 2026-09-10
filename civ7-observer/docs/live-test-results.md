@@ -47,3 +47,56 @@ Same session, same target. Every value below came from read-only probes.
 
 Unit ID stayed stable across the move. Previously visible tiles that fell out of sight
 moved to REVEALED and are no longer exported; no fresh state was read for them.
+
+## Verbatim doctor reports (copied from the terminal during the 2026-09-10 session)
+
+Game closed, before first launch and again after shutdown (`doctor --json`, exit 1):
+
+```json
+{"status":"DEBUGGER_UNAVAILABLE","ok":false,"gameProcess":"not-detected","discovery":{"url":"http://127.0.0.1:9444/json","targetCount":0,"error":{"code":"DEBUGGER_UNAVAILABLE","message":"no UI debugger answering at http://127.0.0.1:9444/json: [Errno 111] Connection refused"}}}
+```
+
+Single-player, turn 2 (`doctor --json`, exit 0):
+
+```json
+{
+  "schemaVersion": 1,
+  "status": "IN_GAME",
+  "ok": true,
+  "summary": "in-game realm found (target 0): turn 2, localPlayerId 0, localObserverId 0",
+  "discovery": {"url": "http://127.0.0.1:9444/json", "targetCount": 1, "error": null},
+  "targets": [{"index": 0, "id": "0", "title": "127.0.0.1:9444/json", "type": "page", "url": "fs://game/root-game.html", "kind": "game",
+    "probe": {"inGame": true, "hasUI": true, "hasGameContext": true, "hasGame": true, "hasPlayers": true, "hasMap": true, "localPlayerId": 0, "localObserverId": 0, "turn": 2, "href": "fs://game/root-game.html"},
+    "error": null, "contractIssue": false, "durationMs": 32}],
+  "selected": {"index": 0, "id": "0", "title": "127.0.0.1:9444/json", "type": "page", "url": "fs://game/root-game.html"},
+  "context": {"turn": 2, "localPlayerId": 0, "localObserverId": 0},
+  "gameProcess": "detected", "adapterVersion": "0.1.0", "durationMs": 61
+}
+```
+
+Main menu (`doctor`, exit 1):
+
+```text
+status: NOT_IN_GAME
+summary: game UI reachable but no loaded game (main menu or loading screen)
+discovery: http://127.0.0.1:9444/json (1 targets)
+  [0] id=0 kind=menu title='127.0.0.1:9444/json' url='fs://game/core/ui/shell/root-shell.html' inGame=False turn=None localPlayerId=0 localObserverId=-1
+game process: detected; adapter 0.1.0; 60 ms
+```
+
+Hotseat, seat 1, turn 1 (`doctor --json | jq '{status, context}'`, exit 0):
+
+```json
+{"status":"IN_GAME","context":{"turn":1,"localPlayerId":0,"localObserverId":0}}
+```
+
+Hotseat, seat 2, turn 1 after the pass-device curtain (`doctor --json | jq '{status, context}'`, exit 0):
+
+```json
+{"status":"IN_GAME","context":{"turn":1,"localPlayerId":1,"localObserverId":1}}
+```
+
+## Still pending human action
+
+- Debugger-disabled run (`UIDebugger 0`, relaunch) to learn whether the option controls the listener.
+- Human confirmation that the in-game turn counter and the active leader matched the doctor's turn/localPlayerId for the single-player and hotseat captures.

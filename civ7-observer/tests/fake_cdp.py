@@ -95,6 +95,8 @@ class FakeCdpServer:
     targets: object = field(default_factory=list)   # list, or callable -> (status, body_bytes)
     ws_scripts: dict[str, list] = field(default_factory=dict)  # path -> actions
     ws_reject_status: int | None = None
+    redirect_to: str | None = None   # if set, /json and ws upgrades answer 302 Location: redirect_to
+    ws_redirect_to: str | None = None  # if set, only ws upgrades answer 302
     discovery_delay: float = 0.0
     port: int = 0
     _sock: socket.socket | None = None
@@ -167,6 +169,9 @@ class FakeCdpServer:
     def _handle_http(self, conn: socket.socket, path: str) -> None:
         if self.discovery_delay:
             time.sleep(self.discovery_delay)
+        if self.redirect_to is not None:
+            conn.sendall(f"HTTP/1.1 302 Found\r\nLocation: {self.redirect_to}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode())
+            return
         if path != "/json":
             status, body = 404, b"not found"
         elif callable(self.targets):
@@ -178,6 +183,10 @@ class FakeCdpServer:
 
     def _handle_ws(self, conn: socket.socket, path: str, headers: dict[str, str]) -> None:
         self.connections.append(path)
+        target = self.ws_redirect_to or self.redirect_to
+        if target is not None:
+            conn.sendall(f"HTTP/1.1 302 Found\r\nLocation: {target}\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode())
+            return
         if self.ws_reject_status is not None or path not in self.ws_scripts:
             status = self.ws_reject_status or 404
             conn.sendall(f"HTTP/1.1 {status} Rejected\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".encode())
