@@ -157,4 +157,4 @@ exported; only presence of the API will be noted). Swap seats and re-run `probe`
 | commander association (first live) | `UNIT_ARMY_COMMANDER` id 393220 at (66, 37), `isCommander true`, `armyId {owner:1, id:65536, type:29}`; `UNIT_HOPLITE` id 458757 adjacent at (67, 36), `armyId null` (not yet packed) |
 | roster changes since turn 14 | scouts now 3/3 movement, damaged scout healed to 22/100, embarked scout still `isOnMap true` |
 | packed-unit read-back, while packed | PASS: `snapshot` still lists 6 units; hoplite 458757 `locationStatus off-map`, `location null`, `armyId {owner:1,id:65536,type:29}`, movement 1/2; commander 393220 unchanged at (66, 37) with the same army id; raw `location` was `{-9999,-9999}` and `isOnMap false`, `isValid true` |
-| packed-unit read-back, after unpacking | pending |
+| packed-unit read-back, after unpacking | PASS: hoplite 458757 `locationStatus tile` at (65, 37), `armyId null`, movement 0/2; commander 393220 unchanged with its army id; same ComponentID across all three captures; roster count 6 throughout |
