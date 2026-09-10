@@ -1,0 +1,11 @@
+.venv/
+__pycache__/
+*.pyc
+*.egg-info/
+.pytest_cache/
+civ7-observer/runs/
+civ7-observer/fixtures/recorded/
+reference/
+tmp/
+build/
+plans/
