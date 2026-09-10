@@ -146,4 +146,5 @@ exported; only presence of the API will be noted). Swap seats and re-run `probe`
 | serialized keys | only the schema's keys; no `ws://`, no resources, no foreign units, no yields, no seed |
 | `--mode singleplayer` in the hotseat game (negative) | `UNSUPPORTED_GAME_MODE: game is local-hotseat but the service allows only singleplayer`, no file |
 | `--player 1` from seat 0 (negative) | `WRONG_PLAYER`, no file |
-| movement read-back | pending: move an owned unit, capture again, compare id/location/movement/observation id |
+| movement read-back | PASS: human moved two units, second `snapshot` (observation `0391da35…`, still turn 15): scout id 327683 (56, 17) 2/2 → (55, 19) 0/2; warrior id 524293 (63, 15) 2/2 → (65, 14) 0/2; the other 4 units byte-identical; unit id set unchanged; settlements unchanged; fresh observation id |
+| session id across CLI runs | each `snapshot` process is a separate attachment, so `sessionId` differs per run (`8d150a07…` then `2ad21fff…`); `serve` will hold one session for its lifetime |
