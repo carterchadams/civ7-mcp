@@ -127,3 +127,12 @@ embarked, at least one civic completed, camera parked over unknown terrain.
 
 Pending on seat 0 (Isabella): a town (`isTown true`) and resources (deliberately not
 exported; only presence of the API will be noted). Swap seats and re-run `probe`.
+
+## Change 2: probe (seat 1 = player 0 Isabella, turn 15, after the swap)
+
+| test | result |
+|---|---|
+| `probe` on the active seat | PASS: player 0, turn 15, 0 payload errors; localPlayerId 0, localObserverId 0, isTurnActive true |
+| town | Sevilla id 131073 at (60, 14) `isTown true`, `isCapital false`, pop 2; Madrid remains capital pop 6, `getCapital()` still Madrid |
+| roster | 2 settlements (1 town), 6 units (5 scouts, 1 warrior), one scout damaged 45/100, none embarked, none off-map |
+| resources / notifications | APIs present (member names recorded in the contract); not read, not exported |

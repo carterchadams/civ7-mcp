@@ -82,7 +82,7 @@ by our payload and `tests/test_payload_policy.py`.
 | production (optional) | `BuildQueue.currentProductionTypeHash` (-1 = none), `BuildQueue.isEmpty`, `BuildQueue.getTurnsLeft()` (-1 seen even with an item queued), `getPercentComplete()`, `getProductionTypeName(hash)` | P/M | queue entries: `{orderType, kind, type, unitType, constructibleType, projectType, location{-9999,-9999}=none, instance ComponentID}`; resolve `type` through `GameInfo.Units` / `Constructibles` / `Projects` by which lookup hits | `city.BuildQueue.getTurnsLeft` 3 sites | scout hash while building a scout; -1 / true / -1 when idle; `UNIT_HOPLITE` queued with `unitType` set and the other two -1 |
 | yields (optional) | `Yields.getNetYield(yieldIndex)` | M | int per yield; indices follow `GameInfo.Yields` order `FOOD, PRODUCTION, GOLD, SCIENCE, CULTURE, HAPPINESS, DIPLOMACY`; `getNetYields()` does not exist | | food net 11 |
 
-Population split observed: pop 4 = rural 3 + urban 1 (`pendingPopulation` 0). Not yet observed on the bound seat: a town (`isTown` true), razing, conquest. Seat 0 reportedly has a town; capture it when that seat is active.
+Population split observed: pop 4 = rural 3 + urban 1 (`pendingPopulation` 0). Town observed on seat 0, turn 15: Sevilla `{owner:0,id:131073,type:1}` at (60, 14), `isTown true`, `isCapital false`, pop 2 (rural 1, urban 1), empty build queue; it appears in `getCities()` and `getCapital().id` still points at Madrid. A town exposes no extra members beyond the city shape. Not yet observed: razing, conquest.
 
 ## Units: `player.Units`
 
@@ -173,10 +173,18 @@ FULLY_UNLOCKED node.
 | core field | status |
 |---|---|
 | context, mode, seat identity | verified (SP + both hotseat seats) |
-| settlement id/name/location/isTown/isCapital/population | verified incl. rural/urban split; `isTown true` pending seat 0 capture |
-| unit id/type/name/location/isOnMap/movement/health | verified incl. damage and embarkation; `isOnMap false` not yet seen |
+| settlement id/name/location/isTown/isCapital/population | verified incl. rural/urban split and a town (`isTown true`) |
+| unit id/type/name/location/isOnMap/movement/health | verified incl. damage and embarkation; `isOnMap false` known from shipped scripts, not yet seen live (commander packing) |
 | tech current/completed/target/turns | verified incl. sentinel and state decoding |
 | civic current/completed/tree/turns | verified incl. completed node, civ-specific tree, node→tree mapping |
 | visibility + tile keys + adjacency | verified |
 
 `probe --out runs/capabilities.json` reproduces every live row above with 0 payload errors.
+
+## APIs present but excluded from the observation (v0.1 policy)
+
+| surface | members seen | policy |
+|---|---|---|
+| `player.Resources` | `getResources`, `getCountResourcesToAssign`, `getCountImportedResources`, `getCityIDAssigned`, `getUnassignedResourceYieldBonus`, `isRessourceAssignmentLocked` | not read, not exported; `getResourceType` on tiles is blocked by the policy test |
+| `Game.Notifications` | `find`, `getIdsForPlayer`, `getMessage`, `getSummary`, `getType`, `getSeverity`, plus **mutators `send`, `activate`, `dismiss`** | not read; never call the mutators |
+| `player.Diplomacy` | component exists | met leaders / war state not read, not exported |
