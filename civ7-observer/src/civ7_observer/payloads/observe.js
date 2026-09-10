@@ -12,6 +12,9 @@
     return JSON.stringify(result);
   };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
+  const isBool = (v) => typeof v === "boolean";
+  class Contract extends Error {}
+  const need = (ok, what) => { if (!ok) throw new Contract(what); };
   const isLoc = (l) => l !== null && typeof l === "object" && isInt(l.x) && isInt(l.y);
   const isComponentId = (c) => c !== null && typeof c === "object" && isInt(c.owner) && isInt(c.id) && isInt(c.type);
   const noneComponentId = (c) => isComponentId(c) && c.owner === -1 && c.id === -1;
@@ -26,8 +29,9 @@
   };
 
   // ---- 1. context and guards, before any roster read
-  let turnBefore, localPlayerId, localObserverId, age, flags;
+  let turnBefore, localPlayerId, localObserverId, age, flags, inGame;
   try {
+    inGame = typeof UI !== "undefined" && typeof UI.isInGame === "function" ? UI.isInGame() : undefined;
     turnBefore = Game.turn;
     localPlayerId = GameContext.localPlayerID;
     localObserverId = GameContext.localObserverID;
@@ -35,6 +39,9 @@
     flags = Configuration.getGame();
   } catch (e) {
     return refuse("NOT_IN_GAME", "game context unavailable: " + String(e).slice(0, 120));
+  }
+  if (inGame !== true) {
+    return refuse("NOT_IN_GAME", "UI.isInGame() is not true");
   }
   if (!isInt(turnBefore) || !isInt(localPlayerId) || !isInt(localObserverId)) {
     return refuse("NOT_IN_GAME", "turn or seat identity missing");
@@ -72,21 +79,30 @@
   };
 
   // ---- 2. settlements
-  const settlementRecord = (c) => {
+  const settlementRecord = (c, i) => {
+    const at = "settlement[" + i + "]";
+    need(isComponentId(c.id), at + ".id is not a ComponentID");
+    need(isInt(c.owner), at + ".owner is not an integer");
+    need(isBool(c.isTown), at + ".isTown is not a boolean");
+    need(isBool(c.isCapital), at + ".isCapital is not a boolean");
+    need(isInt(c.population) && isInt(c.ruralPopulation) && isInt(c.urbanPopulation), at + " population fields are not integers");
+    need(c.location === undefined || c.location === null || isLoc(c.location), at + ".location is malformed");
+    need(typeof c.name === "string" || c.name === undefined || c.name === null, at + ".name is not a string");
     const rec = {
-      id: c.id,
+      id: { owner: c.id.owner, id: c.id.id, type: c.id.type },
       owner: c.owner,
       nameKey: typeof c.name === "string" ? c.name : null,
       displayName: compose(c.name),
       location: isLoc(c.location) ? { x: c.location.x, y: c.location.y } : null,
-      isTown: c.isTown === true,
-      isCapital: c.isCapital === true,
+      isTown: c.isTown,
+      isCapital: c.isCapital,
       population: { total: c.population, rural: c.ruralPopulation, urban: c.urbanPopulation },
       production: null
     };
     try {
       const q = c.BuildQueue;
       const hash = q.currentProductionTypeHash;
+      need(isInt(hash), "BuildQueue.currentProductionTypeHash is not an integer");
       const empty = q.isEmpty === true || hash === -1;
       let key = null, kind = null;
       if (!empty) {
@@ -105,11 +121,20 @@
     if (!Array.isArray(cities)) throw new Error("getCities() did not return an array");
     result.settlements = cities.map(settlementRecord);
   } catch (e) {
-    return refuse("API_CONTRACT_MISMATCH", "settlement roster read failed: " + String(e).slice(0, 120));
+    return refuse("API_CONTRACT_MISMATCH", "settlement roster read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
   }
 
   // ---- 3. units
-  const unitRecord = (u) => {
+  let movementAbsent = 0, healthAbsent = 0;
+  const unitRecord = (u, i) => {
+    const at = "unit[" + i + "]";
+    need(isComponentId(u.id), at + ".id is not a ComponentID");
+    need(isInt(u.owner), at + ".owner is not an integer");
+    need(isInt(u.type), at + ".type is not an integer");
+    need(isBool(u.isOnMap), at + ".isOnMap is not a boolean");
+    need(isBool(u.isEmbarked), at + ".isEmbarked is not a boolean");
+    need(isBool(u.isCommanderUnit), at + ".isCommanderUnit is not a boolean");
+    need(u.armyId === undefined || u.armyId === null || isComponentId(u.armyId), at + ".armyId is malformed");
     const loc = u.location;
     let locationStatus, location = null;
     if (u.isOnMap === false) {
@@ -120,24 +145,35 @@
     } else {
       locationStatus = "invalid";
     }
+    let movement = null;
     const mv = u.Movement;
-    const movement = mv && isInt(mv.movementMovesRemaining) && isInt(mv.maxMoves)
-      ? { remaining: mv.movementMovesRemaining, max: mv.maxMoves } : null;
+    if (mv === undefined || mv === null) {
+      movementAbsent++;
+    } else {
+      need(isInt(mv.movementMovesRemaining) && isInt(mv.maxMoves), at + ".Movement fields are not integers");
+      movement = { remaining: mv.movementMovesRemaining, max: mv.maxMoves };
+    }
+    let health = null;
     const hp = u.Health;
-    const health = hp && isInt(hp.damage) && isInt(hp.maxDamage) ? { damage: hp.damage, maxDamage: hp.maxDamage } : null;
+    if (hp === undefined || hp === null) {
+      healthAbsent++;
+    } else {
+      need(isInt(hp.damage) && isInt(hp.maxDamage), at + ".Health fields are not integers");
+      health = { damage: hp.damage, maxDamage: hp.maxDamage };
+    }
     return {
-      id: u.id,
+      id: { owner: u.id.owner, id: u.id.id, type: u.id.type },
       owner: u.owner,
       type: u.type,
       typeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
       displayName: compose(u.name),
       locationStatus: locationStatus,
       location: location,
-      isEmbarked: u.isEmbarked === true,
+      isEmbarked: u.isEmbarked,
       movement: movement,
       health: health,
-      isCommander: u.isCommanderUnit === true,
-      armyId: isComponentId(u.armyId) && !noneComponentId(u.armyId) ? u.armyId : null
+      isCommander: u.isCommanderUnit,
+      armyId: isComponentId(u.armyId) && !noneComponentId(u.armyId) ? { owner: u.armyId.owner, id: u.armyId.id, type: u.armyId.type } : null
     };
   };
   try {
@@ -146,8 +182,10 @@
     const live = units.filter((u) => u && u.isDead !== true && u.isValid !== false);
     if (live.length !== units.length) warnings.push({ code: "UNITS_SKIPPED", message: "dead or invalid unit objects omitted", count: units.length - live.length });
     result.units = live.map(unitRecord);
+    if (movementAbsent) warnings.push({ code: "MOVEMENT_ABSENT", message: "Movement component absent on some units; movement reported as null", count: movementAbsent });
+    if (healthAbsent) warnings.push({ code: "HEALTH_ABSENT", message: "Health component absent on some units; health reported as null", count: healthAbsent });
   } catch (e) {
-    return refuse("API_CONTRACT_MISMATCH", "unit roster read failed: " + String(e).slice(0, 120));
+    return refuse("API_CONTRACT_MISMATCH", "unit roster read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
   }
 
   // ---- 4. context after

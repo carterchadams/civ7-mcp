@@ -8,7 +8,7 @@ from typing import Any, Callable
 from civ7_observer import cdp
 from civ7_observer.doctor import DoctorResult, DoctorStatus, run_doctor
 from civ7_observer.payloads import load_payload
-from civ7_observer.targets import RealmProbe, parse_realm_probe
+from civ7_observer.targets import RealmKind, RealmProbe, classify, parse_realm_probe
 
 
 class ObserverError(Exception):
@@ -38,7 +38,16 @@ class GameSession:
         self.session.close()
 
     def read_context(self) -> RealmProbe:
-        return parse_realm_probe(self.session.evaluate_readonly(load_payload("context.js")))
+        try:
+            return parse_realm_probe(self.session.evaluate_readonly(load_payload("context.js")))
+        except cdp.CdpError as exc:
+            raise ObserverError(exc.code, exc.message) from exc
+
+    def context_is_live(self, probe: RealmProbe) -> bool:
+        """Same in-game realm, same seat, same turn as when the session was opened."""
+        return (classify(probe) is RealmKind.GAME
+                and (probe.turn, probe.local_player_id, probe.local_observer_id)
+                == (self.context.turn, self.context.local_player_id, self.context.local_observer_id))
 
 
 def open_game_session(
@@ -51,7 +60,10 @@ def open_game_session(
     if result.status is not DoctorStatus.IN_GAME:
         raise ObserverError(str(result.status), result.summary, doctor=result.to_dict())
     assert result.selected is not None and result.context is not None
-    targets = discover(port, timeout)
+    try:
+        targets = discover(port, timeout)
+    except cdp.CdpError as exc:
+        raise ObserverError(exc.code, exc.message) from exc
     matching = [t for t in targets if t.id == result.selected["id"] and t.ws_url is not None]
     if len(matching) != 1:
         raise ObserverError("NO_GAME_TARGET", "selected target disappeared between discovery and connection")
@@ -63,6 +75,9 @@ def open_game_session(
     except cdp.CdpError as exc:
         session.close()
         raise ObserverError(exc.code, exc.message) from exc
+    if classify(context) is not RealmKind.GAME:
+        session.close()
+        raise ObserverError("NOT_IN_GAME", "reopened session is not an in-game realm", context=context.to_dict())
     expected = result.context
     if (context.turn, context.local_player_id, context.local_observer_id) != (
             expected["turn"], expected["localPlayerId"], expected["localObserverId"]):

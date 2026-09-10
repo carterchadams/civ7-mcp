@@ -121,3 +121,32 @@ test("payload source contains no forbidden operations", () => {
     assert.ok(!raw.includes(bad), `forbidden token in payload: ${bad}`);
   }
 });
+
+// ---- review finding 3: visibility-first even when the enum contract is broken
+
+function spyMap(revealed, log) {
+  return new Proxy({ getGridWidth: () => 10, getGridHeight: () => 8, getPlotCount: () => 80, getRevealedState: () => revealed, getTerrainType: () => 1, getBiomeType: () => 0, getFeatureType: () => -1, getElevation: () => 100, isRiver: () => false, getRiverType: () => -1, getIndexFromXY: () => 0, getLocationFromIndex: () => ({ x: 0, y: 0 }), getAdjacentPlotLocation: () => ({ x: 0, y: 0 }) }, { get(t, k) { log.push(String(k)); return t[k]; } });
+}
+
+for (const [label, revealed, enumValue] of [
+  ["hidden tile", 0, { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 }],
+  ["fogged tile", 1, { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 }],
+  ["absent enum", 2, undefined],
+  ["enum without VISIBLE", 2, { HIDDEN: 0 }],
+  ["non-integer visibility result", "2", { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 }],
+  ["undefined visibility result", undefined, { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 }],
+]) {
+  test(`no tile detail reads for: ${label}`, () => {
+    const log = [];
+    const g = fullGame();
+    g.GameplayMap = spyMap(revealed, log);
+    if (enumValue === undefined) delete g.RevealedStates; else g.RevealedStates = enumValue;
+    const r = run(g, 1);
+    const detailReads = log.filter((k) => /Terrain|Biome|Feature|Elevation|River|Index|Adjacent/.test(k));
+    assert.deepEqual(detailReads, [], `detail reads happened: ${detailReads}`);
+    assert.ok(log.includes("getRevealedState"));
+    if (label !== "hidden tile" && label !== "fogged tile") {
+      assert.ok(r.errors.some((e) => e.path.startsWith("map.sampleTile")), "broken visibility contract must be recorded as an error");
+    }
+  });
+}

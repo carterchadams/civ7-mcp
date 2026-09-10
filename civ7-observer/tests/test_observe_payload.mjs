@@ -152,3 +152,50 @@ test("payload source contains no forbidden operations", () => {
     assert.ok(!raw.includes(bad), `forbidden token in payload: ${bad}`);
   }
 });
+
+// ---- review findings 1 and 2
+
+function unitWith(extra) {
+  return { id: { owner: 1, id: 7, type: 26 }, owner: 1, type: 99, name: "Scout", location: { x: 1, y: 1 }, isOnMap: true, isEmbarked: false, isDead: false, isValid: true, isCommanderUnit: false, armyId: { owner: -1, id: -1, type: 0 }, Movement: { movementMovesRemaining: 0, maxMoves: 2 }, Health: { damage: 0, maxDamage: 100 }, ...extra };
+}
+function cityWith(extra) {
+  return { id: { owner: 1, id: 65536, type: 1 }, owner: 1, name: "LOC_MADRID", location: { x: 63, y: 15 }, isTown: false, isCapital: true, population: 6, ruralPopulation: 4, urbanPopulation: 2, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true }, ...extra };
+}
+
+test("missing or mistyped required settlement fields refuse instead of coercing", () => {
+  for (const extra of [{ isTown: undefined }, { isCapital: "yes" }, { population: "6" }, { ruralPopulation: undefined }, { id: 65536 }, { owner: "1" }, { location: { x: "a", y: 1 } }]) {
+    const r = run(game({ cities: [cityWith(extra)] }), 1);
+    assert.equal(r.refused?.code, "API_CONTRACT_MISMATCH", `expected refusal for ${JSON.stringify(extra)}`);
+  }
+});
+
+test("missing or mistyped required unit fields refuse instead of coercing", () => {
+  for (const extra of [{ isEmbarked: undefined }, { isCommanderUnit: 1 }, { isOnMap: "true" }, { id: { owner: 1, id: 7 } }, { type: "99" }, { owner: undefined }]) {
+    const r = run(game({ units: [unitWith(extra)] }), 1);
+    assert.equal(r.refused?.code, "API_CONTRACT_MISMATCH", `expected refusal for ${JSON.stringify(extra)}`);
+  }
+});
+
+test("malformed present Movement or Health refuses; absent component is null with a warning; zero movement preserved", () => {
+  assert.equal(run(game({ units: [unitWith({ Movement: { movementMovesRemaining: "2", maxMoves: 2 } })] }), 1).refused?.code, "API_CONTRACT_MISMATCH");
+  assert.equal(run(game({ units: [unitWith({ Health: { damage: 1.5, maxDamage: 100 } })] }), 1).refused?.code, "API_CONTRACT_MISMATCH");
+  const absent = run(game({ units: [unitWith({ Movement: undefined, Health: undefined })] }), 1);
+  assert.equal(absent.refused, null);
+  assert.equal(absent.units[0].movement, null);
+  assert.equal(absent.units[0].health, null);
+  assert.ok(absent.warnings.some((w) => w.code === "MOVEMENT_ABSENT" && w.count === 1));
+  assert.ok(absent.warnings.some((w) => w.code === "HEALTH_ABSENT" && w.count === 1));
+  const zero = run(game({ units: [unitWith({ Movement: { movementMovesRemaining: 0, maxMoves: 2 } })] }), 1);
+  assert.deepEqual(zero.units[0].movement, { remaining: 0, max: 2 });
+});
+
+test("refuses when UI.isInGame() is not exactly true", () => {
+  for (const v of [false, undefined, "true"]) {
+    const g = game();
+    g.UI.isInGame = () => v;
+    assert.equal(run(g, 1).refused?.code, "NOT_IN_GAME");
+  }
+  const g = game();
+  delete g.UI;
+  assert.equal(run(g, 1).refused?.code, "NOT_IN_GAME");
+});

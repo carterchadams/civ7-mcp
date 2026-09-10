@@ -148,3 +148,12 @@ exported; only presence of the API will be noted). Swap seats and re-run `probe`
 | `--player 1` from seat 0 (negative) | `WRONG_PLAYER`, no file |
 | movement read-back | PASS: human moved two units, second `snapshot` (observation `0391da35…`, still turn 15): scout id 327683 (56, 17) 2/2 → (55, 19) 0/2; warrior id 524293 (63, 15) 2/2 → (65, 14) 0/2; the other 4 units byte-identical; unit id set unchanged; settlements unchanged; fresh observation id |
 | session id across CLI runs | each `snapshot` process is a separate attachment, so `sessionId` differs per run (`8d150a07…` then `2ad21fff…`); `serve` will hold one session for its lifetime |
+
+## Steps 2 and 3 review fixes (seat 2 = player 1 Alexander, turn 16)
+
+| test | result |
+|---|---|
+| `snapshot --mode local-hotseat` with strict-typed payload | PASS: player 1, turn 16, 1 settlement, 6 units, 0 warnings, observation `370b6b5c…` |
+| commander association (first live) | `UNIT_ARMY_COMMANDER` id 393220 at (66, 37), `isCommander true`, `armyId {owner:1, id:65536, type:29}`; `UNIT_HOPLITE` id 458757 adjacent at (67, 36), `armyId null` (not yet packed) |
+| roster changes since turn 14 | scouts now 3/3 movement, damaged scout healed to 22/100, embarked scout still `isOnMap true` |
+| packed-unit read-back | pending: pack the hoplite into the commander, capture, unpack, capture |

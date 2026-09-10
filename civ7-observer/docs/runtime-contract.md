@@ -99,10 +99,10 @@ Population split observed: pop 4 = rural 3 + urban 1 (`pendingPopulation` 0). To
 | health | `Health.damage`, `Health.maxDamage` | P | int; health = maxDamage − damage | 14 / 11 sites | 0 / 100; **32 / 100 after combat** |
 | embarked | `unit.isEmbarked`, `unit.embarkationType` | P | boolean; hash (-1 for naval units that cannot embark) | | scout on water: `isEmbarked true`, **`isOnMap` still true**, moves 1/2; galley `embarkationType -1` |
 | sight | `unit.sightRange` | P | int | | 2 |
-| commander | `unit.isCommanderUnit`, `unit.armyId` | P | boolean; ComponentID with `owner -1, id -1` = no army | 13 / 14 sites | false, none |
+| commander | `unit.isCommanderUnit`, `unit.armyId` | P | boolean; ComponentID with `owner -1, id -1` = no army | 13 / 14 sites | false, none; **turn 16: `UNIT_ARMY_COMMANDER` has `isCommanderUnit true` and `armyId {owner:1,id:65536,type:29}`**; an unpacked hoplite next to it has no army |
 | combat (optional) | `Combat.getMeleeStrength()` | M | | | deferred |
 
-Observed on turn 14 (seat 1): four units, one damaged (32/100), one embarked scout at (60, 39) that still reports `isOnMap true`, one galley. Still not observed: an off-map/packed unit (`isOnMap false`) and a commander with an army. Embarkation is therefore **not** the off-map case; packing into a commander is the remaining candidate.
+Observed on turn 14 (seat 1): four units, one damaged (32/100), one embarked scout at (60, 39) that still reports `isOnMap true`, one galley. A commander with an army is now observed (turn 16). Still not observed: an off-map/packed unit (`isOnMap false`). Embarkation is **not** the off-map case; packing into a commander is the remaining candidate.
 
 ## Technology: `player.Techs`
 
@@ -179,7 +179,16 @@ FULLY_UNLOCKED node.
 | civic current/completed/tree/turns | verified incl. completed node, civ-specific tree, node→tree mapping |
 | visibility + tile keys + adjacency | verified |
 
-`probe --out runs/capabilities.json` reproduces every live row above with 0 payload errors.
+## How each row was obtained
+
+`probe` (packaged `capabilities.js`) samples the **first** settlement and unit, the
+progression records with `getNode`, the mode flags, enums, and one visible tile. It ran
+with 0 payload errors on seats 0 and 1. The remaining rows (every unit's embarkation and
+damage, node→tree mapping via the node definition, per-node cost, mastery depth, the
+build-queue entry shape, city yields, adjacency by object, and the method inventories)
+came from the developer expressions preserved in `docs/dev-probes/` and can be re-run
+with the recipe in that folder's README. A zero probe error count is not coverage of
+the rows the probe does not read.
 
 ## APIs present but excluded from the observation (v0.1 policy)
 

@@ -62,8 +62,8 @@ def run_probe(
             raise ObserverError(exc.code, exc.message) from exc
         data = _validate(value, bound)
         after = gs.read_context()
-    if after.turn != gs.context.turn or after.local_player_id != local or after.local_observer_id != local:
-        raise ObserverError("CONTEXT_CHANGED", "game context changed during the probe; result discarded")
+    if not gs.context_is_live(after):
+        raise ObserverError("CONTEXT_CHANGED", "game context changed during the probe; result discarded", after=after.to_dict())
     if data["context"].get("turn") != gs.context.turn:
         raise ObserverError("CONTEXT_CHANGED", "payload observed a different turn than the session; result discarded")
     text = json.dumps(data, indent=2, sort_keys=True)

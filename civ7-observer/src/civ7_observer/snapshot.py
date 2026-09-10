@@ -67,8 +67,8 @@ def capture(gs, *, player: int | None, mode: str) -> dict[str, Any]:
     except schema.InvalidObservation as exc:
         raise ObserverError("INVALID_OBSERVATION", str(exc)) from exc
     after = gs.read_context()
-    if (after.turn, after.local_player_id, after.local_observer_id) != (gs.context.turn, local, local):
-        raise ObserverError("CONTEXT_CHANGED", "game context changed during the capture; result discarded")
+    if not gs.context_is_live(after):
+        raise ObserverError("CONTEXT_CHANGED", "game context changed during the capture; result discarded", after=after.to_dict())
     if validated["context"]["turn"] != gs.context.turn:
         raise ObserverError("CONTEXT_CHANGED", "payload observed a different turn than the session; result discarded")
     return schema.build_observation(

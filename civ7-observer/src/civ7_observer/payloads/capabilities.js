@@ -207,8 +207,11 @@
     const sampleTile = sampleLoc === null ? null : read("map.sampleTile", () => {
       const x = sampleLoc.x, y = sampleLoc.y;
       const revealed = GameplayMap.getRevealedState(BOUND_PLAYER_ID, x, y);
-      const tile = { x: x, y: y, revealedState: revealed };
-      if (has("RevealedStates") && revealed !== RevealedStates.VISIBLE) return tile;
+      const tile = { x: x, y: y, revealedState: revealed === undefined ? null : revealed };
+      const visibleEnum = has("RevealedStates") && RevealedStates && Number.isInteger(RevealedStates.VISIBLE) ? RevealedStates.VISIBLE : null;
+      if (visibleEnum === null) throw new Error("RevealedStates.VISIBLE is not an integer; no tile details read");
+      if (!Number.isInteger(revealed)) throw new Error("getRevealedState returned a non-integer; no tile details read");
+      if (revealed !== visibleEnum) return tile;
       tile.terrain = read("map.sampleTile.terrain", () => GameplayMap.getTerrainType(x, y));
       tile.terrainName = read("map.sampleTile.terrainName", () => lookupName(GameInfo.Terrains, tile.terrain, "TerrainType"));
       tile.biome = read("map.sampleTile.biome", () => GameplayMap.getBiomeType(x, y));

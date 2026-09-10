@@ -107,3 +107,29 @@ def test_snapshot_command_wires_flags(monkeypatch, capsys, tmp_path):
 def test_snapshot_command_rejects_unknown_mode(capsys):
     with pytest.raises(SystemExit):
         cli.main(["snapshot", "--mode", "network"])
+
+
+def test_snapshot_json_reports_transport_failures_as_structured_errors(monkeypatch, capsys):
+    from civ7_observer import cdp as cdp_mod
+
+    def boom(**kw):
+        raise cdp_mod.CdpConnectionClosed("gone")
+
+    monkeypatch.setattr(cli, "run_snapshot", boom)
+    code = cli.main(["snapshot", "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 1
+    assert json.loads(out)["error"]["code"] == "CDP_CONNECTION_CLOSED"
+
+
+def test_probe_json_reports_transport_failures_as_structured_errors(monkeypatch, capsys):
+    from civ7_observer import cdp as cdp_mod
+
+    def boom(**kw):
+        raise cdp_mod.DiscoveryUnavailable("gone")
+
+    monkeypatch.setattr(cli, "run_probe", boom)
+    code = cli.main(["probe", "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 1
+    assert json.loads(out)["error"]["code"] == "DEBUGGER_UNAVAILABLE"

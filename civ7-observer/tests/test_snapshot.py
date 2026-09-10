@@ -81,3 +81,21 @@ def test_two_snapshots_in_one_process_share_session_but_not_observation_ids(tmp_
     r1, _, _ = run_snapshot(tmp_path, json.dumps(OBS))
     r2, _, _ = run_snapshot(tmp_path, json.dumps(OBS))
     assert r1.observation_id != r2.observation_id
+
+
+def test_snapshot_refuses_when_final_context_is_not_in_game(tmp_path):
+    with pytest.raises(service.ObserverError) as ei:
+        run_snapshot(tmp_path, json.dumps(OBS), after=json.dumps({**GAME, "inGame": False}))
+    assert ei.value.code == "CONTEXT_CHANGED"
+    assert not (tmp_path / "observation.json").exists()
+
+
+def test_snapshot_final_context_disconnect_is_typed_and_unpublished(tmp_path):
+    import websocket
+    ctx = json.dumps(GAME)
+    scripts = {"a": [reply(1, ctx), reply(1, ctx), reply(2, json.dumps(OBS)), websocket.WebSocketConnectionClosedException()]}
+    tl = [target("a")]
+    with pytest.raises(service.ObserverError) as ei:
+        snapshot.run_snapshot(port=9444, timeout=1, out=tmp_path / "o.json", player=None, mode="singleplayer", discover=lambda p, t: tl, session_factory=Factory(scripts))
+    assert ei.value.code == "CDP_CONNECTION_CLOSED"
+    assert not (tmp_path / "o.json").exists()

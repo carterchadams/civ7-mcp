@@ -49,3 +49,39 @@ def test_open_game_session_rechecks_context_on_reconnect():
     with pytest.raises(service.ObserverError) as ei:
         service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f)
     assert ei.value.code == "CONTEXT_CHANGED"
+
+
+def test_second_discovery_failure_is_a_typed_observer_error():
+    calls = {"n": 0}
+    tl = [target("a")]
+
+    def discover(p, t):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise cdp.DiscoveryUnavailable("gone")
+        return tl
+
+    f = Factory({"a": [reply(1, json.dumps(GAME))]})
+    with pytest.raises(service.ObserverError) as ei:
+        service.open_game_session(port=9444, timeout=1, discover=discover, session_factory=f)
+    assert ei.value.code == "DEBUGGER_UNAVAILABLE"
+
+
+def test_reopened_context_not_in_game_is_refused():
+    menu_like = {**GAME, "inGame": False}
+    f = Factory({"a": [reply(1, json.dumps(GAME)), reply(1, json.dumps(menu_like))]})
+    tl = [target("a")]
+    with pytest.raises(service.ObserverError) as ei:
+        service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f)
+    assert ei.value.code == "NOT_IN_GAME"
+    assert f.all_sockets[-1].closed == 1
+
+
+def test_read_context_transport_failure_is_a_typed_observer_error():
+    import websocket
+    f = Factory({"a": [reply(1, json.dumps(GAME)), reply(1, json.dumps(GAME)), websocket.WebSocketConnectionClosedException()]})
+    tl = [target("a")]
+    with service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f) as gs:
+        with pytest.raises(service.ObserverError) as ei:
+            gs.read_context()
+    assert ei.value.code == "CDP_CONNECTION_CLOSED"

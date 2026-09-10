@@ -9,7 +9,7 @@ import sys
 import json
 from pathlib import Path
 
-from civ7_observer import __version__
+from civ7_observer import __version__, cdp
 from civ7_observer.doctor import run_doctor
 from civ7_observer.probe import run_probe
 from civ7_observer.schema import MODES
@@ -80,7 +80,7 @@ def _print_human(result) -> None:
 def _run_probe(args) -> int:
     try:
         result = run_probe(port=args.port, timeout=args.timeout, out=args.out, player=args.player, target_id=args.target_id)
-    except ObserverError as exc:
+    except (ObserverError, cdp.CdpError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": exc.to_dict()}, indent=2))
         else:
@@ -97,7 +97,7 @@ def _run_probe(args) -> int:
 def _run_snapshot(args) -> int:
     try:
         result = run_snapshot(port=args.port, timeout=args.timeout, out=args.out, player=args.player, mode=args.mode, target_id=args.target_id)
-    except ObserverError as exc:
+    except (ObserverError, cdp.CdpError) as exc:
         if args.json:
             print(json.dumps({"ok": False, "error": exc.to_dict()}, indent=2))
         else:
