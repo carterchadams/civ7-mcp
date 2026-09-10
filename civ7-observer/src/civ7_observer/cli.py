@@ -6,12 +6,17 @@ import argparse
 import logging
 import sys
 
+import json
+from pathlib import Path
+
 from civ7_observer import __version__
 from civ7_observer.doctor import run_doctor
+from civ7_observer.probe import run_probe
+from civ7_observer.service import ObserverError
 
 DEFAULT_PORT = 9444
 DEFAULT_TIMEOUT = 5.0
-_STUBS = ("probe", "snapshot", "serve")
+_STUBS = ("snapshot", "serve")
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -25,6 +30,15 @@ def _build_parser() -> argparse.ArgumentParser:
     d.add_argument("--target-id", default=None, help="restrict to one discovered target id (for the ambiguous case)")
     d.add_argument("--json", action="store_true", help="print the machine-readable report")
     d.add_argument("-v", "--verbose", action="store_true", help="debug logging on stderr")
+
+    p = sub.add_parser("probe", help="developer-only capability diagnostics for the local seat, written to a file")
+    p.add_argument("--port", type=int, default=DEFAULT_PORT)
+    p.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    p.add_argument("--target-id", default=None)
+    p.add_argument("--player", type=int, default=None, help="engine player id to bind (default: the local seat)")
+    p.add_argument("--out", type=Path, default=Path("runs/capabilities.json"))
+    p.add_argument("--json", action="store_true")
+    p.add_argument("-v", "--verbose", action="store_true")
 
     for name in _STUBS:
         s = sub.add_parser(name, help=f"{name} (not implemented in Change 1)")
@@ -51,6 +65,23 @@ def _print_human(result) -> None:
     print(f"game process: {result.game_process}; adapter {result.adapter_version}; {result.duration_ms} ms")
 
 
+def _run_probe(args) -> int:
+    try:
+        result = run_probe(port=args.port, timeout=args.timeout, out=args.out, player=args.player, target_id=args.target_id)
+    except ObserverError as exc:
+        if args.json:
+            print(json.dumps({"ok": False, "error": exc.to_dict()}, indent=2))
+        else:
+            print(f"probe failed: {exc.code}: {exc.message}")
+        return 1
+    if args.json:
+        print(json.dumps({"ok": True, **result.to_dict()}, indent=2))
+    else:
+        print(f"probe written: {result.path} (player {result.bound_player_id}, turn {result.turn}, "
+              f"{result.error_count} payload errors, {result.size_bytes} bytes)")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command in _STUBS:
@@ -58,6 +89,8 @@ def main(argv: list[str] | None = None) -> int:
         return 2
     logging.basicConfig(stream=sys.stderr, level=logging.DEBUG if args.verbose else logging.WARNING,
                         format="%(levelname)s %(name)s: %(message)s")
+    if args.command == "probe":
+        return _run_probe(args)
     result = run_doctor(port=args.port, timeout=args.timeout, target_id=args.target_id)
     if args.json:
         print(result.to_json())

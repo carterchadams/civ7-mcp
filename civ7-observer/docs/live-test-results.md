@@ -100,3 +100,10 @@ Hotseat, seat 2, turn 1 after the pass-device curtain (`doctor --json | jq '{sta
 
 - Debugger-disabled run (`UIDebugger 0`, relaunch) to learn whether the option controls the listener.
 - Human confirmation that the in-game turn counter and the active leader matched the doctor's turn/localPlayerId for the single-player and hotseat captures.
+
+## Change 2: probe (hotseat game, seat 1, turn 2)
+
+| test | result |
+|---|---|
+| `probe --out runs/capabilities.json` | PASS: player 0, turn 2, 0 payload errors, 16061 bytes; Spain / Isabella, capital Madrid pop 1 idle, scout at (63, 15) 2/2 moves 0/100 damage, tech tree `TREE_TECHS_AQ` nothing selected (turnsLeft -1), Agriculture FULLY_UNLOCKED depth 1, civic Chiefdom IN_PROGRESS 10/60 6 turns, sample tile (63,15) VISIBLE `TERRAIN_FLAT`/`BIOME_PLAINS` elevation 554 |
+| `probe --player 1` from seat 0 | PASS (negative): `WRONG_PLAYER: bound player 1 is not the local seat (localPlayerId=0, localObserverId=0)`, exit 1, no file written |

@@ -1,195 +1,178 @@
-# Runtime contract (live evidence)
+# Runtime contract (Milestone B)
 
-Recorded from the installed native Linux build on 2026-09-10 via `Runtime.evaluate`
-against the single Cohtml target. Developer-only, read-only probes; no operations were
-sent. Values are what this build returned on turn 2 of a fresh single-player game.
+Local-build-specific evidence for every field the observation needs. "Source" cites the
+shipped UI script that reads the same API (under
+`Base/modules/`, native Linux build, Steam buildid 24661151). "Live" is what the API
+returned through `probe` / developer probes on 2026-09-10. Enum names come from the live
+globals and match the shipped scripts' usage.
+
+Legend: **P** property, **M** method. Hash = engine integer id (may be negative); resolve
+through `GameInfo.<Table>.lookup(hash).<TypeKey>`.
 
 | item | value |
 |---|---|
-| Steam buildid | 24661151 |
-| Cohtml | 2.2.3.0, CDP protocol 1.3 (`/json/version`) |
-| V8 | 9.4.146.24 |
-| Debugger listen address | `0.0.0.0:9444` (all interfaces, not loopback only) |
-| Targets | exactly one: id `"0"`, ws `ws://127.0.0.1:9444/json/devtools/page/0`; url is `fs://game/root-game.html` in a loaded game and `fs://game/core/ui/shell/root-shell.html` at the main menu |
-| `AppOptions.txt` | `~/snap/steam/common/My Games/Sid Meier's Civilization VII/AppOptions.txt`; the `UIDebugger` line was still commented (`;UIDebugger 1`) yet the debugger was listening |
+| Cohtml / V8 | 2.2.3.0 (CDP 1.3) / 9.4.146.24 |
+| Debugger | `0.0.0.0:9444`; one target, id `"0"`, ws `ws://127.0.0.1:9444/json/devtools/page/0`; url `fs://game/root-game.html` in game, `fs://game/core/ui/shell/root-shell.html` at the menu |
+| Config file | `~/snap/steam/common/My Games/Sid Meier's Civilization VII/AppOptions.txt` (debugger was on with `;UIDebugger 1` commented) |
+| UI script tree | `base-standard/ui` 601 js + 603 maps, `core/ui` 373 js, `ui-next` present under both; no `.ts` shipped; source maps carry no enum declarations |
+
+## Enums (live globals, confirmed against shipped usage)
+
+| enum | values | shipped usage |
+|---|---|---|
+| `ProgressionTreeNodeState` | `NODE_STATE_INVALID 0, NODE_STATE_CLOSED 1, NODE_STATE_OPEN 2, NODE_STATE_IN_PROGRESS 3, NODE_STATE_UNLOCKED 4, NODE_STATE_FULLY_UNLOCKED 5` | `base-standard/ui/tree-grid/tree-grid.js:226-341,734-764` |
+| `RevealedStates` | `HIDDEN 0, REVEALED 1, VISIBLE 2` | 49 call sites, e.g. `base-standard/ui/world-input/world-input.js` |
+| `DirectionTypes` | `NO_DIRECTION -1, NE 0, E 1, SE 2, SW 3, W 4, NW 5, NUM 6` | used with `getAdjacentPlotLocation` |
+| `PlayerIds` | `NO_PLAYER -1, WORLD_PLAYER 63, OBSERVER_ID 1000` | 63 appears in `aiPlayerIDs`; never export it as a rival |
 
 ## Context
 
-| read | live shape |
-|---|---|
-| `UI.isInGame()` | boolean `true` in a loaded game |
-| `UI.isMultiplayer()` | boolean `false` |
-| `UI.isHotseat` | **undefined** (does not exist) |
-| `Game.turn` | number `2` |
-| `Game.age` | number hash `2077444219`; resolve with `GameInfo.Ages.lookup(hash).AgeType` |
-| `GameContext.localPlayerID` / `localObserverID` | numbers, both `0` in a loaded single-player game; at the main menu `GameContext` still exists with `localPlayerID 0` and `localObserverID -1` while `Game`, `Players`, `GameplayMap` are undefined |
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| in game | `UI.isInGame()` | M | boolean | everywhere | true in game, false at menu |
+| multiplayer | `UI.isMultiplayer()` | M | boolean; **true in local hotseat** | | false SP, true hotseat |
+| turn | `Game.turn` | P | int ≥ 1 | `panel-sub-system-dock.js` | 1, 2 |
+| age | `Game.age` | P | hash → `GameInfo.Ages.lookup(h).AgeType` | | `AGE_ANTIQUITY` |
+| local player | `GameContext.localPlayerID` | P | int; **follows the hotseat seat** | 10+ call sites | 0 → 1 on seat swap |
+| local observer | `GameContext.localObserverID` | P | int; equals localPlayerID in game; **-1 at menu** | | 0 → 1 on seat swap |
+| `Players`, `GameplayMap`, `Game` | globals | | undefined at the main menu, `GameContext` still defined | | confirmed |
 
-## Game mode: `Configuration.getGame()`
+## Game mode: `Configuration.getGame()` (object of P)
 
-Object with boolean flags `isHotseat`, `isLocalMultiplayer`, `isNetworkMultiplayer`,
-`isInternetMultiplayer`, `isLANMultiplayer`, `isAnyMultiplayer`, `isPlayByCloud`,
-`isMatchMaking`, `isPrivateGame`, `isSavedGame`, `isGameStarted`, `isGameReady`,
-`isPaused`; all multiplayer flags were `false` in single-player.
+| flag | SP | hotseat | note |
+|---|---|---|---|
+| `isHotseat` | false | true | primary hotseat signal |
+| `isLocalMultiplayer` | false | true | |
+| `isAnyMultiplayer` | false | true | |
+| `isNetworkMultiplayer`, `isInternetMultiplayer`, `isLANMultiplayer`, `isPlayByCloud`, `isMatchMaking` | false | false | all must be false for an allowed session |
+| `isGameStarted` / `isGameReady` | true / false | true / false | `isGameReady` is false mid-game; do not gate on it |
+| `getGameModeString()` | `"BAD_MODE"` | `"BAD_MODE"` | unusable |
 
-Live two-human hotseat game (turn 1, seat 1): `isHotseat true`, `isLocalMultiplayer true`,
-`isAnyMultiplayer true`, `UI.isMultiplayer() true`, `isNetworkMultiplayer false`,
-`isInternetMultiplayer false`, `isLANMultiplayer false`, `isPlayByCloud false`,
-`isGameStarted true`, `isGameReady false` (even mid-game), `humanPlayerIDs [0, 1]`,
-`humanPlayerCount 2`, `aiPlayerIDs` 2-29 plus 63 (63 is likely the independent-powers
-slot), `observerIDs []`. `getGameModeString()` returned `"BAD_MODE"`, so do not use it
-for the mode guard; use the boolean flags. The local-hotseat guard for Change 3 is
-therefore: `isHotseat && isLocalMultiplayer && !isNetworkMultiplayer && !isInternetMultiplayer && !isLANMultiplayer && !isPlayByCloud`,
-and single-player is `!isAnyMultiplayer`. Also exposes
-`humanPlayerIDs`, `aiPlayerIDs`, `participatingPlayerIDs`, `observerIDs`, `gameSeed`
-(do **not** export), `gameMode` (number hash; `getGameModeString()` exists).
+The object also exposes `humanPlayerIDs`, `aiPlayerIDs`, `participatingPlayerIDs`,
+`observerIDs`, `gameSeed`. **Never read them in a payload** (policy test).
 
-## Player: `Players.get(id)`
+Guard: single-player = `!isAnyMultiplayer`; local hotseat = `isHotseat && isLocalMultiplayer && !isNetworkMultiplayer && !isInternetMultiplayer && !isLANMultiplayer && !isPlayByCloud`.
 
-Properties: `id`, `isTurnActive`, `isAlive`, `isHuman`, `isAI`, `isMajor`, `isMinor`,
-`isBarbarian`, `isIndependent`, `civilizationType` (hash), `leaderType` (hash),
-`civilizationName`, `leaderName`, `team`. Components include `Cities`, `Units`, `Techs`,
-`Culture`, `Visibility`, `Diplomacy`, `Treasury`, `Resources`.
+## Player: `Players.get(BOUND_PLAYER_ID)`
+
+| field | kind | shape | live |
+|---|---|---|---|
+| `id` | P | int | 0 / 1 |
+| `isTurnActive` | P | boolean; the other hotseat human reads false | true for the seat |
+| `isAlive`, `isHuman`, `isAI`, `isMajor`, `isMinor`, `isBarbarian`, `isIndependent` | P | boolean | |
+| `civilizationType` | P | hash → `GameInfo.Civilizations.lookup(h).CivilizationType` | `CIVILIZATION_SPAIN` |
+| `leaderType` | P | hash → `GameInfo.Leaders.lookup(h).LeaderType` | `LEADER_ISABELLA` |
+| components | P | `Cities`, `Units`, `Techs`, `Culture`, `Visibility`, `Diplomacy`, `Treasury`, `Resources`, `Armies`, … | |
+
+**Omniscience:** `Players.get(otherId)` and `GameplayMap.getRevealedState(otherId, …)` answer
+fully from any seat (seat 2 read seat 1's 19 visible tiles). Seat binding is enforced only
+by our payload and `tests/test_payload_policy.py`.
 
 ## Settlements: `player.Cities`
 
-`getCities()` returns an array (1 on turn 2). `getCapital()`, `getCityIds()`, `numCities`
-also exist. City record: `id` is a **ComponentID object** `{owner, id, type}` (e.g.
-`{"owner":0,"id":65536,"type":1}`), `localId`, `owner`, `name` (localization key; use
-`Locale.compose`), `location` `{x, y}`, `isTown` (boolean), `isCapital`,
-`isOriginalCapital`, `population`, `ruralPopulation`, `urbanPopulation`,
-`pendingPopulation`, `isBeingRazed`, `isDistantLands`, plus components `Production`,
-`Growth`, `Yields`, `BuildQueue`, `Districts`, `Constructibles`.
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| roster | `Cities.getCities()` | M | array incl. towns (`isTown` true) | `city-banners.js` | 1 city |
+| id | `city.id` | P | ComponentID `{owner, id, type}`; keep whole object | | `{owner:0,id:65536,type:1}` |
+| `localId`, `owner` | P | int | | |
+| name | `city.name` → `Locale.compose(name)` | P → M | localization key → display string | 15 sites `Locale.compose(city.name)` | `LOC_CITY_NAME_GREECE1` → `Athênai`; `Madrid` |
+| location | `city.location` | P | `{x, y}` | 46 sites | `{63,7}` |
+| `isTown`, `isCapital`, `isOriginalCapital`, `isBeingRazed`, `isDistantLands` | P | boolean | 31 / 22 / 16 sites | |
+| population | `population`, `ruralPopulation`, `urbanPopulation`, `pendingPopulation` | P | int | 12 sites | 1 |
+| production (optional) | `BuildQueue.currentProductionTypeHash` (-1 = none), `BuildQueue.isEmpty`, `BuildQueue.getTurnsLeft()` (-1 = none), `getQueue()` | P/M | | `city.BuildQueue.getTurnsLeft` 3 sites | scout hash while building a scout; -1 / true / -1 when idle |
+| yields (optional) | `Yields.getNetYield`, `getYields`, `getNetYields` | M | not yet shaped | | deferred |
+
+Not yet observed: a town (`isTown` true), razing, conquest. **Needs game progress.**
 
 ## Units: `player.Units`
 
-`getUnits()` returns an array (1 on turn 2). Unit record: `id` ComponentID
-`{"owner":0,"id":131072,"type":26}`, `localId`, `owner`, `type` (hash; resolve with
-`GameInfo.Units.lookup(hash).UnitType`), `typeName`, `typeHash`, `name`, `location`
-`{x, y}`, `isOnMap`, `isDead`, `isValid`, `isEmbarked`, `isFortified`, `hasMoved`,
-`canMove`, `isCommanderUnit`, `armyId`, `formationID`, `sightRange`. `Movement`
-component: `movementMovesRemaining` and `maxMoves` (both `2` for the starting unit).
-`Health` and `Combat` components exist (shapes not yet probed).
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| roster | `Units.getUnits()` | M | array | | 1 unit |
+| id | `unit.id` | P | ComponentID `{owner, id, type}` | | `{owner:0,id:131072,type:26}` |
+| type | `unit.type` → `GameInfo.Units.lookup(h).UnitType`; also `unit.typeName`, `typeHash` | P | hash | | `UNIT_SCOUT` |
+| name | `unit.name` (`Locale.compose` in 5 sites) | P | string | | `Scout` |
+| location | `unit.location` | P | `{x, y}`; **invalid = `x == -1 \|\| y == -1`** | `world-input.js:378` | `{63,15}` |
+| on map | `unit.isOnMap` | P | boolean; false for packed/off-map units | 5 sites | true |
+| `isDead`, `isValid`, `isEmbarked`, `isFortified`, `hasMoved`, `canMove` | P | boolean | | |
+| movement | `Movement.movementMovesRemaining`, `Movement.maxMoves` | P | int; UI reads `Movement?.` (component may be absent) | 7 / 3 sites | 2 / 2, 0 / 2 after moving |
+| health | `Health.damage`, `Health.maxDamage` | P | int; health = maxDamage − damage | 14 / 11 sites | 0 / 100 |
+| commander | `unit.isCommanderUnit`, `unit.armyId` | P | boolean; ComponentID with `owner -1, id -1` = no army | 13 / 14 sites | false, none |
+| combat (optional) | `Combat.getMeleeStrength()` | M | | | deferred |
+
+Not yet observed: off-map/packed unit, damaged unit, commander with army. **Needs game progress.**
 
 ## Technology: `player.Techs`
 
-Methods: `getTreeType`, `getResearching`, `getResearched`, `getTargetNode`,
-`getTurnsLeft`, `getNodeCost`, `getTurnsForNode`, `getLastCompletedNodeType`,
-`isNodeUnlocked`, `getNodeUnlockDepthsRemaining`, `getNumTechsUnlocked`,
-`getAllAvailableNodeTypes`.
-
-- `getResearching()` returns an **object** `{type, state, progress, depth, maxDepth}`,
-  not a number. With no research chosen it was `{"type":-1,"state":0,"progress":0,"depth":0,"maxDepth":0}`
-  (`type: -1` is the "none" sentinel).
-- `getResearched()` returns an **array of the same record shape**; on turn 2 it already
-  listed nodes such as `{"type":510800721,"state":5,"progress":0,"depth":1,"maxDepth":1}`.
-  The `state` enum meaning (0, 3, 5 observed) must be mapped before export.
-- `getTargetNode()` returned number `-1` (no queued target).
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| tree | `Techs.getTreeType()` → `GameInfo.ProgressionTrees.lookup(h).ProgressionTreeType` | M | hash | | `TREE_TECHS_AQ` |
+| current | `Techs.getResearching()` | M | object `{type, state, progress, depth, maxDepth}`; **`type -1` = none; its `state` field is unreliable (0 = INVALID even while in progress)** | `panel-sub-system-dock.js:517` (uses `.type` only) | `{type:-1,…}` then Pottery |
+| current node data | `Game.ProgressionTrees.getNode(BOUND, type)` | M | `{nodeType, state, progress, depthUnlocked, maxDepth, repeatedDepth, unlockIndices[]}`; null for -1 | `panel-sub-system-dock.js:372-398`, `tree-grid.js:221` | Pottery state 3 |
+| node state | `Game.ProgressionTrees.getNodeState(BOUND, type)` | M | `ProgressionTreeNodeState` | `tree-grid.js:217` | |
+| cost / progress | `Techs.getNodeCost(type)` (int, 0 possible), `getNode().progress` | M/P | dock: ratio = `1 − progress/cost` (0 cost ⇒ 1) | `panel-sub-system-dock.js:525-529` | |
+| turns left | `Techs.getTurnsLeft()` | M | int; **-1 = nothing selected** | `panel-sub-system-dock.js:519` | 7 / -1 |
+| completed | `Techs.getResearched()` | M | array of the same record shape, **includes OPEN (2) and IN_PROGRESS (3) nodes**; completed = `state === NODE_STATE_FULLY_UNLOCKED (5)`; partial mastery = `NODE_STATE_UNLOCKED (4)` with `getNode().depthUnlocked < maxDepth` | `tree-grid.js:294,341` (`isCompleted`), `tree-grid.js:891` | Agriculture 5/depth 1; Pottery, Animal Husbandry, Sailing 2 |
+| queued target | `Techs.getTargetNode()` | M | hash; -1 = none | | -1 |
+| available (optional) | `Techs.getAllAvailableNodeTypes()` | M | not yet probed | | |
+| node names | `GameInfo.ProgressionTreeNodes.lookup(h).ProgressionTreeNodeType`, `.Name` | | | dock | `NODE_TECH_AQ_AGRICULTURE` |
 
 ## Civics: `player.Culture`
 
-Methods include `getActiveTree`, `getAvailableTrees`, `getResearching`, `getResearched`,
-`getTargetNode`, `getTurnsLeft`, `getNodeCost`, `getLastCompletedNodeType`,
-`getLastCompletedNodeTreeType`, `isNodeUnlocked`, `getNumCivicsUnlocked`,
-`getAllAvailableNodeTypes`, tradition/government/ideology readers, and **`unlockTradition`
-(a mutator; never call)**.
+Same record shapes and state semantics as Techs, plus:
 
-- `getResearching()` object: `{"type":-420583012,"state":0,"progress":10,"depth":0,"maxDepth":1}`.
-- `getResearched()` array of the same shape.
-- `getActiveTree()` returns a number hash (`-667771572`); resolve with
-  `GameInfo.ProgressionTrees.lookup(hash).ProgressionTreeType`.
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| active tree | `Culture.getActiveTree()` | M | hash; null/0 possible before any choice | `model-culture-tree.js:82`, `culture-chooser.js:78,128` | `TREE_CIVICS_AQ_MAIN` |
+| available trees | `Culture.getAvailableTrees()` | M | array of hashes; civ-specific trees appear here | `culture-chooser.js:120` | `[TREE_CIVICS_AQ_MAIN]` only so far |
+| current | `Culture.getResearching()` | M | as Techs; `progress` live 10 with cost 60 | `panel-sub-system-dock.js:399` | Chiefdom |
+| current node (dock path) | `Game.ProgressionTrees.getTree(BOUND, activeTree).nodes[activeNodeIndex]` then `getNode` | M | `activeNodeIndex -1` = none | `panel-sub-system-dock.js:376-384` | |
+| depth label | `getNode().depthUnlocked ≥ 1` ⇒ roman numeral `depthUnlocked + 1` | | | `panel-sub-system-dock.js:391-396` | |
+| turns left | `Culture.getTurnsLeft()`, `getTurnsForNode(type)` | M | int | `model-culture-tree.js:94` | 6, 8 |
+| completed | `Culture.getResearched()` | M | as Techs | | Chiefdom state 3 (in progress) |
+| mutators present on the same object | `unlockTradition` | M | **never call** | | |
+
+Not yet observed: a completed civic (state 5), a civilization-specific tree in
+`getAvailableTrees()`, mastery depth > 1. **Needs game progress.**
 
 ## Map: `GameplayMap`
 
-- Grid `74 x 46` in this save (`getGridWidth()`, `getGridHeight()`, `getPlotCount()`).
-- `RevealedStates` is `{"HIDDEN":0,"REVEALED":1,"VISIBLE":2}`.
-- `getRevealedState(playerId, x, y)` is **player-first** (see live-test-results for the
-  swapped-order check). Tile readers: `getTerrainType`, `getBiomeType`,
-  `getFeatureType`, `getFeatureClassType`, `getElevation`, `getRiverType`, `isRiver`,
-  `isNavigableRiver`, `getResourceType` (do not export in v0.1), `getYield(s)`,
-  `getPlotIndicesInRadius`, `getAdjacentPlotLocation`, `getDirectionToPlot`,
-  `getIndexFromXY`, `getLocationFromIndex`.
-- Static tables: `GameInfo.Terrains` (6), `Biomes` (6), `Features` (40), `Units` (89),
-  `ProgressionTreeNodes` (186); each has `.lookup(hash)` and `.length`.
+| field | receiver | kind | shape / sentinel | source | live |
+|---|---|---|---|---|---|
+| size | `getGridWidth()`, `getGridHeight()`, `getPlotCount()` | M | int | | 74 × 46 |
+| visibility | `getRevealedState(playerId, x, y)` | M | **player-first**; `RevealedStates`; out-of-range → 0; swapped args silently → 0 | 20 shipped sites all pass `GameContext.localPlayerID` first | city tile 2, far 0 |
+| terrain / biome / feature | `getTerrainType`, `getBiomeType`, `getFeatureType` `(x, y)` | M | hash; feature -1 = none; lookup `Terrains.TerrainType`, `Biomes.BiomeType`, `Features.FeatureType` | | `TERRAIN_FLAT`, `BIOME_PLAINS`, -1 |
+| elevation / river | `getElevation(x,y)` int; `isRiver(x,y)` bool; `getRiverType(x,y)` (-1 none); `isNavigableRiver(x,y)` | M | | | 554, false, -1 |
+| index | `getIndexFromXY(x,y)`, `getLocationFromIndex(i)` | M | round-trips | | 1173 ↔ {63,15} |
+| adjacency | `getAdjacentPlotLocation({x,y}, DirectionTypes)` | M | `{x, y}`; **the `(x, y, dir)` form returns undefined** | | 6 neighbours of {63,15}: {64,16},{64,15},{64,14},{63,14},{62,15},{63,16} |
+| yields (optional) | `getYields(x, y, playerId)` | M | returned `[]`; signature unconfirmed | | deferred |
+| resources | `getResourceType` | M | **excluded in v0.1** (policy) | | |
+| full-grid scan | visibility-first loop over 3404 plots | | ~10 ms in-game; 19-33 visible tiles ≈ 0.7 KB | | no chunking needed |
 
-## Progression trees: `Game.ProgressionTrees`
+## Static tables (`GameInfo.*`, each has `.length`, `.lookup(hash)`, rows carry `$hash`)
 
-`getTree`, `getNode`, `getTreeStructure`, `getNodeState`, `getNodeProgress`,
-`getNodeCurrentUnlockDepth`, `getNodeMaxUnlockDepth`, `getNodeUnlockIndicesAtDepth`,
-`getAllTreeRevealData`, and **`revealTree` (a mutator; never call)**.
+`Units 89`, `ProgressionTreeNodes 186`, `ProgressionTrees 23`, `Terrains 6`, `Biomes 6`,
+`Features 40`, `Ages 3`, `Civilizations 33`, `Leaders 24`, `Yields 7`.
 
-## Live checks of the adapter's error mapping (same session)
+## Progression state matrix (observed)
 
-| expression | adapter result |
+| where | record `state` | `getNode().state` | meaning |
+|---|---|---|---|
+| `getResearching()` for a just-chosen or in-progress node | 0 | 3 | **use `getNode`**, not the record |
+| `getResearched()` entry, completed all depths | 5 | 5 | completed |
+| `getResearched()` entry, open | 2 | 2 | available |
+| `getResearched()` entry, in progress | 3 | 3 | current |
+| not observed yet | 4 | 4 | unlocked with mastery remaining |
+
+## Acceptance status
+
+| core field | status |
 |---|---|
-| reference to an undefined global | `CDP_EVALUATE_EXCEPTION`, description `ReferenceError: ... is not defined` |
-| `undefined` | `CDP_MISSING_VALUE` (remote type `undefined`) |
-| `1+1` / `({a:1})` | values `2` / `{"a": 1}` returned by value |
-| syntax error | `CDP_EVALUATE_EXCEPTION`, `SyntaxError: Unexpected end of input` |
+| context, mode, seat identity | verified (SP + both hotseat seats) |
+| settlement id/name/location/isTown/isCapital/population | verified; town value only seen false |
+| unit id/type/name/location/isOnMap/movement/health | verified; off-map only seen true |
+| tech current/completed/target/turns | verified incl. sentinel and state decoding |
+| civic current/completed/tree/turns | verified; completed and civ-specific tree **not yet observed** |
+| visibility + tile keys + adjacency | verified |
 
-No CDP events arrived unsolicited during any call (`events_ignored == 0`).
-
-## Visibility signature check
-
-With the capital at (63, 7): `getRevealedState(pid, 63, 7)` = `2` (VISIBLE),
-`getRevealedState(pid, 64, 7)` = `2`, a far tile = `0`, out-of-range coordinates = `0`.
-**Swapped order** `getRevealedState(63, 7, pid)` returned `0`, a plausible-looking HIDDEN,
-so the wrong argument order fails silently. Player-first is confirmed.
-
-A full-grid scan of 74 x 46 tiles (visibility first, then terrain/biome/feature for
-VISIBLE tiles only) took about 10 ms inside the game and produced 19 visible tiles
-(10 revealed-but-fogged, 3375 hidden), 644 bytes of tile JSON. Chunking is unnecessary
-at this map size.
-
-## Hash and name resolution (confirmed)
-
-`GameInfo.Ages.lookup(Game.age).AgeType` = `AGE_ANTIQUITY`;
-`GameInfo.Civilizations.lookup(player.civilizationType).CivilizationType` = `CIVILIZATION_GREECE`;
-`GameInfo.Units.lookup(unit.type).UnitType` = `UNIT_SCOUT`; `unit.name` = `Scout`;
-`GameInfo.Terrains.lookup(...)` = `TERRAIN_FLAT`; `city.name` = `LOC_CITY_NAME_GREECE1`
-and `Locale.compose(city.name)` = `Athênai`;
-`GameInfo.ProgressionTreeNodes.lookup(...)` = `NODE_CIVIC_AQ_MAIN_CHIEFDOM`,
-`NODE_TECH_AQ_AGRICULTURE`; `GameInfo.ProgressionTrees.lookup(...)` = `TREE_CIVICS_AQ_MAIN`,
-`TREE_TECHS_AQ`.
-
-**Caveat for Change 4:** `Techs.getResearched()` returned 4 records on turn 2 with
-`state` values `[5, 2, 2, 2]`. Only one node can plausibly be complete that early, so
-`getResearched()` is not "completed nodes"; it appears to include available/in-progress
-nodes and the `state` field must be decoded before anything is reported as completed.
-
-## Progression `state` codes observed so far
-
-| state | observed on | meaning inferred |
-|---|---|---|
-| 0 | `getResearching()` records for a just-chosen tech and the in-progress civic | current selection (progress carried separately) |
-| 2 | `getResearched()` entries for Pottery, Animal Husbandry, Sailing before/while chosen | available, not started or not completed |
-| 3 | `getResearched()` entry for the civic currently in progress (progress 10) | in progress |
-| 5 | `getResearched()` entry for Agriculture (depth 1 of 1) | completed |
-
-`getResearching()` and the matching `getResearched()` entry can disagree on `state`
-(civic Chiefdom: 0 vs 3). Treat `getResearching().type` as "current" and decode
-`getResearched()` states explicitly; do not count anything below 5 as completed until
-the enum is confirmed in the game's UI scripts. `Techs.getTurnsLeft()` and
-`Culture.getTurnsLeft()` return numbers (7 and 8 here).
-
-`city.BuildQueue.currentProductionTypeHash` returned the `UNIT_SCOUT` hash while the
-capital was building a scout.
-
-## Hotseat seat transition (turn 1, seat 1 ended turn, curtain dismissed on seat 2)
-
-`GameContext.localPlayerID` went 0 -> 1 and `GameContext.localObserverID` went 0 -> 1,
-so both follow the active seat. `Players.get(0).isTurnActive` became false while
-`Players.get(1).isTurnActive` is true. The target id, URL, and WebSocket URL did not
-change across the seat swap.
-
-**Omniscience warning:** from seat 2's realm, `GameplayMap.getRevealedState(0, x, y)`
-still returned player 0's real visibility (19 visible tiles vs 7 for player 1). Every
-player-scoped read in `observe.js` must be keyed by the bound player id **and** the
-bound id must equal `localPlayerID`/`localObserverID` at capture time; the game does not
-restrict the debug API to the current seat.
-
-## Open items for Change 2
-
-- Map the `state` enum used by `getResearching`/`getResearched` records.
-- Confirm `Health`/`Combat` unit component fields and the off-map (`isOnMap === false`) representation.
-- Confirm `Locale.compose` for display names and `civilizationFullName`.
-- Confirm the hotseat values of `localPlayerID` / `localObserverID` on each seat.
+`probe --out runs/capabilities.json` reproduces every live row above with 0 payload errors.

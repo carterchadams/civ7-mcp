@@ -4,4 +4,4 @@ set -e
 cd "$(dirname "$0")"
 PY="${PYTHON:-../.venv/bin/python}"
 "$PY" -m pytest tests -q "$@"
-node --test tests/test_payload.mjs
+node --test tests/*.mjs

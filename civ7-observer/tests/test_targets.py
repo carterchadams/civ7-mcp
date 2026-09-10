@@ -24,11 +24,17 @@ def target(id_, ws="ok"):
 
 
 class Factory:
-    """Builds CdpSessions over scripted sockets keyed by target id."""
+    """Builds CdpSessions over scripted sockets keyed by target id.
+
+    The reply script for an id is shared across connections, so a second
+    connection to the same target continues consuming where the first stopped.
+    """
 
     def __init__(self, scripts):
-        self.scripts = scripts
+        from collections import deque
+        self.scripts = {k: (v if isinstance(v, Exception) else deque(v)) for k, v in scripts.items()}
         self.sockets = {}
+        self.all_sockets = []
         self.connects = []
 
     def __call__(self, ws_url, *, timeout):
@@ -41,6 +47,7 @@ class Factory:
         else:
             sock = ScriptedSocket(script)
             self.sockets[id_] = sock
+            self.all_sockets.append(sock)
 
             def connect(u, t):
                 return sock

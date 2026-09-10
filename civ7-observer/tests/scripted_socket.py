@@ -10,7 +10,7 @@ class ScriptedSocket:
     """Replays a queue of frames (str/bytes) or exceptions on recv()."""
 
     def __init__(self, script: list[object] | None = None) -> None:
-        self.script: deque[object] = deque(script or [])
+        self.script: deque[object] = script if isinstance(script, deque) else deque(script or [])
         self.sent: list[str] = []
         self.timeouts: list[float | None] = []
         self.closed = 0

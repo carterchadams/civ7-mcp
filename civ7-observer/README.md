@@ -3,8 +3,10 @@
 Read-only local observer for **one** Civilization VII player, reached through the
 game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
 
-This is Change 1 of `plans/civ7-local-observer-poc-plan.md`: the **connection
-doctor** only. `probe`, `snapshot` and `serve` are registered but not implemented.
+Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
+**connection doctor**) and Change 2 (the developer **capability probe** and the
+runtime contract in `docs/runtime-contract.md`). `snapshot` and `serve` are
+registered but not implemented.
 
 ## Install (Linux, this repo)
 
@@ -55,6 +57,20 @@ Keep the port on loopback; never forward it.
 `doctor` sends one fixed, packaged, read-only expression (`payloads/context.js`) to
 each target and classifies the realm by what it exposes. It never accepts JavaScript
 from the command line or from a model.
+
+## Run the capability probe (developer only)
+
+```bash
+.venv/bin/python -m civ7_observer probe --out civ7-observer/runs/capabilities.json
+.venv/bin/python -m civ7_observer probe --player 1 --json   # refuses unless seat 1 is the local seat
+```
+
+`probe` binds one engine player id (default: the current local seat), refuses with
+`WRONG_PLAYER` if that id is not both `localPlayerID` and `localObserverID`, evaluates
+`payloads/capabilities.js` with the id substituted for `BOUND_PLAYER_ID`, re-checks the
+context afterwards (`CONTEXT_CHANGED` discards the result), and writes the JSON
+atomically. The output is diagnostics for `docs/runtime-contract.md`, not an
+observation for a model; `runs/` is git-ignored.
 
 ## Tests
 

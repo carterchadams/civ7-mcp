@@ -45,7 +45,7 @@ def test_target_id_flag(monkeypatch, capsys):
     assert seen["target_id"] == "abc"
 
 
-@pytest.mark.parametrize("cmd", ["probe", "snapshot", "serve"])
+@pytest.mark.parametrize("cmd", ["snapshot", "serve"])
 def test_stub_commands_exit_2(cmd, capsys):
     code = cli.main([cmd])
     _, err = capsys.readouterr()
@@ -59,3 +59,31 @@ def test_module_entrypoint_runs_from_outside_repo(tmp_path):
     assert proc.returncode == 1
     doc = json.loads(proc.stdout)
     assert doc["status"] == "DEBUGGER_UNAVAILABLE"
+
+
+def test_probe_command_prints_summary_and_returns_zero(monkeypatch, capsys, tmp_path):
+    from civ7_observer import probe as probe_mod
+    seen = {}
+
+    def fake_run_probe(**kw):
+        seen.update(kw)
+        return probe_mod.ProbeResult(path=kw["out"], bound_player_id=1, turn=2, error_count=0, size_bytes=10)
+
+    monkeypatch.setattr(cli, "run_probe", fake_run_probe)
+    code = cli.main(["probe", "--out", str(tmp_path / "c.json"), "--player", "1", "--port", "9555"])
+    out, _ = capsys.readouterr()
+    assert code == 0 and seen["player"] == 1 and seen["port"] == 9555
+    assert str(tmp_path / "c.json") in out
+
+
+def test_probe_command_reports_typed_error(monkeypatch, capsys):
+    from civ7_observer import service as service_mod
+
+    def boom(**kw):
+        raise service_mod.ObserverError("WRONG_PLAYER", "seat is 1")
+
+    monkeypatch.setattr(cli, "run_probe", boom)
+    code = cli.main(["probe", "--json"])
+    out, err = capsys.readouterr()
+    assert code == 1
+    assert json.loads(out)["error"]["code"] == "WRONG_PLAYER"
