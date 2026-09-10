@@ -107,3 +107,23 @@ Hotseat, seat 2, turn 1 after the pass-device curtain (`doctor --json | jq '{sta
 |---|---|
 | `probe --out runs/capabilities.json` | PASS: player 0, turn 2, 0 payload errors, 16061 bytes; Spain / Isabella, capital Madrid pop 1 idle, scout at (63, 15) 2/2 moves 0/100 damage, tech tree `TREE_TECHS_AQ` nothing selected (turnsLeft -1), Agriculture FULLY_UNLOCKED depth 1, civic Chiefdom IN_PROGRESS 10/60 6 turns, sample tile (63,15) VISIBLE `TERRAIN_FLAT`/`BIOME_PLAINS` elevation 554 |
 | `probe --player 1` from seat 0 | PASS (negative): `WRONG_PLAYER: bound player 1 is not the local seat (localPlayerId=0, localObserverId=0)`, exit 1, no file written |
+
+## Change 2: probe (hotseat game, seat 2 = player 1 Alexander, turn 14)
+
+Human-reported game state: explored, scout damaged, met two leaders, at war, one scout
+embarked, at least one civic completed, camera parked over unknown terrain.
+
+| test | result |
+|---|---|
+| `probe` on the active seat | PASS: player 1, turn 14, 0 payload errors, 18899 bytes |
+| damage read-back | scout id 131072 `Health.damage 32 / maxDamage 100` |
+| embarked unit | scout id 262146 at (60, 39) `isEmbarked true`, `isOnMap true`, moves 1/2; galley id 327683 `embarkationType -1` |
+| completed civic | Chiefdom `NODE_STATE_FULLY_UNLOCKED`, `depthUnlocked 1 / maxDepth 1`; Discipline in progress 72/125, 1 turn left |
+| civ-specific tree | `getAvailableTrees()` = `[TREE_CIVICS_AQ_MAIN, TREE_CIVICS_AQ_GREECE]`; Ekklesia and Agoge OPEN, tree resolved from the node definition |
+| mastery depth | Writing `maxDepth 2`, `getNodeUnlockDepthsRemaining 2`, `getTurnsForNode 9` |
+| production | Athênai pop 4 (rural 3, urban 1) building `UNIT_HOPLITE`; queue entry shape recorded |
+| visibility vs camera | 84 visible / 87 revealed / 3233 hidden for player 1 regardless of where the camera was |
+| omitted by design | met leaders, war state, notifications, resources: not read, not exported |
+
+Pending on seat 0 (Isabella): a town (`isTown true`) and resources (deliberately not
+exported; only presence of the API will be noted). Swap seats and re-run `probe`.
