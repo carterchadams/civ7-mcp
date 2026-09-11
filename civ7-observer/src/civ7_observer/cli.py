@@ -12,10 +12,12 @@ from pathlib import Path
 from civ7_observer import __version__, cdp
 from civ7_observer.doctor import run_doctor
 from civ7_observer.probe import run_probe
+from civ7_observer.runner import DEFAULT_MAX_TOOL_CALLS, Runner
 from civ7_observer.schema import MODES
 from civ7_observer.actions import ActionRegistry
 from civ7_observer.service import ObserverError, open_game_session
 from civ7_observer.snapshot import run_snapshot
+from civ7_observer.workspace import Workspace
 
 DEFAULT_PORT = 9444
 DEFAULT_TIMEOUT = 5.0
@@ -78,6 +80,28 @@ def _build_parser() -> argparse.ArgumentParser:
     act.add_argument("--note", default="", help="reconcile: how the outcome was verified")
     act.add_argument("--json", action="store_true")
     act.add_argument("-v", "--verbose", action="store_true")
+
+    pl = sub.add_parser("play", help="let a model play one turn of the bound seat through the offered actions")
+    pl.add_argument("--player", type=int, required=True, help="engine player id to bind for this turn")
+    pl.add_argument("--mode", choices=MODES, required=True)
+    pl.add_argument("--port", type=int, default=DEFAULT_PORT)
+    pl.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    pl.add_argument("--target-id", default=None)
+    pl.add_argument("--model", default=None, help="model id (default: the provider's default)")
+    pl.add_argument("--api-key", default=None, help="default: $ANTHROPIC_API_KEY")
+    pl.add_argument("--max-tool-calls", type=int, default=DEFAULT_MAX_TOOL_CALLS,
+                    help="hard budget for one turn; the turn stops when it is spent")
+    pl.add_argument("--workspace", type=Path, default=None, help="root for per-seat plan and friction (default: the host state directory)")
+    pl.add_argument("--journal", type=Path, default=None, help="action journal for this seat (default: the host state directory)")
+    pl.add_argument("--json", action="store_true")
+    pl.add_argument("-v", "--verbose", action="store_true")
+
+    fr = sub.add_parser("friction", help="what a seat could not do: the backlog its agent reported")
+    fr.add_argument("--player", type=int, required=True)
+    fr.add_argument("--workspace", type=Path, default=None)
+    fr.add_argument("--kind", default=None, help="only this friction kind")
+    fr.add_argument("--json", action="store_true")
+    fr.add_argument("-v", "--verbose", action="store_true")
 
     for name in _STUBS:
         s = sub.add_parser(name, help=f"{name} (not implemented in Change 1)")
@@ -177,6 +201,40 @@ def _run_act(args) -> int:
         return _emit(args, {"ok": False, "error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}, 1)
 
 
+def _run_play(args) -> int:
+    from civ7_observer.provider import DEFAULT_MODEL, AnthropicProvider, ProviderError
+    try:
+        provider = AnthropicProvider(api_key=args.api_key, model=args.model or DEFAULT_MODEL)
+    except ProviderError as exc:
+        return _emit(args, {"ok": False, "error": {"code": "NO_API_KEY", "message": str(exc)}}, 2)
+    runner = Runner(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode,
+                    provider=provider, journal_path=args.journal, workspace_root=args.workspace,
+                    target_id=args.target_id, max_tool_calls=args.max_tool_calls)
+    result = runner.play_turn()
+    payload = {
+        "ok": result.status == "turn_ended", "status": result.status, "seat": args.player,
+        "actions": [a.get("kind") for a in result.actions],
+        "receipts": result.actions, "friction": result.friction, "pause": result.pause,
+        "planRevision": result.plan_revision, "toolCalls": result.tool_calls,
+        "report": result.report, "error": result.error,
+        "usage": getattr(provider, "usage", None),
+        "transcript": str(result.transcript_path) if result.transcript_path else None,
+    }
+    return _emit(args, payload, 0 if result.status == "turn_ended" else 1)
+
+
+def _run_friction(args) -> int:
+    reports = Workspace(root=args.workspace or _state_workspace(), seat=args.player).friction()
+    if args.kind:
+        reports = [r for r in reports if r.get("kind") == args.kind]
+    return _emit(args, {"ok": True, "seat": args.player, "count": len(reports), "reports": reports}, 0)
+
+
+def _state_workspace() -> Path:
+    from civ7_observer.attachment import state_dir
+    return state_dir() / "workspace"
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command in _STUBS:
@@ -190,6 +248,10 @@ def main(argv: list[str] | None = None) -> int:
         return _run_snapshot(args)
     if args.command == "act":
         return _run_act(args)
+    if args.command == "play":
+        return _run_play(args)
+    if args.command == "friction":
+        return _run_friction(args)
     if args.command == "serve":
         from civ7_observer.server import serve
         return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id,

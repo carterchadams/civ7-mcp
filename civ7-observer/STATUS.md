@@ -20,7 +20,10 @@ observation-only any more: `act perform` mutates the running game.
 | constrained native actions (research, civic, skip unit, move unit, produce unit, end turn) | working, live-verified |
 | compact turn brief (`get_turn_brief`): the required decision, bounded options, explicit pause | working, live-verified (~4 KB, ~150 ms) |
 | actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
-| agent runner / scheduler | **not implemented** |
+| agent runner: a model plays one turn of one bound seat (`play`) | working, offline-tested only |
+| skill cards generated from the strategy guide, routed per decision | working, offline-tested only |
+| per-seat plan and friction backlog (`friction`) | working, offline-tested only |
+| scheduler: watching for a seat's turn, seat swapping, driving the curtain | **not implemented** |
 | in-game mod, remote seats, containers | **not implemented, deferred** (see release scope) |
 
 ## Commands
@@ -31,7 +34,12 @@ python -m civ7_observer probe    --out FILE [--player N] [--json]         # deve
 python -m civ7_observer snapshot --mode MODE [--player N] --out FILE [--json]
 python -m civ7_observer serve    --player N --mode MODE [--allow-actions] [--journal FILE]
 python -m civ7_observer act      {list|perform|result|reconcile|rebind} --player N --mode MODE [...]
+python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--workspace DIR]
+python -m civ7_observer friction --player N [--kind KIND] [--workspace DIR]
 ```
+
+`play` runs one turn of the bound seat with a model and exits 0 only if the turn was ended. It
+needs `ANTHROPIC_API_KEY`. See `docs/agent-runner.md`.
 
 `MODE` is `singleplayer` or `local-hotseat` and must match the running game. `--player` is an
 engine player id and must equal both `localPlayerID` and `localObserverID` at the time of the call.
@@ -54,7 +62,8 @@ A client only ever sees opaque action ids; engine operation names and arguments 
 | `inflight.json` | durable reservation written **before** any mutation is dispatched |
 | `unresolved.json` | game-wide barrier of uncertain outcomes |
 
-Plus a per-seat journal wherever `--journal` points (default `runs/actions.jsonl`) with its
+Plus `workspace/seat<N>/` (the agent's own plan, friction backlog and turn transcript) and a
+per-seat journal wherever `--journal` points (default `runs/actions.jsonl`) with its
 `.offers.json` sidecar. Corrupt shared state raises `STATE_CORRUPT` and stops; it never reads as
 empty. A reservation with no recorded outcome makes every seat refuse `RECONCILIATION_REQUIRED`
 until a human resolves it with `act reconcile`.
@@ -86,21 +95,23 @@ forward reload is not detected; after any load the host must be rebound explicit
 
 ## Known gaps and non-claims
 
-1. No agent runner or scheduler yet: a client must be driven by hand or by an external agent.
+1. The runner plays one turn per invocation and has never been run against the live game. There is
+   no scheduler: nothing watches for a seat's turn, swaps seats or drives the hotseat curtain.
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
 3. The action catalog covers 6 of the game's decision kinds; see `../plans/civ7-player-actions.md`
    (untracked) for the full inventory and `docs/action-contract.md` for what is implemented.
 4. Concealment behind the stock hotseat curtain is verified for one agent turn; consecutive agent
    seats, blocking popups, diplomacy and disconnect are not.
-5. No end-to-end token/latency measurement for a model decision loop.
+5. No end-to-end token/latency measurement for the runner's decision loop. A hand-driven MCP client
+   turn (5 moves and an end turn) took 33.5 s.
 6. The debugger listens on `0.0.0.0:9444` on this build. Firewall it on a shared network.
 7. DLC and mod list for the tested build are not recorded.
 
 ## Evidence
 
 `docs/runtime-contract.md` (per-field native API contract), `docs/action-contract.md` (action
-semantics and binding rules), `docs/live-test-results.md` and `docs/phase-2-live-test-results.md`
+semantics and binding rules), `docs/agent-runner.md` (the runner, its prompt and its tools), `docs/live-test-results.md` and `docs/phase-2-live-test-results.md`
 (what was actually run against the game, with results), `docs/hotseat-matrix.jsonl` and
 `docs/hotseat-mcp-matrix.jsonl` (raw robustness rows).
 
@@ -110,6 +121,6 @@ semantics and binding rules), `docs/live-test-results.md` and `docs/phase-2-live
 civ7-observer/run-tests.sh        # pytest + node --test
 ```
 
-354 Python tests and 78 JavaScript tests at the time of writing. Offline tests use a fake Cohtml
+407 Python tests and 78 JavaScript tests at the time of writing. Offline tests use a fake Cohtml
 debugger and mocked game globals; **passing them does not establish native engine semantics**, only
 that our code behaves as intended against our understanding of it.

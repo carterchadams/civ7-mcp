@@ -1,0 +1,66 @@
+{
+  "R-CIV": {
+    "text": "Civilizations have Apex and Time-Tested variants. Continuing the same civilization is possible, but abilities, trainable units and civics can differ by Age. Time-Tested Syncretism can select borrowed infrastructure, a borrowed military unit, or an Affirmation; it is an exclusive choice, not permission to take all three. Retained infrastructure is not the same as retaining an obsolete military unit’s recruitment. P06",
+    "title": "Identity does not imply a fixed kit"
+  },
+  "R-COMBAT": {
+    "text": "Infantry, ranged fire and siege roles are not interchangeable. Settlement capture can involve fortified districts rather than only the central tile. Native movement, target and capture legality must decide what can be done now; a remembered capital-rush rule cannot. C02",
+    "title": "Attack the actual defense system"
+  },
+  "R-COMMAND": {
+    "text": "Commanders can organize packed units, deployment, promotions and reinforcement. Packed or travelling units require explicit states; they are not dead or free to act independently. Deployment action budgets and capacities vary, so look them up before approaching combat. Treat a Commander as a protected support asset, not an ordinary attack unit. C01",
+    "title": "The roster includes more than visible models"
+  },
+  "R-DIPLOMACY": {
+    "text": "Diplomatic responses can have distinct accept/support/reject costs and effects. Influence competes across cooperation, military support and Independent Power interactions; it is not an unlimited free bonus. Current peace negotiations can include Gold and Influence, so a launch-era settlement-only peace interface is incomplete. C06, P01",
+    "title": "Influence is a budget"
+  },
+  "R-GEOGRAPHY": {
+    "text": "Map-generation styles differ substantially. Do not assume that Distant Lands lie east, that an island has a fixed status, or that an unseen landmass has a predictable outline. Use only disclosed regional classifications and legitimately observed routes. P09",
+    "title": "Explore the actual world"
+  },
+  "R-GOVERNMENT": {
+    "text": "The 1.4.1 government model includes an immediate passive ability, celebration choices and two exclusive government Traditions that can carry forward. Happiness stages interact with other effects but do not independently grant universal bonuses. Standard-speed celebrations were shortened to six turns. Use live stage thresholds, ability descriptions and remaining durations. P03",
+    "title": "Stability and policy are active systems"
+  },
+  "R-GROWTH": {
+    "text": "Growth can offer an improvement or, when unlocked, a Specialist. The important decision is the legal target and its effect, not a remembered Civ VI builder routine. Capacity and before/after yield information belong in that decision’s context. P07",
+    "title": "Growth itself makes a land-use decision"
+  },
+  "R-NAVAL": {
+    "text": "The revised naval model distinguishes scouting/melee Light ships from heavier combat ships; Heavy ships use ranged combat outside Antiquity. Read each unit’s current attack modes and vision rather than applying one generic ship template. P08",
+    "title": "Ship class and Age matter"
+  },
+  "R-PREVIEW": {
+    "text": "Production-menu base yields and best adjacency indicators are not a recommendation. Placement and growth previews can show settlement-level before/after changes, maintenance, lost yields, overbuilding and adjacency. Choose a building-and-location pair or growth target using those deltas, not the largest isolated number. P07",
+    "title": "Gross output is not marginal value"
+  },
+  "R-RELIGION": {
+    "text": "Pantheons, organized religion, beliefs and relic acquisition form an Age-sensitive subsystem. The present victory model does not include a separate religious victory. Use current belief conditions, charges, legal targets and Great Work slot eligibility; do not follow a Civ VI religious-conversion win plan or an obsolete relic-count Legacy Path by habit. C04, P04",
+    "title": "Beliefs are effects, not an automatic win"
+  },
+  "R-SPECIALIST": {
+    "text": "Under 1.4.0, Specialists have no default Science/Culture yield and add 100% of their tile’s adjacency yields. Maintenance depends on Age and building category. Town purchasing, research-tree effects and growth economics were also revised. Over-limit Happiness penalties are uncapped; negative local Happiness can sharply reduce non-Food yields. Do not reuse launch-era Specialist arithmetic or assume a cost plateau makes unlimited expansion harmless. P02",
+    "title": "Evaluate the actual urban tile"
+  },
+  "R-TOWN": {
+    "text": "Towns generally turn Production into Gold rather than operating city production queues. Specialized Towns can support connected Cities with Food. Conversion buys different capabilities and can change network economics. Treat every focus, purchase exception and conversion price as a live choice; special civilizations can change the baseline. C05, C07\n\nEarlier official notes also explicitly revised City Hall yields and conversion-related economic warnings. That is a reason to inspect current whole-empire effects instead of treating conversion as a free upgrade. P11",
+    "title": "A network, not a map full of identical cities"
+  },
+  "R-TRADE": {
+    "text": "Merchants, eligible routes and a settlement trade network matter for resource movement. Nearby coordinates alone do not prove a legal connection. Query the active graph, reachable destinations and resource-assignment eligibility; do not substitute a hand-drawn hex radius or assume a Civ VI trader-income model. C03",
+    "title": "Connectivity is a game relation"
+  },
+  "R-TRANSITION": {
+    "text": "Civilization selection now occurs at the end of the current Age. Plan the transition using the outgoing empire, then inspect the incoming state anew. Do not presume that all buildings, units, connections, effects, identities or order queues persist unchanged merely because a prior guide says they do. P02",
+    "title": "Reattach strategically after an Age change"
+  },
+  "R-TRIUMPH": {
+    "text": "Triumphs replaced Legacy Paths and are separate from victories. Major Triumphs unlock next-Age Dedications; ordinarily three can be activated. Minor Triumphs give immediate benefits and some are first-to contests. Modern-Age Triumphs are Minor. The selected set changes available objectives; Triumphs can be disabled. A Classic Triumph set does not, by itself, establish the old victory rules. P05",
+    "title": "Optional goals, not an obligatory railroad"
+  },
+  "R-VICTORY": {
+    "text": "The current victory tracks are Military/Dominion, Cultural/Tourism, Economic/GDP and Scientific/Innovation. Military, cultural and economic victories compare the leader’s score with the runner-up; the required dominance ratio falls as the Ages progress. Meeting the condition starts a five-turn countdown that can pause and resume. Scientific victory requires 100 Innovation and a Launch Pad for its five-turn countdown. Projects, slotted Codices and technology Masteries can contribute Innovation. Read the enabled tracks, exact current thresholds, timing and qualifying infrastructure from the game, not a launch-era checklist. P04\n\n**Interpretation rule:** Science per turn is not Innovation; Culture per turn is not Tourism; a Gold balance is not GDP; army strength is not Dominion. Rate, stock, score, eligibility and countdown are separate fields. Do not infer one from another.",
+    "title": "Which finish line matters"
+  }
+}

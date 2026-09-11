@@ -1,0 +1,631 @@
+{
+  "rules": [
+    "R-CIV",
+    "R-COMBAT",
+    "R-COMMAND",
+    "R-DIPLOMACY",
+    "R-GEOGRAPHY",
+    "R-GOVERNMENT",
+    "R-GROWTH",
+    "R-NAVAL",
+    "R-PREVIEW",
+    "R-RELIGION",
+    "R-SPECIALIST",
+    "R-TOWN",
+    "R-TRADE",
+    "R-TRANSITION",
+    "R-TRIUMPH",
+    "R-VICTORY"
+  ],
+  "skills": {
+    "civ7-ages-and-crises": {
+      "execute": [
+        "crisis.choose",
+        "dedications.choose",
+        "government.choose",
+        "transition.choose"
+      ],
+      "file": "civ7-ages-and-crises.md",
+      "purpose": "Use as an Age nears its end, during crisis choices, at civilization/Dedication selection, and immediately after entering a new Age.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "military",
+        "rules",
+        "trade",
+        "transition",
+        "triumphs",
+        "victory"
+      ],
+      "rules": [
+        "R-CIV",
+        "R-GOVERNMENT",
+        "R-TRANSITION",
+        "R-TRIUMPH"
+      ],
+      "title": "Age transition, civilization choice and crisis response"
+    },
+    "civ7-combat-and-sieges": {
+      "execute": [
+        "settlements.capture_decision",
+        "units.attack",
+        "units.fortify",
+        "units.heal",
+        "units.move",
+        "units.pillage"
+      ],
+      "file": "civ7-combat-and-sieges.md",
+      "purpose": "Use for visible engagements, defensive repositioning, attack selection, healing, pillaging or capturing fortified settlements.",
+      "read": [
+        "commanders",
+        "context",
+        "diplomacy",
+        "economy",
+        "map",
+        "military",
+        "rules"
+      ],
+      "rules": [
+        "R-COMBAT",
+        "R-COMMAND"
+      ],
+      "title": "Tactical combat, retreat and settlement capture"
+    },
+    "civ7-commanders-and-logistics": {
+      "execute": [
+        "commanders.deploy",
+        "commanders.pack",
+        "commanders.promote",
+        "commanders.reinforce",
+        "units.move"
+      ],
+      "file": "civ7-commanders-and-logistics.md",
+      "purpose": "Use when transporting an army, assigning promotions, deploying packed units, coordinating reinforcements or protecting a Commander.",
+      "read": [
+        "commanders",
+        "context",
+        "decisions",
+        "economy",
+        "map",
+        "military",
+        "rules"
+      ],
+      "rules": [
+        "R-COMBAT",
+        "R-COMMAND"
+      ],
+      "title": "Commanders, deployment and reinforcement"
+    },
+    "civ7-cultural-victory": {
+      "execute": [
+        "celebration.choose",
+        "great_works.assign",
+        "production.choose",
+        "production.purchase",
+        "religion.choose"
+      ],
+      "file": "civ7-cultural-victory.md",
+      "purpose": "Use when evaluating or pursuing Cultural victory to grow the actual Tourism score efficiently while preserving its scoring assets and finish conditions.",
+      "read": [
+        "context",
+        "economy",
+        "great_works",
+        "map",
+        "production",
+        "religion",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-GOVERNMENT",
+        "R-PREVIEW",
+        "R-RELIGION",
+        "R-VICTORY"
+      ],
+      "title": "Cultural victory execution"
+    },
+    "civ7-diplomacy-and-independents": {
+      "execute": [
+        "diplomacy.propose",
+        "diplomacy.respond",
+        "independents.act"
+      ],
+      "file": "civ7-diplomacy-and-independents.md",
+      "purpose": "Use for first contacts, incoming proposals, Independent Power investment, treaties, war preparation or peace negotiation.",
+      "read": [
+        "context",
+        "decisions",
+        "diplomacy",
+        "economy",
+        "map",
+        "military",
+        "rules",
+        "trade",
+        "victory"
+      ],
+      "rules": [
+        "R-DIPLOMACY"
+      ],
+      "title": "Diplomacy, Independent Powers and war support"
+    },
+    "civ7-economic-victory": {
+      "execute": [
+        "production.choose",
+        "production.purchase",
+        "resources.assign",
+        "settlements.convert",
+        "trade.deliver",
+        "trade.establish"
+      ],
+      "file": "civ7-economic-victory.md",
+      "purpose": "Use when evaluating or pursuing Economic victory to build an actual GDP-scoring system rather than merely accumulating a large treasury.",
+      "read": [
+        "context",
+        "economy",
+        "map",
+        "military",
+        "production",
+        "resources",
+        "rules",
+        "trade",
+        "victory"
+      ],
+      "rules": [
+        "R-TOWN",
+        "R-TRADE",
+        "R-VICTORY"
+      ],
+      "title": "Economic victory execution"
+    },
+    "civ7-force-planning": {
+      "execute": [
+        "production.choose",
+        "production.purchase",
+        "units.move",
+        "units.upgrade"
+      ],
+      "file": "civ7-force-planning.md",
+      "purpose": "Use before war, when a frontier becomes unsafe, when recruiting reinforcements, or when deciding whether military spending is sufficient.",
+      "read": [
+        "commanders",
+        "context",
+        "diplomacy",
+        "economy",
+        "map",
+        "military",
+        "production",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-COMBAT",
+        "R-COMMAND",
+        "R-DIPLOMACY"
+      ],
+      "title": "Force planning, recruitment and operational readiness"
+    },
+    "civ7-growth-and-specialists": {
+      "execute": [
+        "growth.choose"
+      ],
+      "file": "civ7-growth-and-specialists.md",
+      "purpose": "Use at settlement growth decisions or when evaluating whether an urban Specialist is better than developing another rural tile.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "growth",
+        "production",
+        "resources",
+        "rules"
+      ],
+      "rules": [
+        "R-GROWTH",
+        "R-PREVIEW",
+        "R-SPECIALIST"
+      ],
+      "title": "Growth allocation and Specialist staffing"
+    },
+    "civ7-happiness-and-government": {
+      "execute": [
+        "celebration.choose",
+        "government.choose",
+        "policies.assign"
+      ],
+      "file": "civ7-happiness-and-government.md",
+      "purpose": "Use when stability changes, selecting a government or celebration, filling policy/tradition slots, or assessing expansion and Specialist maintenance.",
+      "read": [
+        "context",
+        "decisions",
+        "diplomacy",
+        "economy",
+        "production",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-GOVERNMENT",
+        "R-PREVIEW",
+        "R-SPECIALIST"
+      ],
+      "title": "Happiness, government, policies and celebrations"
+    },
+    "civ7-military-victory": {
+      "execute": [
+        "diplomacy.propose",
+        "settlements.capture_decision",
+        "settlements.found",
+        "units.attack",
+        "units.move"
+      ],
+      "file": "civ7-military-victory.md",
+      "purpose": "Use when evaluating or pursuing Military victory to select territorial objectives that change Dominion while remaining defensible and economically sustainable.",
+      "read": [
+        "commanders",
+        "context",
+        "diplomacy",
+        "economy",
+        "map",
+        "military",
+        "rules",
+        "trade",
+        "victory"
+      ],
+      "rules": [
+        "R-COMBAT",
+        "R-COMMAND",
+        "R-DIPLOMACY",
+        "R-VICTORY"
+      ],
+      "title": "Military victory and sustainable territorial dominance"
+    },
+    "civ7-naval-and-overseas": {
+      "execute": [
+        "commanders.deploy",
+        "settlements.found",
+        "trade.deliver",
+        "units.attack",
+        "units.move"
+      ],
+      "file": "civ7-naval-and-overseas.md",
+      "purpose": "Use for coastal defense, ocean reconnaissance, overseas settlement, amphibious attacks or transporting valuable cargo and civilians.",
+      "read": [
+        "commanders",
+        "context",
+        "economy",
+        "map",
+        "military",
+        "production",
+        "resources",
+        "rules",
+        "trade"
+      ],
+      "rules": [
+        "R-GEOGRAPHY",
+        "R-NAVAL",
+        "R-TRADE"
+      ],
+      "title": "Naval operations and overseas development"
+    },
+    "civ7-opening-and-expansion": {
+      "execute": [
+        "production.choose",
+        "settlements.found",
+        "units.move"
+      ],
+      "file": "civ7-opening-and-expansion.md",
+      "purpose": "Use in the first development phase or when deciding whether the empire should expand, stabilize or invest in existing settlements.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "map",
+        "military",
+        "production",
+        "rules"
+      ],
+      "rules": [
+        "R-CIV",
+        "R-GROWTH",
+        "R-TOWN"
+      ],
+      "title": "Opening priorities and expansion tempo"
+    },
+    "civ7-production-and-placement": {
+      "execute": [
+        "production.choose",
+        "production.purchase",
+        "production.repair"
+      ],
+      "file": "civ7-production-and-placement.md",
+      "purpose": "Use when selecting or changing a settlement queue, buying infrastructure, repairing damage, or placing a building, quarter or Wonder.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "growth",
+        "production",
+        "resources",
+        "rules"
+      ],
+      "rules": [
+        "R-PREVIEW",
+        "R-TOWN"
+      ],
+      "title": "Production, purchasing and building placement"
+    },
+    "civ7-reconnaissance-and-memory": {
+      "execute": [
+        "units.move",
+        "units.scout_action"
+      ],
+      "file": "civ7-reconnaissance-and-memory.md",
+      "purpose": "Use when exploring, updating enemy sightings, choosing safe routes or deciding which missing information is worth obtaining.",
+      "read": [
+        "context",
+        "map",
+        "memory",
+        "military",
+        "rules"
+      ],
+      "rules": [
+        "R-GEOGRAPHY"
+      ],
+      "title": "Reconnaissance, uncertainty and map memory"
+    },
+    "civ7-religion-and-great-works": {
+      "execute": [
+        "great_works.assign",
+        "religion.choose",
+        "religion.spread",
+        "units.move"
+      ],
+      "file": "civ7-religion-and-great-works.md",
+      "purpose": "Use when selecting a belief, founding or spreading religion, acquiring relics/artifacts/codices, or assigning Great Works to eligible slots.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "great_works",
+        "map",
+        "production",
+        "religion",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-PREVIEW",
+        "R-RELIGION",
+        "R-VICTORY"
+      ],
+      "title": "Beliefs, religious actions and Great Work use"
+    },
+    "civ7-research-and-civics": {
+      "execute": [
+        "attributes.choose",
+        "civics.choose",
+        "research.choose"
+      ],
+      "file": "civ7-research-and-civics.md",
+      "purpose": "Use when choosing research, evaluating a mastery or unique civic, spending an attribute point, or planning an unlock needed by another skill.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "military",
+        "production",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-CIV",
+        "R-GOVERNMENT",
+        "R-SPECIALIST",
+        "R-VICTORY"
+      ],
+      "title": "Technology, civics, masteries and ability choices"
+    },
+    "civ7-rules-and-capabilities": {
+      "execute": [],
+      "file": "civ7-rules-and-capabilities.md",
+      "purpose": "Use on attachment, save load, Age transition, game update or unfamiliar choice to establish which rules and tools actually apply.",
+      "read": [
+        "context",
+        "decisions",
+        "rules"
+      ],
+      "rules": [
+        "R-CIV",
+        "R-TRANSITION",
+        "R-VICTORY"
+      ],
+      "title": "Rules, identity and capability calibration"
+    },
+    "civ7-scientific-victory": {
+      "execute": [
+        "great_works.assign",
+        "production.choose",
+        "production.purchase",
+        "research.choose"
+      ],
+      "file": "civ7-scientific-victory.md",
+      "purpose": "Use when evaluating or pursuing Scientific victory to convert research and production into the actual Innovation and infrastructure requirements.",
+      "read": [
+        "context",
+        "economy",
+        "great_works",
+        "military",
+        "production",
+        "research",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-PREVIEW",
+        "R-VICTORY"
+      ],
+      "title": "Scientific victory execution"
+    },
+    "civ7-settlement-sites": {
+      "execute": [
+        "settlements.found",
+        "units.move"
+      ],
+      "file": "civ7-settlement-sites.md",
+      "purpose": "Use before founding or redirecting a settler to compare legal sites by development, connectivity, defense and strategic purpose.",
+      "read": [
+        "context",
+        "economy",
+        "map",
+        "military",
+        "resources",
+        "rules",
+        "trade"
+      ],
+      "rules": [
+        "R-GEOGRAPHY",
+        "R-TOWN",
+        "R-TRADE"
+      ],
+      "title": "Settlement-site selection"
+    },
+    "civ7-towns-and-cities": {
+      "execute": [
+        "production.purchase",
+        "settlements.choose_focus",
+        "settlements.convert"
+      ],
+      "file": "civ7-towns-and-cities.md",
+      "purpose": "Use when a Town can specialize or convert, or when rebalancing which settlements supply the empire and which operate production centers.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "growth",
+        "production",
+        "resources",
+        "rules",
+        "trade"
+      ],
+      "rules": [
+        "R-PREVIEW",
+        "R-SPECIALIST",
+        "R-TOWN"
+      ],
+      "title": "Town focus and City conversion"
+    },
+    "civ7-trade-and-connections": {
+      "execute": [
+        "diplomacy.propose",
+        "trade.connect",
+        "trade.establish",
+        "units.move"
+      ],
+      "file": "civ7-trade-and-connections.md",
+      "purpose": "Use when connecting settlements, choosing a merchant destination, improving trade access, or diagnosing missing resource and Food benefits.",
+      "read": [
+        "context",
+        "diplomacy",
+        "economy",
+        "map",
+        "military",
+        "resources",
+        "rules",
+        "trade"
+      ],
+      "rules": [
+        "R-GEOGRAPHY",
+        "R-TOWN",
+        "R-TRADE"
+      ],
+      "title": "Trade routes and settlement connections"
+    },
+    "civ7-treasury-and-resources": {
+      "execute": [
+        "production.purchase",
+        "resources.assign",
+        "units.upgrade"
+      ],
+      "file": "civ7-treasury-and-resources.md",
+      "purpose": "Use when spending scarce Gold or Influence, assigning resources, responding to a deficit, or comparing immediate investment with a cash reserve.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "military",
+        "resources",
+        "rules",
+        "trade"
+      ],
+      "rules": [
+        "R-GOVERNMENT",
+        "R-TRADE",
+        "R-VICTORY"
+      ],
+      "title": "Treasury, resource allocation and economic reserves"
+    },
+    "civ7-triumphs-and-dedications": {
+      "execute": [
+        "dedications.choose",
+        "triumphs.claim"
+      ],
+      "file": "civ7-triumphs-and-dedications.md",
+      "purpose": "Use when choosing optional Age objectives, evaluating a first-to race, claiming a reward or selecting next-Age Dedications.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "military",
+        "production",
+        "rules",
+        "triumphs",
+        "victory"
+      ],
+      "rules": [
+        "R-TRIUMPH",
+        "R-VICTORY"
+      ],
+      "title": "Triumph selection and Dedication value"
+    },
+    "civ7-turn-management": {
+      "execute": [
+        "actions.end_turn",
+        "actions.resolve_decision"
+      ],
+      "file": "civ7-turn-management.md",
+      "purpose": "Use at every playable turn and after a major state change to resolve blockers, preserve priorities and verify completed actions.",
+      "read": [
+        "context",
+        "decisions",
+        "economy",
+        "memory",
+        "military",
+        "victory"
+      ],
+      "rules": [
+        "R-VICTORY"
+      ],
+      "title": "Turn management and commitment execution"
+    },
+    "civ7-victory-monitoring": {
+      "execute": [],
+      "file": "civ7-victory-monitoring.md",
+      "purpose": "Use every turn to inspect enabled finish conditions, detect imminent rival wins and choose whether to continue, pivot or interrupt.",
+      "read": [
+        "context",
+        "diplomacy",
+        "economy",
+        "memory",
+        "military",
+        "rules",
+        "victory"
+      ],
+      "rules": [
+        "R-VICTORY"
+      ],
+      "title": "Victory monitoring, commitment and denial"
+    }
+  },
+  "source": "CIV7-AGENT-STRATEGY-GUIDE.md"
+}
