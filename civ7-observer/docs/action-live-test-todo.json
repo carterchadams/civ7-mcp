@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 176,
+          "confirmed": 177,
           "rejected": 0,
           "unknown": 0
         }
@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 549,
+          "confirmed": 551,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,7 +139,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2225,
+          "confirmed": 2234,
           "rejected": 12,
           "unknown": 0
         }
@@ -163,7 +163,7 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1899,
+          "confirmed": 1916,
           "rejected": 24,
           "unknown": 4
         }
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 154,
+          "confirmed": 155,
           "rejected": 2,
           "unknown": 1
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 234,
+          "confirmed": 236,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 90,
+          "confirmed": 93,
           "rejected": 0,
           "unknown": 0
         }
@@ -595,9 +595,9 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 21,
+          "confirmed": 24,
           "rejected": 0,
-          "unknown": 0
+          "unknown": 1
         }
       }
     },
@@ -1303,7 +1303,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 199,
+          "confirmed": 203,
           "rejected": 1,
           "unknown": 1
         }
@@ -1883,6 +1883,42 @@
       "consequence_class": "low",
       "procedure": "take a `move_great_work` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `MOVE_GREAT_WORK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-rename_unit",
+      "action_family": "rename_unit",
+      "expected_kind": "NAME_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "rename_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `rename_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `NAME_UNIT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-rename_city",
+      "action_family": "rename_city",
+      "expected_kind": "NAME_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "rename_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `rename_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `NAME_CITY` receipt in the seat journal",
       "evidence_refs": {}
     },
     {
@@ -3047,15 +3083,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 5,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "rename_unit",
+        "rename_city",
+        "found_religion"
+      ],
       "consequence_class": "medium",
       "procedure": "Custom religion name and renaming",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     }
   ]
