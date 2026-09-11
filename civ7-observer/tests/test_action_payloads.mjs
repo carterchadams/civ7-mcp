@@ -1197,6 +1197,116 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- buying a building with gold, and promoting a town into a city
+// Both ride CityCommandTypes.PURCHASE: one carries a constructible and its plot, the other the
+// ORDER_TOWN_UPGRADE directive. Gold is the precondition for both, since the treasury only moves on a
+// mutation and so a lighter balance is a positive, specific effect.
+function withGoldPurchases(g, { gold = 900, upgradeOk = true, isTown = true, upgradeCost = 320, spend = 144, buyable = [501] } = {}) {
+  withBuildings(g, {});
+  const me = g.Players.get(1);
+  me.Treasury = { goldBalance: gold };
+  me.Units = { getUnits: () => [] };
+  g.CityCommandTypes = { EXPAND: 7771, PURCHASE: 1490793096 };
+  g.OrderTypes = { ORDER_TOWN_UPGRADE: 8 };
+  const city = me.Cities.getCities()[0];
+  city.isTown = isTown;
+  city.Gold = { getTownUpgradeCost: () => upgradeCost };
+  g.Game.CityCommands = {
+    canStart: (cid, cmd, args, show) => {
+      g._log.push(`pcanStart(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)},${show})`);
+      if (cmd !== 1490793096 || cid.owner !== 1) return { Success: false };
+      if (args.Directive !== undefined) return { Success: upgradeOk && city.isTown === true };
+      if (args.UnitType !== undefined) return { Success: false };
+      return { Success: buyable.includes(args.ConstructibleType), Cost: 144 };
+    },
+    sendRequest: (cid, cmd, args) => {
+      g._log.push(`psendRequest(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)})`);
+      if (args.Directive !== undefined) { city.isTown = false; me.Treasury = { goldBalance: gold - upgradeCost }; return; }
+      me.Treasury = { goldBalance: gold - spend };
+    },
+  };
+  return g;
+}
+
+test("building-purchase offers carry the native cost, the seat's gold and the same plot as the build offer", () => {
+  const log = [];
+  const g = withGoldPurchases(withUnits(world({ log }), [])); g._log = log;
+  const buys = runOffers(g).offers.filter((o) => o.kind === "PURCHASE_CONSTRUCTIBLE");
+  assert.deepEqual(buys.map((o) => [o.arg, o.arg2, o.arg3, o.x, o.y, o.placement, o.constructibleKey, o.cost, o.pre, o.goldBalance, o.affordable]),
+    [[65536, 501, 403, 3, 4, "urban", "BUILDING_GRANARY", 144, 900, 900, true],
+     [65536, 501, 404, 4, 4, "newUrban", "BUILDING_GRANARY", 144, 900, 900, true],
+     [65536, 501, 504, 4, 5, "newUrban", "BUILDING_GRANARY", 144, 900, 900, true]]);
+  assert.ok(!log.some((e) => e.startsWith("psendRequest")), "enumeration must never buy anything");
+});
+
+test("a building the seat cannot afford is still offered, marked unaffordable rather than hidden", () => {
+  const log = [];
+  const g = withGoldPurchases(withUnits(world({ log }), []), { gold: 12 }); g._log = log;
+  const buys = runOffers(g).offers.filter((o) => o.kind === "PURCHASE_CONSTRUCTIBLE");
+  assert.ok(buys.length > 0);
+  assert.ok(buys.every((o) => o.affordable === false && o.goldBalance === 12));
+});
+
+test("perform PURCHASE_CONSTRUCTIBLE re-checks gold and canStart with the plot, sends PURCHASE and reads back a lighter treasury", () => {
+  const log = [];
+  const g = withGoldPurchases(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "PURCHASE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plotIndex: 403, goldBefore: 900, gold: 756, matches: true });
+  assert.ok(log.find((e) => e.startsWith("psendRequest(") && e.includes('"ConstructibleType":501') && e.includes('"X":3') && e.includes('"Y":4')));
+  assert.ok(!log.some((e) => e.startsWith("bsendRequest")), "buying must never touch the build queue");
+});
+
+test("perform PURCHASE_CONSTRUCTIBLE refuses an unknown city, a non-constructible, a changed treasury and a refused purchase without sending", () => {
+  for (const [label, mk, cid, ct, pi, pre] of [
+    ["unknown city", () => withGoldPurchases(withUnits(world({ log: [] }), [])), 7, 501, 403, 900],
+    ["not a constructible", () => withGoldPurchases(withUnits(world({ log: [] }), [])), 65536, 4242, 403, 900],
+    ["treasury moved", () => withGoldPurchases(withUnits(world({ log: [] }), [])), 65536, 501, 403, 800],
+    ["canStart false", () => withGoldPurchases(withUnits(world({ log: [] }), []), { buyable: [] }), 65536, 501, 403, 900],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "PURCHASE_CONSTRUCTIBLE", cid, ct, pi, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("psendRequest")), `${label}: must not send`);
+  }
+  const none = withGoldPurchases(withUnits(world({ log: [] }), []), { spend: 0 }); none._log = [];
+  const rr = runPerformArgs(none, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
+test("a town is offered the upgrade to a city with its own gold price; a city is not offered it at all", () => {
+  const log = [];
+  const g = withGoldPurchases(withUnits(world({ log }), [])); g._log = log;
+  const ups = runOffers(g).offers.filter((o) => o.kind === "UPGRADE_TOWN");
+  assert.deepEqual(ups.map((o) => [o.arg, o.cityName, o.cost, o.pre, o.goldBalance, o.affordable, o.canStart]), [[65536, "Cordoba", 320, 900, 900, true, true]]);
+  const asCity = withGoldPurchases(withUnits(world({ log: [] }), []), { isTown: false }); asCity._log = [];
+  assert.deepEqual(runOffers(asCity).offers.filter((o) => o.kind === "UPGRADE_TOWN"), []);
+  const refused = withGoldPurchases(withUnits(world({ log: [] }), []), { upgradeOk: false }); refused._log = [];
+  assert.deepEqual(runOffers(refused).offers.filter((o) => o.kind === "UPGRADE_TOWN"), []);
+});
+
+test("perform UPGRADE_TOWN sends the upgrade directive and reads back a settlement that is no longer a town", () => {
+  const log = [];
+  const g = withGoldPurchases(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "UPGRADE_TOWN", 65536, 0, 0, { pre: 900 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "UPGRADE_TOWN", arg: 65536, wasTown: true, isTown: false, matches: true });
+  assert.ok(log.find((e) => e.startsWith("psendRequest(") && e.includes('"Directive":8')));
+  for (const [label, mk, cid, pre] of [
+    ["unknown settlement", () => withGoldPurchases(withUnits(world({ log: [] }), [])), 7, 900],
+    ["already a city", () => withGoldPurchases(withUnits(world({ log: [] }), []), { isTown: false }), 65536, 900],
+    ["treasury moved", () => withGoldPurchases(withUnits(world({ log: [] }), [])), 65536, 100],
+    ["canStart false", () => withGoldPurchases(withUnits(world({ log: [] }), []), { upgradeOk: false }), 65536, 900],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "UPGRADE_TOWN", cid, 0, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("psendRequest")), `${label}: must not send`);
+  }
+});
+
 test("the traditions confirm is gated per slot type, so a free slot elsewhere does not hold it back", () => {
   const log = [];
   // two crisis slots free with crisis cards pending, and plenty of free ordinary slots with none

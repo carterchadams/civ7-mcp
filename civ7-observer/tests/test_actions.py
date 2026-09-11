@@ -1003,10 +1003,10 @@ def test_resource_assignment_confirms_on_the_assignment_map_and_consider_on_the_
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"resourceNotificationCleared": True}
 
 
-def test_promotion_offer_and_confirmation_on_the_units_promotion_count(tmp_path):
+def test_promotion_offer_and_confirmation_on_the_units_held_promotions(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionsEarned": 0, "promotionPoints": 1, "commendationPoints": 0, "unitLevel": 2, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "earned": 0, "hasPromotion": False, "matches": False}}
-    rb = {**RB, "unitPromotions": {"5": 1}}
+    rb = {**RB, "unitPromotions": {"5": [7101]}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
     with gs:
@@ -1016,15 +1016,15 @@ def test_promotion_offer_and_confirmation_on_the_units_promotion_count(tmp_path)
         assert "arg" not in pu and "arg2" not in pu and "arg3" not in pu
         res = reg.perform(gs, action_id=pu["actionId"], request_id="pu-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
-    assert res["confirmedBy"]["effect"] == {"unitPromoted": {"unitId": 5, "promotion": 7101, "promotions": 1}}
+    assert res["confirmedBy"]["effect"] == {"unitPromoted": {"unitId": 5, "promotion": 7101}}
     sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
     assert '"PROMOTE_UNIT"' in sent and "const ARG2 = 7101;" in sent and "const ARG3 = 8101;" in sent
 
 
-def test_promotion_poll_does_not_confirm_while_the_count_is_unchanged(tmp_path):
+def test_promotion_poll_does_not_confirm_while_the_promotion_is_absent(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "earned": 0, "hasPromotion": False, "matches": False}}
-    rb = {**RB, "unitPromotions": {"5": 0}}
+    rb = {**RB, "unitPromotions": {"5": [9999]}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
     with gs:
@@ -1062,6 +1062,67 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
         res = reg.perform(gs, action_id=pu["actionId"], request_id="buy-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
+
+
+def test_building_purchase_confirms_on_a_lighter_treasury(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "cityId": 65536, "cityName": "Pārsa", "constructibleKey": "BUILDING_GRANARY", "constructibleClass": "BUILDING", "displayName": "Granary", "cost": 144, "goldBalance": 2792, "affordable": True, "plotIndex": 403, "placement": "urban", "x": 3, "y": 4, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2792, "matches": False}}
+    rb = {**RB, "goldBalance": 2648}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pc = next(o for o in out["offers"] if o["kind"] == "purchase_constructible")
+        assert pc["cost"] == 144 and pc["affordable"] is True and pc["plotIndex"] == 403 and pc["placement"] == "urban"
+        assert "arg" not in pc and "arg2" not in pc and "arg3" not in pc
+        res = reg.perform(gs, action_id=pc["actionId"], request_id="bb-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"constructiblePurchased": {"cityId": 65536, "constructibleType": 501, "plotIndex": 403, "goldSpent": 144}}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert "const ARG2 = 501;" in sent and "const ARG3 = 403;" in sent
+
+
+def test_a_building_purchase_that_leaves_the_treasury_untouched_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2792, "matches": False}}
+    rb = {**RB, "goldBalance": 2792}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pc = next(o for o in out["offers"] if o["kind"] == "purchase_constructible")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=pc["actionId"], request_id="bb-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_town_promotion_confirms_on_the_settlement_no_longer_being_a_town(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "UPGRADE_TOWN", "arg": 131073, "pre": 2792, "cityId": 131073, "cityName": "Gordion", "cost": 320, "goldBalance": 2792, "affordable": True, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "UPGRADE_TOWN", "arg": 131073, "wasTown": True, "isTown": True, "matches": False}}
+    rb = {**RB, "townFlags": {"65536": False, "131073": False}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        up = next(o for o in out["offers"] if o["kind"] == "promote_town_to_city")
+        assert up["cost"] == 320 and up["cityName"] == "Gordion" and up["affordable"] is True and "arg" not in up
+        res = reg.perform(gs, action_id=up["actionId"], request_id="up-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"townUpgraded": {"cityId": 131073}}
+
+
+def test_a_town_that_is_still_a_town_after_the_upgrade_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "UPGRADE_TOWN", "arg": 131073, "pre": 2792, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "UPGRADE_TOWN", "arg": 131073, "wasTown": True, "isTown": True, "matches": False}}
+    rb = {**RB, "townFlags": {"131073": True}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        up = next(o for o in out["offers"] if o["kind"] == "promote_town_to_city")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=up["actionId"], request_id="up-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
 
 
 def test_age_transition_choice_confirms_on_the_parameter_and_the_finish_on_the_notification_or_the_age(tmp_path):

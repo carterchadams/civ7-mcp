@@ -68,6 +68,10 @@ DECISION_OF_KIND = {
     "produce_unit": "production",
     "produce_constructible": "production",
     "purchase_unit": "production",
+    "purchase_constructible": "production",
+    # Promoting a town is a settlement-wide decision, not one more thing to build, so it reads under
+    # the population group next to expansion rather than competing with the build queue.
+    "promote_town_to_city": "population",
     "skip_unit": "unit",
     "move_unit": "unit",
     "make_trade_route": "unit",

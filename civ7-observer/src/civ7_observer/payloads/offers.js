@@ -349,6 +349,20 @@
               cost: isInt(check.Cost) ? check.Cost : null, goldBalance: goldBalance, canStart: true });
           }
         }
+        // A town becomes a city for gold. The shipped production chooser gates the button on
+        // canStart(PURCHASE, {Directive: OrderTypes.ORDER_TOWN_UPGRADE}) and reads the price from the
+        // settlement's own Gold component; the native check reports no Cost of its own.
+        if (c.isTown === true && typeof OrderTypes !== "undefined" && isInt(OrderTypes.ORDER_TOWN_UPGRADE) &&
+            typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.PURCHASE)) {
+          const upArgs = { Directive: OrderTypes.ORDER_TOWN_UPGRADE };
+          const upCheck = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, upArgs, false);
+          if (upCheck && upCheck.Success === true && isInt(goldBalance)) {
+            let upCost = null;
+            try { const v = c.Gold && typeof c.Gold.getTownUpgradeCost === "function" ? c.Gold.getTownUpgradeCost() : null; upCost = typeof v === "number" && v >= 0 ? Math.floor(v) : null; } catch (e) { upCost = null; }
+            offers.push({ kind: "UPGRADE_TOWN", arg: c.id.id, pre: goldBalance, cityId: c.id.id, cityName: compose(c.name),
+              cost: upCost, goldBalance: goldBalance, affordable: isInt(upCost) ? goldBalance >= upCost : null, canStart: true });
+          }
+        }
         // Buildings need a plot: the shipped chooser asks canStart(BUILD, {ConstructibleType}) and the
         // placement mode then offers `Plots` (existing urban plots) and `ExpandUrbanPlots` (rural plots
         // that would become urban). One offer per (constructible, plot); the plot index rides as arg3.
@@ -358,6 +372,8 @@
             const probe = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, { ConstructibleType: row.$hash }, false);
             if (!probe || probe.Success !== true) continue;
             const groups = [["urban", Array.isArray(probe.Plots) ? probe.Plots : []], ["newUrban", Array.isArray(probe.ExpandUrbanPlots) ? probe.ExpandUrbanPlots : []]];
+            const buyCheck = (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.PURCHASE))
+              ? Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, { ConstructibleType: row.$hash }, false) : null;
             for (const [placement, plots] of groups) {
               for (const pi of plots) {
                 if (!isInt(pi)) continue;
@@ -371,6 +387,21 @@
                   displayName: typeof row.Name === "string" ? compose(row.Name) : null, cost: cost("getConstructibleProductionCost", row.$hash), turns: turnsFor(row.$hash),
                   x: loc.x, y: loc.y, plotIndex: pi, placement: placement, terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
                   featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: GameplayMap.isRiver(loc.x, loc.y) === true, yields: plotYields(loc.x, loc.y), canStart: true });
+                // Gold builds the same constructible at once instead of queueing it. The native
+                // purchase check carries its own Cost, which is the price the shipped chooser shows.
+                if (buyCheck && buyCheck.Success === true && isInt(goldBalance)) {
+                  const buyPlotArgs = { ConstructibleType: row.$hash, X: loc.x, Y: loc.y };
+                  const pchk = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyPlotArgs, false);
+                  if (pchk && pchk.Success === true) {
+                    const bcost = isInt(pchk.Cost) ? pchk.Cost : (isInt(buyCheck.Cost) ? buyCheck.Cost : null);
+                    offers.push({ kind: "PURCHASE_CONSTRUCTIBLE", arg: c.id.id, arg2: row.$hash, arg3: pi, pre: goldBalance, cityId: c.id.id, cityName: compose(c.name),
+                      constructibleKey: row.ConstructibleType, constructibleClass: typeof row.ConstructibleClass === "string" ? row.ConstructibleClass : null,
+                      displayName: typeof row.Name === "string" ? compose(row.Name) : null, cost: bcost, goldBalance: goldBalance,
+                      affordable: isInt(bcost) ? goldBalance >= bcost : null,
+                      x: loc.x, y: loc.y, plotIndex: pi, placement: placement, terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
+                      featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: GameplayMap.isRiver(loc.x, loc.y) === true, yields: plotYields(loc.x, loc.y), canStart: true });
+                  }
+                }
               }
             }
           }
