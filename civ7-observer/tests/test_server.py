@@ -30,7 +30,9 @@ def test_server_exposes_exactly_two_read_only_tools():
         assert t.annotations.readOnlyHint is True
         assert t.annotations.destructiveHint is False
         assert t.annotations.openWorldHint is False
-        assert t.parameters.get("properties", {}) == {}, "tools accept no arguments"
+        # read-only tools take no required argument; get_observation's optional include_map is the one switch
+        assert t.parameters.get("required", []) == [], "tools require no arguments"
+        assert set(t.parameters.get("properties", {})) <= {"include_map"}
         assert "read-only" in t.description.lower() or "read only" in t.description.lower()
 
 
@@ -47,6 +49,11 @@ def test_get_observation_returns_validated_observation(capsys):
     out = tool(s, "get_observation").fn()
     assert out["schemaVersion"] == 1 and out["context"]["playerId"] == 1
     assert out["settlements"][0]["displayName"] == "Madrid"
+    # the tile list is opt-in: everything else about the map stays, and the omission is counted
+    assert out["map"]["tiles"] == [] and out["map"]["tilesOmitted"] == len(OBS["map"]["tiles"]) and "include_map" in out["map"]["note"]
+    s2, _ = make({"a": [reply(1, ctx), reply(1, ctx), reply(2, json.dumps(OBS)), reply(3, ctx)]})
+    full = tool(s2, "get_observation").fn(include_map=True)
+    assert full["map"]["tiles"] == OBS["map"]["tiles"] and "tilesOmitted" not in full["map"]
     assert "omittedFeatures" in out and "resources" in out["omittedFeatures"]
     captured = capsys.readouterr()
     assert captured.out == "", "stdout is reserved for the MCP transport"

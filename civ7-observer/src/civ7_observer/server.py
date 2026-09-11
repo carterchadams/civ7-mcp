@@ -66,7 +66,8 @@ OBSERVATION_DESCRIPTION = (
     "Read-only. Returns one validated observation of the single, pre-bound Civilization VII player: "
     "context (turn, age, seat, mode), owned settlements, owned units, technology and civics "
     "(current, queued target, banked in-progress nodes, completed nodes with earned depth), and the "
-    "currently visible map tiles only. Deliberately omitted (see `omittedFeatures`): resources, yields, "
+    "currently visible map tiles only when `include_map` is true (default false: the tile list is large and "
+    "rarely needed; `map.tilesOmitted` counts it). Deliberately omitted (see `omittedFeatures`): resources, yields, "
     "foreign units and settlements, diplomacy, notifications, fogged and hidden tiles, other players, seeds. "
     "Absence of an enemy or resource in this observation is NOT evidence of its absence in the game. "
     "Takes no arguments. On failure returns {\"error\": {\"code\", \"message\"}} with codes such as "
@@ -175,7 +176,9 @@ def build_server(
     ))
 
     @mcp.tool(name="get_observation", description=OBSERVATION_DESCRIPTION, annotations=READ_ONLY)
-    def get_observation() -> dict[str, Any]:
+    def get_observation(include_map: bool = False) -> dict[str, Any]:
+        if not isinstance(include_map, bool):
+            return {"error": {"code": "INVALID_ARGUMENT", "message": "include_map must be true or false"}}
         with lock:
             try:
                 with open_game_session(port=port, timeout=timeout, target_id=target_id, discover=discover, session_factory=session_factory) as gs:
@@ -185,6 +188,13 @@ def build_server(
                 return {"error": exc.to_dict()}
             log.info("observation %s turn %s: %d settlements, %d units, %d tiles",
                      obs["observationId"], obs["context"]["turn"], len(obs["settlements"]), len(obs["units"]), len(obs["map"]["tiles"]))
+            # The visible-tile list is nine tenths of the document (live: 66 KB of 72 KB); a seat
+            # asking about its settlements got a file it then searched seventeen times. Tiles are
+            # sent only when asked for; everything else about the map stays.
+            if not include_map:
+                tiles = obs["map"].get("tiles", [])
+                obs["map"] = {**obs["map"], "tiles": [], "tilesOmitted": len(tiles),
+                              "note": "visible tiles omitted; pass include_map=true for the tile list"}
             return obs
 
     @mcp.tool(name="get_status", description=STATUS_DESCRIPTION, annotations=READ_ONLY)
