@@ -2988,6 +2988,7 @@ function withGreatWorks(g, { archive = [], ok = true } = {}) {
   g.Game.Culture = { getGreatWorkType: (i) => (i === 7 ? 5501 : 5502) };
   g.GameInfo.GreatWorks = table([{ $hash: 5501, GreatWorkType: "GREATWORK_A", Name: "LOC_GW_A" }, { $hash: 5502, GreatWorkType: "GREATWORK_B", Name: "LOC_GW_B" }]);
   g.GameInfo.Constructibles = table([{ $hash: 8801, ConstructibleType: "BUILDING_MUSEUM" }]);
+  g.Constructibles = { get: (cid) => ({ type: 8801, cityId: cid.id === 9001 ? 65536 : 131072 }) };
   g.PlayerOperationTypes.MOVE_GREAT_WORK = 6201;
   const inner = g.Game.PlayerOperations;
   g.Game.PlayerOperations = {
@@ -3003,16 +3004,17 @@ function withGreatWorks(g, { archive = [], ok = true } = {}) {
 test("great works are offered per (work, building with an empty slot) from the seat's own buildings and archive, and a move reads back the work in its destination", () => {
   const g = withGreatWorks(withUnits(world({ log: [] }), []), { archive: [11] }); g._log = [];
   const r = runOffers(g).offers.filter((o) => o.kind === "MOVE_GREAT_WORK");
-  assert.deepEqual(r.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.typeKey, o.cityName, o.constructibleKey, o.slotsFree]), [
-    [7, 65536, 9001, 65536, "GREATWORK_A", "Cordoba", "BUILDING_MUSEUM", 1], [7, 131072, 9002, 65536, "GREATWORK_A", "LOC_T", "BUILDING_MUSEUM", 1],
-    [11, 65536, 9001, -1, "GREATWORK_B", "Cordoba", "BUILDING_MUSEUM", 1], [11, 131072, 9002, -1, "GREATWORK_B", "LOC_T", "BUILDING_MUSEUM", 1]]);
-  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":11,"DestinationCity":65536,"DestinationBuilding":9001})'), "an archived work names no source city");
-  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":7,"DestinationCity":131072,"DestinationBuilding":9002,"SourceCity":65536})'));
-  const p = runPerformArgs(g, "MOVE_GREAT_WORK", 7, 131072, 9002, { pre: 65536 });
+  assert.deepEqual(r.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.typeKey, o.cityName, o.constructibleKey, o.buildingId, o.slotsFree]), [
+    [7, 65536, 8801, 65536, "GREATWORK_A", "Cordoba", "BUILDING_MUSEUM", 9001, 1], [7, 131072, 8801, 65536, "GREATWORK_A", "LOC_T", "BUILDING_MUSEUM", 9002, 1],
+    [11, 65536, 8801, -1, "GREATWORK_B", "Cordoba", "BUILDING_MUSEUM", 9001, 1], [11, 131072, 8801, -1, "GREATWORK_B", "LOC_T", "BUILDING_MUSEUM", 9002, 1]]);
+  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":11,"DestinationCity":65536,"DestinationBuilding":8801})'), "an archived work names no source city; the building travels as its type");
+  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":7,"DestinationCity":131072,"DestinationBuilding":8801,"SourceCity":65536})'));
+  const p = runPerformArgs(g, "MOVE_GREAT_WORK", 7, 131072, 8801, { pre: 65536 });
   assert.equal(p.refused, null);
   assert.deepEqual(p.readback, { kind: "MOVE_GREAT_WORK", arg: 7, destinationCity: 131072, matches: true });
-  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 7, 65536, 9001, { pre: 65536 }).refused.code, "ACTION_EXPIRED", "the work has moved since");
-  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 99, 65536, 9001, { pre: -1 }).refused.code, "UNKNOWN_ACTION");
+  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 7, 65536, 8801, { pre: 65536 }).refused.code, "ACTION_EXPIRED", "the work has moved since");
+  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 99, 65536, 8801, { pre: -1 }).refused.code, "UNKNOWN_ACTION");
+  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 11, 65536, 4444, { pre: -1 }).refused.code, "ACTION_NOT_STARTABLE", "a building type the settlement lacks");
 });
 
 // ---- naming: the name is data the host JSON-encodes; the engine's canStart says what may be named

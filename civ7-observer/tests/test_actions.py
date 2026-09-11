@@ -1171,7 +1171,7 @@ def test_a_move_the_unit_could_not_start_this_turn_confirms_on_its_newly_queued_
 
 def test_automated_exploring_and_a_great_work_move_confirm_by_their_own_signals(tmp_path):
     ex = {"kind": "AUTOMATE_EXPLORE", "arg": 5, "arg2": -1, "arg3": -1, "pre": 1, "unitId": 5, "expect": "asleep", "canStart": True}
-    gw = {"kind": "MOVE_GREAT_WORK", "arg": 7, "arg2": 131072, "arg3": 9002, "pre": 65536, "typeKey": "GREATWORK_A", "cityName": "Town", "canStart": True}
+    gw = {"kind": "MOVE_GREAT_WORK", "arg": 7, "arg2": 131072, "arg3": 8801, "pre": 65536, "typeKey": "GREATWORK_A", "cityName": "Town", "buildingId": 9002, "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [ex, gw]}
     p1 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "AUTOMATE_EXPLORE", "arg": 5, "expect": "asleep", "before": 1, "after": 1, "present": True, "matches": False}}
     p2 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MOVE_GREAT_WORK", "arg": 7, "destinationCity": 131072, "matches": False}}
@@ -1187,7 +1187,7 @@ def test_automated_exploring_and_a_great_work_move_confirm_by_their_own_signals(
         r1 = reg.perform(gs, action_id=e["actionId"], request_id="ex-1", player=1, mode="singleplayer")
         r2 = reg.perform(gs, action_id=w["actionId"], request_id="gw-1", player=1, mode="singleplayer")
     assert r1["confirmedBy"]["effect"] == {"unitAutomated": {"unitId": 5, "action": "automate_explore", "at": None}}
-    assert r2["confirmedBy"]["effect"] == {"greatWorkMoved": {"greatWorkIndex": 7, "cityId": 131072, "buildingId": 9002}}
+    assert r2["confirmedBy"]["effect"] == {"greatWorkMoved": {"greatWorkIndex": 7, "cityId": 131072, "buildingType": 8801}}
 
 
 def test_renaming_needs_text_which_travels_json_encoded_and_confirms_on_the_name_read_back(tmp_path):

@@ -535,7 +535,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "great work offer without its destination")
                 rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
-                for k in ("typeKey", "displayName", "fromCityId", "cityId", "cityName", "constructibleKey", "slotsFree"):
+                for k in ("typeKey", "displayName", "fromCityId", "cityId", "cityName", "constructibleKey", "buildingId", "slotsFree"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
             if kind == "SELECT_CAPITAL":
@@ -1068,7 +1068,7 @@ class ActionRegistry:
                     slots = rb.get("greatWorkSlots")
                     held = slots.get(str(offer["arg2"])) if isinstance(slots, dict) else None
                     if isinstance(held, list) and offer["arg"] in held:
-                        effect = {"greatWorkMoved": {"greatWorkIndex": offer["arg"], "cityId": offer["arg2"], "buildingId": offer["arg3"]}}
+                        effect = {"greatWorkMoved": {"greatWorkIndex": offer["arg"], "cityId": offer["arg2"], "buildingType": offer["arg3"]}}
                 elif kind in ("PILLAGE", "COASTAL_RAID", "PILLAGE_ROUTE"):
                     moves = rb.get("unitMoves")
                     now = moves.get(str(offer["arg"])) if isinstance(moves, dict) else None

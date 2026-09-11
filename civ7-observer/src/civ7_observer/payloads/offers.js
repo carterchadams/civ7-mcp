@@ -235,6 +235,10 @@
     // city's great-work buildings' slots or in the player's archive, and only empty slots are targets.
     if (isInt(PlayerOperationTypes.MOVE_GREAT_WORK) && player.Culture && player.Cities && typeof player.Cities.getCities === "function" && Game.Culture && typeof Game.Culture.getGreatWorkType === "function") {
       const idOf = (v) => (isInt(v) ? v : (v && isInt(v.id) ? v.id : null));
+      // The destination building travels as its constructible TYPE (the shipped screen writes
+      // building.type into the slot's attribute); the instance id was accepted by canStart, which
+      // checks nothing for this operation, and silently dropped by the engine (live, turn 74).
+      const typeOf = (cid) => { try { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); return inst && isInt(inst.type) ? inst.type : null; } catch (e) { return null; } };
       const works = [], dests = [];
       for (const c of player.Cities.getCities()) {
         if (!c || !c.id || !isInt(c.id.id) || !c.Constructibles || typeof c.Constructibles.getGreatWorkBuildings !== "function") continue;
@@ -244,8 +248,9 @@
           const bid = idOf(b.constructibleID !== undefined ? b.constructibleID : (b.buildingID !== undefined ? b.buildingID : b.id));
           let free = 0;
           for (const sl of (Array.isArray(b.slots) ? b.slots : [])) { const gi = sl && isInt(sl.greatWorkIndex) ? sl.greatWorkIndex : -1; if (gi >= 0) works.push({ index: gi, sourceCity: c.id.id }); else free++; }
-          if (isInt(bid) && free > 0) dests.push({ cityId: c.id.id, cityName: compose(c.name), buildingId: bid, free: free,
-            constructibleKey: lookupKey(GameInfo.Constructibles, b.constructibleType !== undefined ? b.constructibleType : b.type, "ConstructibleType") });
+          const btype = typeOf(b.constructibleID !== undefined ? b.constructibleID : b.id);
+          if (isInt(bid) && isInt(btype) && free > 0) dests.push({ cityId: c.id.id, cityName: compose(c.name), buildingId: bid, buildingType: btype, free: free,
+            constructibleKey: lookupKey(GameInfo.Constructibles, btype, "ConstructibleType") });
         }
       }
       try { const n = player.Culture.getNumWorksInArchive(); for (let i = 0; i < n; i++) { const gi = player.Culture.getArchivedGreatWork(i); if (isInt(gi) && gi >= 0) works.push({ index: gi, sourceCity: -1 }); } } catch (e) { /* no archive */ }
@@ -254,11 +259,11 @@
         let row = null; try { const gt = Game.Culture.getGreatWorkType(w.index); row = GameInfo.GreatWorks && isInt(gt) ? GameInfo.GreatWorks.lookup(gt) : null; } catch (e) { row = null; }
         for (const d of dests) {
           if (offeredWorks >= 24) break;
-          const gargs = { Player1: BOUND_PLAYER_ID, GreatWorkIndex: w.index, DestinationCity: d.cityId, DestinationBuilding: d.buildingId };
+          const gargs = { Player1: BOUND_PLAYER_ID, GreatWorkIndex: w.index, DestinationCity: d.cityId, DestinationBuilding: d.buildingType };
           if (w.sourceCity >= 0) gargs.SourceCity = w.sourceCity;
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.MOVE_GREAT_WORK, gargs, false);
           if (!check || check.Success !== true) continue;
-          offers.push({ kind: "MOVE_GREAT_WORK", arg: w.index, arg2: d.cityId, arg3: d.buildingId, pre: w.sourceCity, typeKey: row && typeof row.GreatWorkType === "string" ? row.GreatWorkType : null,
+          offers.push({ kind: "MOVE_GREAT_WORK", arg: w.index, arg2: d.cityId, arg3: d.buildingType, pre: w.sourceCity, buildingId: d.buildingId, typeKey: row && typeof row.GreatWorkType === "string" ? row.GreatWorkType : null,
             displayName: row ? compose(row.Name) : null, fromCityId: w.sourceCity, cityId: d.cityId, cityName: d.cityName, constructibleKey: d.constructibleKey, slotsFree: d.free, canStart: true });
           offeredWorks++;
         }

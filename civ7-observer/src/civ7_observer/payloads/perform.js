@@ -1111,8 +1111,10 @@
     if (source === null) { try { const n = player.Culture.getNumWorksInArchive(); for (let i = 0; i < n; i++) { if (player.Culture.getArchivedGreatWork(i) === ARG) source = -1; } } catch (e) { /* none */ } }
     if (source === null) return refuse("UNKNOWN_ACTION", "great work is not held by this seat");
     if (source !== PRE) return refuse("ACTION_EXPIRED", "the great work moved since the offer was made");
-    let dest = false; try { for (const c of player.Cities.getCities()) { if (!c || !c.id || c.id.id !== ARG2 || !c.Constructibles) continue; for (const b of (c.Constructibles.getGreatWorkBuildings() || [])) { const bid = idOf(b.constructibleID !== undefined ? b.constructibleID : (b.buildingID !== undefined ? b.buildingID : b.id)); if (bid === ARG3 && (b.slots || []).some((sl) => !sl || !isInt(sl.greatWorkIndex) || sl.greatWorkIndex < 0)) dest = true; } } } catch (e) { dest = false; }
-    if (!dest) return refuse("ACTION_NOT_STARTABLE", "destination building has no empty slot in that settlement");
+    // ARG3 is the destination building's constructible TYPE, as the shipped screen sends it
+    const typeOf = (cid) => { try { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); return inst && isInt(inst.type) ? inst.type : null; } catch (e) { return null; } };
+    let dest = false; try { for (const c of player.Cities.getCities()) { if (!c || !c.id || c.id.id !== ARG2 || !c.Constructibles) continue; for (const b of (c.Constructibles.getGreatWorkBuildings() || [])) { const btype = typeOf(b.constructibleID !== undefined ? b.constructibleID : b.id); if (btype === ARG3 && (b.slots || []).some((sl) => !sl || !isInt(sl.greatWorkIndex) || sl.greatWorkIndex < 0)) dest = true; } } } catch (e) { dest = false; }
+    if (!dest) return refuse("ACTION_NOT_STARTABLE", "no building of that type with an empty slot in that settlement");
     const gwArgs = { Player1: BOUND_PLAYER_ID, GreatWorkIndex: ARG, DestinationCity: ARG2, DestinationBuilding: ARG3 };
     if (PRE >= 0) gwArgs.SourceCity = PRE;
     const gwCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], gwArgs, false);
