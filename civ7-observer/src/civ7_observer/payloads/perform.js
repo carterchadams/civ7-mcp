@@ -338,6 +338,7 @@
     let wcity = null;
     try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { wcity = c; break; } } } catch (e) { wcity = null; }
     if (!wcity || !wcity.Workers) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    if (!(wcity.Growth && wcity.Growth.isReadyToPlacePopulation === true)) return refuse("ACTION_EXPIRED", "the settlement has no population point to place");
     let placements = null; try { placements = wcity.Workers.GetAllPlacementInfo(); } catch (e) { placements = null; }
     if (!Array.isArray(placements)) return refuse("API_CONTRACT_MISMATCH", "the settlement's worker placement info is unavailable");
     let slot = null;

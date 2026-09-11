@@ -1262,8 +1262,9 @@ test("perform CANCEL_ALLIANCE refuses an unmet target, itself, a seat with no al
 });
 
 // ---- specialists (a PLAYER operation taking a plot INDEX, not a city one taking x/y)
-function withSpecialists(g, { slots = null, assignable = [489], applied = true } = {}) {
+function withSpecialists(g, { slots = null, assignable = [489], applied = true, ready = true } = {}) {
   withCity(g, {});
+  g.Players.get(1).Cities.getCities()[0].Growth = { isReadyToPlacePopulation: ready };
   g.GameInfo.Yields = [{ $hash: 1, YieldType: "YIELD_FOOD" }, { $hash: 2, YieldType: "YIELD_SCIENCE" }];
   g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_HILL" }]);
   g.GameplayMap = { ...(g.GameplayMap || {}), getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getTerrainType: () => 1, getFeatureType: () => -1, isRiver: () => false, getYield: () => 0 };
@@ -1300,6 +1301,13 @@ test("specialist offers name the plot index, the yields it would add and the upk
   assert.deepEqual(sp[0].yieldsNext, { science: 2 });
   assert.deepEqual(sp[0].upkeepNext, { food: 1 });
   assert.ok(!log.some((e) => e.startsWith("wsendRequest")));
+});
+
+test("specialists are offered only while the settlement has a population point to place", () => {
+  const g = withSpecialists(withUnits(world({ log: [] }), []), { ready: false }); g._log = [];
+  assert.deepEqual(runOffers(g).offers.filter((o) => o.kind === "ASSIGN_WORKER"), [], "the engine accepts and then drops the request without one");
+  const rr = runPerformArgs(g, "ASSIGN_WORKER", 65536, 489, 0, { pre: 0 });
+  assert.ok(rr.refused && !g._log.some((e) => e.startsWith("wsendRequest")));
 });
 
 test("a blocked plot and a plot the engine refuses are both withheld", () => {

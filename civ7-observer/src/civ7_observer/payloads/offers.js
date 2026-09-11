@@ -386,6 +386,10 @@
     if (isInt(PlayerOperationTypes.ASSIGN_WORKER)) {
       for (const c of player.Cities.getCities()) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || !c.Workers) continue;
+        // A specialist is a population point being placed. Without one pending the engine's check
+        // still says yes and then drops the request (live: nothing landed, outcome unknown), so the
+        // offer follows the same readiness flag the population placement itself does.
+        if (!(c.Growth && c.Growth.isReadyToPlacePopulation === true)) continue;
         let info = null; try { info = c.Workers.GetAllPlacementInfo(); } catch (e) { info = null; }
         if (!Array.isArray(info)) continue;
         let cityCap = null, cityWorkers = null;
