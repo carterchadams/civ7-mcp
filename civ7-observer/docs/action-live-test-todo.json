@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 177,
+          "confirmed": 178,
           "rejected": 0,
           "unknown": 0
         }
@@ -43,7 +43,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 160,
+          "confirmed": 161,
           "rejected": 0,
           "unknown": 0
         }
@@ -67,7 +67,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 551,
+          "confirmed": 568,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,8 +139,8 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2234,
-          "rejected": 12,
+          "confirmed": 2355,
+          "rejected": 13,
           "unknown": 0
         }
       }
@@ -163,8 +163,8 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1916,
-          "rejected": 24,
+          "confirmed": 1984,
+          "rejected": 32,
           "unknown": 4
         }
       }
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 155,
+          "confirmed": 157,
           "rejected": 2,
           "unknown": 1
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 236,
+          "confirmed": 250,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 93,
+          "confirmed": 108,
           "rejected": 0,
           "unknown": 0
         }
@@ -307,7 +307,7 @@
       "expected_evidence": "a confirmed `CHANGE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 96,
+          "confirmed": 99,
           "rejected": 3,
           "unknown": 0
         }
@@ -331,7 +331,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 62,
+          "confirmed": 63,
           "rejected": 0,
           "unknown": 2
         }
@@ -355,7 +355,7 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 68,
+          "confirmed": 69,
           "rejected": 0,
           "unknown": 0
         }
@@ -427,7 +427,7 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 14,
+          "confirmed": 15,
           "rejected": 0,
           "unknown": 0
         }
@@ -475,7 +475,7 @@
       "expected_evidence": "a confirmed `CHOOSE_GOLDEN_AGE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 88,
+          "confirmed": 91,
           "rejected": 0,
           "unknown": 0
         }
@@ -499,7 +499,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 83,
+          "confirmed": 87,
           "rejected": 8,
           "unknown": 1
         }
@@ -523,7 +523,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 34,
+          "confirmed": 35,
           "rejected": 0,
           "unknown": 0
         }
@@ -547,7 +547,7 @@
       "expected_evidence": "a confirmed `PROMOTE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 25,
+          "confirmed": 29,
           "rejected": 0,
           "unknown": 2
         }
@@ -571,7 +571,7 @@
       "expected_evidence": "a confirmed `CHOOSE_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 9,
+          "confirmed": 10,
           "rejected": 4,
           "unknown": 4
         }
@@ -595,7 +595,7 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 24,
+          "confirmed": 25,
           "rejected": 0,
           "unknown": 1
         }
@@ -667,7 +667,7 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 5,
+          "confirmed": 6,
           "rejected": 2,
           "unknown": 0
         }
@@ -835,7 +835,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 25,
+          "confirmed": 26,
           "rejected": 5,
           "unknown": 0
         }
@@ -1124,7 +1124,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "town_growth_mode"
@@ -1133,7 +1133,13 @@
       "consequence_class": "low",
       "procedure": "take a `town_growth_mode` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `TOWN_GROWTH_MODE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-queue_remove",
@@ -1142,7 +1148,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "queue_remove"
@@ -1151,7 +1157,13 @@
       "consequence_class": "low",
       "procedure": "take a `queue_remove` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `QUEUE_REMOVE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-queue_move_up",
@@ -1303,7 +1315,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 203,
+          "confirmed": 240,
           "rejected": 1,
           "unknown": 1
         }
@@ -1838,7 +1850,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "automate_explore"
@@ -1847,7 +1859,13 @@
       "consequence_class": "low",
       "procedure": "take a `automate_explore` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `AUTOMATE_EXPLORE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 15,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-wmd_strike",
@@ -1883,7 +1901,13 @@
       "consequence_class": "low",
       "procedure": "take a `move_great_work` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `MOVE_GREAT_WORK` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 0,
+          "rejected": 1,
+          "unknown": 1
+        }
+      }
     },
     {
       "case_id": "LT-rename_unit",
@@ -2760,7 +2784,7 @@
       "variant": "plan-item",
       "priority": 2,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
@@ -3064,7 +3088,7 @@
       "variant": "plan-item",
       "priority": 4,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
