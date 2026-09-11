@@ -260,6 +260,17 @@ def test_choosing_a_religion_is_a_supported_required_decision_not_a_pause(tmp_pa
     assert d["required"] is True and d["options"][0]["kind"] == "found_religion" and "found a religion" in d["note"]
 
 
+def test_choosing_a_belief_is_the_same_religion_decision(tmp_path):
+    """Live, turn 52: the religion was founded and the turn then blocked on a separate belief notification."""
+    bel = [{"kind": "ADD_BELIEF", "arg": 777, "pre": 0, "typeKey": "BELIEF_BONUS_1", "beliefClass": "ENHANCER", "displayName": "Bonus", "canStart": True}]
+    payload = offers_with(bel, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_BELIEF"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "religion")
+    assert d["required"] is True and d["options"][0]["kind"] == "add_belief"
+
+
 def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
     """Live, turn 45: six resource assignments and one confirm; the confirm was the option dropped and
     the seat could not end its turn at all, with nothing left to assign."""

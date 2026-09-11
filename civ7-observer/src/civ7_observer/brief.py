@@ -48,6 +48,8 @@ BLOCKER_DECISION = {
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_RELIGION": "religion",
+    "NOTIFICATION_CHOOSE_BELIEF": "religion",
+    "CHOOSE_BELIEF": "religion",
     "CHOOSE_RELIGION": "religion",
     "DIPLOMATIC_RESPOSE_REQUIRED": "diplomatic_response",
     "DIPLOMATIC_RESPONSE_REQUIRED": "diplomatic_response",
