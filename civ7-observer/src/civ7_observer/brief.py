@@ -59,6 +59,7 @@ DECISION_OF_KIND = {
     "civic": "civic",
     "produce_unit": "production",
     "produce_constructible": "production",
+    "purchase_unit": "production",
     "skip_unit": "unit",
     "move_unit": "unit",
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
@@ -86,7 +87,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -100,7 +101,8 @@ RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity 
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
-                   "settlement are shown: call get_city_options with a cityId for everything it can build")
+                   "settlement are shown: call get_city_options with a cityId for everything it can build. A purchase_unit "
+                   "option spends gold (`cost` against `goldBalance`) and delivers the unit at once, rather than queueing it")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "

@@ -207,6 +207,26 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "PURCHASE_UNIT") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "purchase arguments are not integers");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.PURCHASE)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.PURCHASE unavailable");
+    let city = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { city = c; break; } } } catch (e) { city = null; }
+    if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const urow = GameInfo.Units.lookup(ARG2);
+    if (!urow || typeof urow.UnitType !== "string") return refuse("UNKNOWN_ACTION", "unit type is not a unit definition");
+    let before = null; try { before = player.Units.getUnits().length; } catch (e) { before = null; }
+    if (before !== PRE) return refuse("ACTION_EXPIRED", "the seat's units changed since the purchase was offered");
+    const cityId = city.id;
+    const buyArgs = { UnitType: ARG2 };
+    const pcheck = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false);
+    if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the purchase");
+    Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs);
+    result.outcome = "sent";
+    let after = null; try { after = player.Units.getUnits().length; } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, matches: isInt(after) && after > PRE };
+    return JSON.stringify(result);
+  }
   if (KIND === "PRODUCE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
     if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");

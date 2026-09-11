@@ -235,6 +235,8 @@
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {
       const cities = player.Cities.getCities();
       if (!Array.isArray(cities)) throw new Error("getCities() is not an array");
+      const unitCount = player.Units.getUnits().length;
+      let goldBalance = null; try { const g = player.Treasury.goldBalance; goldBalance = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldBalance = null; }
       for (const c of cities) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
         const cityId = c.id;
@@ -255,6 +257,19 @@
           offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name), queue: queueKeys, queueLength: ppre,
             unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
             cost: cost("getUnitProductionCost", row.$hash), turns: turnsFor(row.$hash), canStart: true });
+        }
+        // Purchasing spends the treasury instead of production and delivers the unit at once. The
+        // native check returns the gold cost in its own result, which is what the shipped chooser shows.
+        if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.PURCHASE)) {
+          for (const row of GameInfo.Units) {
+            if (!row || !isInt(row.$hash) || typeof row.UnitType !== "string") continue;
+            const buyArgs = { UnitType: row.$hash };
+            const check = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false);
+            if (!check || check.Success !== true) continue;
+            offers.push({ kind: "PURCHASE_UNIT", arg: c.id.id, arg2: row.$hash, pre: unitCount, cityId: c.id.id, cityName: compose(c.name),
+              unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+              cost: isInt(check.Cost) ? check.Cost : null, goldBalance: goldBalance, canStart: true });
+          }
         }
         // Buildings need a plot: the shipped chooser asks canStart(BUILD, {ConstructibleType}) and the
         // placement mode then offers `Plots` (existing urban plots) and `ExpandUrbanPlots` (rural plots

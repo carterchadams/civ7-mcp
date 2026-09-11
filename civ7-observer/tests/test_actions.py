@@ -1047,3 +1047,18 @@ def test_town_project_offer_and_confirmation(tmp_path):
         assert tp["cityName"] == "Sendai" and tp["description"] == "+5 healing" and "arg" not in tp and "arg2" not in tp
         res = reg.perform(gs, action_id=tp["actionId"], request_id="tp-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"townProject": {"cityId": 131073, "projectType": 9301}}
+
+
+def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_UNIT", "arg": 65536, "arg2": 777513683, "pre": 1, "cityId": 65536, "cityName": "Pārsa", "unitTypeKey": "UNIT_SPEARMAN", "displayName": "Spearman", "cost": 240, "goldBalance": 2792, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_UNIT", "arg": 65536, "unitType": 777513683, "unitsBefore": 1, "units": 1, "matches": False}}
+    rb = {**RB, "unitCount": 2, "goldBalance": 2552}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pu = next(o for o in out["offers"] if o["kind"] == "purchase_unit")
+        assert pu["cost"] == 240 and pu["goldBalance"] == 2792 and pu["unitTypeKey"] == "UNIT_SPEARMAN" and "arg" not in pu
+        res = reg.perform(gs, action_id=pu["actionId"], request_id="buy-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}

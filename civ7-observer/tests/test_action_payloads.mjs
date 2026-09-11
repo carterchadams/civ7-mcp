@@ -1138,3 +1138,53 @@ test("a settler blocked by the minimum distance is told so, and one blocked for 
   assert.equal(other.tooCloseToSettle, false);
   assert.match(other.reason, /not the minimum-settlement-distance rule/);
 });
+
+// ---- purchasing a unit with the treasury
+function withPurchase(g, { affordable = [99], gold = 800, unitsAfter = 1 } = {}) {
+  withCity(g, {});
+  const me = g.Players.get(1);
+  let units = [];
+  me.Units = { getUnits: () => units };
+  me.Treasury = { goldBalance: gold };
+  g.CityCommandTypes = { EXPAND: 7771, PURCHASE: 1490793096 };
+  const city = me.Cities.getCities()[0];
+  g.Game.CityCommands = {
+    canStart: (cid, cmd, args, show) => { g._log.push(`qcanStart(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)},${show})`); if (cmd !== 1490793096) return { Success: false }; return { Success: cid.owner === 1 && affordable.includes(args.UnitType), Cost: 240, Requirements: {} }; },
+    sendRequest: (cid, cmd, args) => { g._log.push(`qsendRequest(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)})`); for (let i = 0; i < unitsAfter; i++) units = units.concat([unit(900 + i)]); me.Units = { getUnits: () => units }; },
+  };
+  return g;
+}
+
+test("purchase offers carry the native cost and the seat's gold, and never touch the build queue", () => {
+  const log = [];
+  const g = withPurchase(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  const buys = r.offers.filter((o) => o.kind === "PURCHASE_UNIT");
+  assert.deepEqual(buys.map((o) => [o.arg, o.arg2, o.pre, o.cityName, o.unitTypeKey, o.cost, o.goldBalance, o.canStart]),
+    [[65536, 99, 0, "Cordoba", "UNIT_SCOUT", 240, 800, true]]);
+  assert.ok(!log.some((e) => e.startsWith("qsendRequest")));
+});
+
+test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHASE, and reads back a new unit", () => {
+  const log = [];
+  const g = withPurchase(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "PURCHASE_UNIT", arg: 65536, unitType: 99, unitsBefore: 0, units: 1, matches: true });
+  assert.ok(log.find((e) => e.startsWith("qsendRequest(") && e.includes('"UnitType":99')));
+  for (const [label, mk, cid, ut, pre] of [
+    ["unknown city", () => withPurchase(withUnits(world({ log: [] }), [])), 7, 99, 0],
+    ["not a unit", () => withPurchase(withUnits(world({ log: [] }), [])), 65536, 4242, 0],
+    ["roster changed", () => withPurchase(withUnits(world({ log: [] }), [])), 65536, 99, 3],
+    ["canStart false", () => withPurchase(withUnits(world({ log: [] }), []), { affordable: [] }), 65536, 99, 0],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "PURCHASE_UNIT", cid, ut, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("qsendRequest")), `${label}: must not send`);
+  }
+  const none = withPurchase(withUnits(world({ log: [] }), []), { unitsAfter: 0 }); none._log = [];
+  const rr = runPerformArgs(none, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
