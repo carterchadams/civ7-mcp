@@ -167,3 +167,15 @@ def test_pantheon_blocker_is_a_supported_decision(tmp_path):
     required = [d for d in b["decisions"] if d["required"]]
     assert [d["kind"] for d in required] == ["pantheon"] and b["pause"] is None
     assert required[0]["options"][0]["description"] == "+2 Influence"
+
+
+@pytest.mark.parametrize("blocking, decision", [
+    ("NOTIFICATION_CHOOSE_CULTURE_NODE", "civic"), ("NOTIFICATION_CHOOSE_TECH", "research"),
+    ("NOTIFICATION_CHOOSE_CITY_PRODUCTION", "production"), ("NOTIFICATION_COMMAND_UNITS", "unit"),
+])
+def test_notification_named_blockers_map_to_the_same_decisions_as_the_enum(tmp_path, blocking, decision):
+    civic = [{"kind": "SET_CULTURE_TREE_NODE", "arg": 801, "pre": -1, "typeKey": "NODE_CIVIC_AQ_MAIN_MYSTICISM", "displayName": "Mysticism", "tree": "TREE_CIVICS_AQ_MAIN", "cost": 125, "turns": 6, "canStart": True}]
+    production = [{"kind": "PRODUCE_UNIT", "arg": 65536, "arg2": 100, "pre": 0, "cityId": 65536, "cityName": "Pārsa", "queue": [], "queueLength": 0, "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(RESEARCH + civic + UNITS + production, end_can_start=False, blocking=blocking))
+    assert b["pause"] is None and b["endTurn"]["supported"] is True
+    assert [d["kind"] for d in b["decisions"] if d["required"]] == [decision]

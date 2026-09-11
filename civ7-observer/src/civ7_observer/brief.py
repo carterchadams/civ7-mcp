@@ -27,7 +27,16 @@ BLOCKER_DECISION = {
     "NEW_POPULATION": "population",
     "TRADITIONS": "policies",
     "PANTHEON": "pantheon",
-    # data-driven blockers are named after the blocking notification's type
+    # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
+    # notification's type (live: the civic blocker on turn 8 came back as a raw value), so every
+    # supported decision is reachable under its notification name too.
+    "NOTIFICATION_CHOOSE_TECH": "research",
+    "NOTIFICATION_CHOOSE_CULTURE_NODE": "civic",
+    "NOTIFICATION_CHOOSE_CITY_PRODUCTION": "production",
+    "NOTIFICATION_COMMAND_UNITS": "unit",
+    "NOTIFICATION_NEW_POPULATION": "population",
+    "NOTIFICATION_TRADITIONS_AVAILABLE": "policies",
+    "NOTIFICATION_CHOOSE_PANTHEON": "pantheon",
     "NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION": "narrative",
     "NOTIFICATION_CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative",
     "NOTIFICATION_CHOOSE_AUTO_STORY_DIRECTION": "narrative",

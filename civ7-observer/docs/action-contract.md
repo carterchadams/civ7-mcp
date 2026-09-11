@@ -27,7 +27,9 @@ Blocking types observed: `UNITS` (23669119) while any unit has moves and no orde
 blockers are data-driven and absent from `EndTurnBlockingTypes` (live: `-2084516792` for a discovery
 narrative); the payloads then name the blocker after the bound player's notification that has
 `BlocksTurnAdvancement` true (`NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION`), and the brief maps
-those names too. `Game.Notifications.getTypeName`
+those names too. Live (turn 8) the civic blocker itself came back as a raw value and was named
+`NOTIFICATION_CHOOSE_CULTURE_NODE`, so every supported decision is also mapped under its
+notification name. `Game.Notifications.getTypeName`
 does not name blocking types; the `EndTurnBlockingTypes` key does.
 
 ## Binding, identity and outcome rules (`actions.ActionRegistry`)
