@@ -90,5 +90,12 @@ def test_the_driver_injects_operator_directives_read_fresh_each_turn(driver):
     source = DRIVER.read_text(encoding="utf-8")
     assert '"--directives"' in source
     assert "operator_directives(state_dir() / \"sessions\")" in source
-    assert "directives=directives)" in source
+    assert "directives=directives, testing=" in source
     assert 'summary["directives"] = bool(directives)' in source
+
+
+def test_the_driver_injects_testing_opportunities_and_grades_them_by_receipts(driver):
+    source = DRIVER.read_text(encoding="utf-8")
+    assert "ledger.opportunities(seat, offered)" in source
+    assert "testing=TestLedger.note(cases)" in source
+    assert "ledger.record_receipts(seat, rows, turn=turn)" in source, "passes come from receipts, not from the report"

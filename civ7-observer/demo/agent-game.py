@@ -32,6 +32,7 @@ from civ7_observer.runner import assemble_system_prompt
 from civ7_observer.server import default_journal
 from civ7_observer.service import open_game_session
 from civ7_observer.session import SeatSession, operator_directives
+from civ7_observer.testing import TestLedger
 
 PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
@@ -161,8 +162,13 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     else:
         directives = operator_directives(state_dir() / "sessions")
     summary["directives"] = bool(directives)
+    # Live-test opportunities: at most two open cases whose kinds this seat is being offered right now.
+    ledger = TestLedger(ctx["match"])
+    offered = {o.get("kind") for d in brief.get("decisions", []) for o in d.get("options", []) if o.get("kind")}
+    cases = ledger.opportunities(seat, offered)
+    summary["testing"] = [c["case_id"] for c in cases]
     system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir),
-                                    directives=directives)
+                                    directives=directives, testing=TestLedger.note(cases))
     system_path = RUNS / f"{tag}.system.md"
     system_path.write_text(system, encoding="utf-8")
     transcript = RUNS / f"{tag}.transcript.jsonl"
@@ -207,6 +213,9 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     (RUNS / f"{tag}.report.txt").write_text(report, encoding="utf-8")
 
     rows = journal_rows(seat)[journal_before:]
+    # Passing is decided by receipts, never by the agent's narrative.
+    summary["testingChanged"] = ledger.record_receipts(seat, rows, turn=turn)
+    ledger.aggregate()
     receipts = [{"kind": r.get("kind"), "status": r.get("status"), "requestId": r.get("requestId")} for r in rows if r.get("status") != "pending"]
     ended = any(r.get("kind") == "END_TURN" and r.get("status") == "confirmed" and r.get("turn") == turn for r in rows)
     unknown = [r["requestId"] for r in rows if r.get("status") == "unknown"]
@@ -274,6 +283,8 @@ def main() -> int:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
             cur = res.get("curtain") or {}
             line = (f"[{res['tag']}] {res['status']}" + (" [directives]" if res.get("directives") else "")
+                    + (f" [test: {','.join(res['testing'])}]" if res.get("testing") else "")
+                    + (f" [test-result: {','.join(c['case_id'] + '=' + c['live_status'] for c in res['testingChanged'])}]" if res.get("testingChanged") else "")
                     + (f" (curtains {cur.get('curtainsBefore')}->{cur.get('curtainsAfter')}" + (", advisor popup confirmed" if (cur.get('advisorPopup') or {}).get('confirmed') else "") + ")" if cur and "curtainsBefore" in cur else "")
                     + (f" in {res['elapsedS']}s, ${res.get('costUsd') or 0:.2f}, tools {res['toolCalls']}, receipts "
                        f"{[(r['kind'], r['status']) for r in res['receipts']]}, friction {len(res['friction'])}" if "elapsedS" in res else ""))

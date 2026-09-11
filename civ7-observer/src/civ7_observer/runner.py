@@ -112,7 +112,8 @@ summary. The skill cards below are your procedures."""
 
 
 def assemble_system_prompt(brief: dict[str, Any], plan_text: str, *, instructions: str = INSTRUCTIONS,
-                           skills_location: str | None = None, directives: str | None = None) -> str:
+                           skills_location: str | None = None, directives: str | None = None,
+                           testing: str | None = None) -> str:
     """The per-turn system prompt: operating instructions, the operating contract, the skill cards
     routed for this brief's decisions (required first), the friction card, the rules those cards
     cite, the seat's own plan as the seat last wrote it, and the catalog of every other card.
@@ -133,6 +134,8 @@ def assemble_system_prompt(brief: dict[str, Any], plan_text: str, *, instruction
         parts.append("# Operator directives\n\nThese come from the people running this game and take priority over "
                      "your own plan. Act on each one as soon as it is possible, check every turn whether it has become "
                      "possible if it is not, and say in your closing summary what you did about each.\n\n" + directives)
+    if testing:
+        parts.append(testing)
     parts += ["", skills.operating()]
     for skill_id in routed:
         parts.append(skills.card(skill_id))

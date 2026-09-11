@@ -1,0 +1,1551 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "case_id": "LT-research",
+      "action_family": "research",
+      "expected_kind": "SET_TECH_TREE_NODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "research"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `research` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 171,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-civic",
+      "action_family": "civic",
+      "expected_kind": "SET_CULTURE_TREE_NODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "civic"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `civic` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 157,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-research_goal",
+      "action_family": "research_goal",
+      "expected_kind": "SET_TECH_TREE_TARGET_NODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "research_goal"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `research_goal` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-civic_goal",
+      "action_family": "civic_goal",
+      "expected_kind": "SET_CULTURE_TREE_TARGET_NODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "civic_goal"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `civic_goal` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SET_CULTURE_TREE_TARGET_NODE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-end_turn",
+      "action_family": "end_turn",
+      "expected_kind": "END_TURN",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "end_turn"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `end_turn` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 516,
+          "rejected": 4,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-skip_unit",
+      "action_family": "skip_unit",
+      "expected_kind": "SKIP_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "skip_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `skip_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2022,
+          "rejected": 8,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-move_unit",
+      "action_family": "move_unit",
+      "expected_kind": "MOVE_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "move_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `move_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1645,
+          "rejected": 10,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-produce_unit",
+      "action_family": "produce_unit",
+      "expected_kind": "PRODUCE_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "produce_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `produce_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 148,
+          "rejected": 1,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-produce_project",
+      "action_family": "produce_project",
+      "expected_kind": "PRODUCE_PROJECT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "produce_project"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `produce_project` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PRODUCE_PROJECT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-found_city",
+      "action_family": "found_city",
+      "expected_kind": "FOUND_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "found_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `found_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOUND_CITY` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 36,
+          "rejected": 5,
+          "unknown": 5
+        }
+      }
+    },
+    {
+      "case_id": "LT-expand_city",
+      "action_family": "expand_city",
+      "expected_kind": "EXPAND_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "expand_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `expand_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 213,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-produce_constructible",
+      "action_family": "produce_constructible",
+      "expected_kind": "PRODUCE_CONSTRUCTIBLE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "produce_constructible"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `produce_constructible` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 79,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-activate_tradition",
+      "action_family": "activate_tradition",
+      "expected_kind": "CHANGE_TRADITION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "activate_tradition"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `activate_tradition` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHANGE_TRADITION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 96,
+          "rejected": 3,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-confirm_traditions",
+      "action_family": "confirm_traditions",
+      "expected_kind": "CONSIDER_ASSIGN_TRADITIONS",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "confirm_traditions"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `confirm_traditions` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 61,
+          "rejected": 0,
+          "unknown": 2
+        }
+      }
+    },
+    {
+      "case_id": "LT-narrative_choice",
+      "action_family": "narrative_choice",
+      "expected_kind": "CHOOSE_NARRATIVE_STORY_DIRECTION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "narrative_choice"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `narrative_choice` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 65,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-found_pantheon",
+      "action_family": "found_pantheon",
+      "expected_kind": "FOUND_PANTHEON",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "found_pantheon"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `found_pantheon` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOUND_PANTHEON` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 4,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-change_government",
+      "action_family": "change_government",
+      "expected_kind": "CHANGE_GOVERNMENT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "change_government"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `change_government` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHANGE_GOVERNMENT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 10,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-buy_attribute",
+      "action_family": "buy_attribute",
+      "expected_kind": "BUY_ATTRIBUTE_TREE_NODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "buy_attribute"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `buy_attribute` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 12,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-consider_attributes",
+      "action_family": "consider_attributes",
+      "expected_kind": "CONSIDER_ASSIGN_ATTRIBUTE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "consider_attributes"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `consider_attributes` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONSIDER_ASSIGN_ATTRIBUTE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 3,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-choose_celebration",
+      "action_family": "choose_celebration",
+      "expected_kind": "CHOOSE_GOLDEN_AGE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "choose_celebration"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `choose_celebration` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_GOLDEN_AGE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 87,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-assign_resource",
+      "action_family": "assign_resource",
+      "expected_kind": "ASSIGN_RESOURCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "assign_resource"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `assign_resource` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 68,
+          "rejected": 8,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-consider_resources",
+      "action_family": "consider_resources",
+      "expected_kind": "CONSIDER_ASSIGN_RESOURCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "consider_resources"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `consider_resources` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 28,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-promote_unit",
+      "action_family": "promote_unit",
+      "expected_kind": "PROMOTE_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "promote_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `promote_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PROMOTE_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 24,
+          "rejected": 0,
+          "unknown": 2
+        }
+      }
+    },
+    {
+      "case_id": "LT-town_project",
+      "action_family": "town_project",
+      "expected_kind": "CHOOSE_TOWN_PROJECT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "town_project"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `town_project` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_TOWN_PROJECT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 6,
+          "rejected": 1,
+          "unknown": 2
+        }
+      }
+    },
+    {
+      "case_id": "LT-purchase_unit",
+      "action_family": "purchase_unit",
+      "expected_kind": "PURCHASE_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "purchase_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `purchase_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PURCHASE_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 4,
+          "rejected": 1,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-purchase_constructible",
+      "action_family": "purchase_constructible",
+      "expected_kind": "PURCHASE_CONSTRUCTIBLE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "purchase_constructible"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `purchase_constructible` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PURCHASE_CONSTRUCTIBLE` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-promote_town_to_city",
+      "action_family": "promote_town_to_city",
+      "expected_kind": "UPGRADE_TOWN",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "promote_town_to_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `promote_town_to_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-choose_age_civilization",
+      "action_family": "choose_age_civilization",
+      "expected_kind": "CHOOSE_AGE_CIVILIZATION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "choose_age_civilization"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `choose_age_civilization` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_AGE_CIVILIZATION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 3,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-finish_age_transition",
+      "action_family": "finish_age_transition",
+      "expected_kind": "SET_AGE_TRANSITION_DATA",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "finish_age_transition"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `finish_age_transition` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SET_AGE_TRANSITION_DATA` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 3,
+          "rejected": 0,
+          "unknown": 2
+        }
+      }
+    },
+    {
+      "case_id": "LT-pick_legacy_card",
+      "action_family": "pick_legacy_card",
+      "expected_kind": "ADVANCED_START_MODIFY_DECK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "pick_legacy_card"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `pick_legacy_card` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADVANCED_START_MODIFY_DECK` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 12,
+          "rejected": 6,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-finish_legacy_deck",
+      "action_family": "finish_legacy_deck",
+      "expected_kind": "ADVANCED_START_MARK_COMPLETED",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "finish_legacy_deck"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `finish_legacy_deck` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADVANCED_START_MARK_COMPLETED` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 4,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-greet_new_civilization",
+      "action_family": "greet_new_civilization",
+      "expected_kind": "RESPOND_DIPLOMATIC_FIRST_MEET",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "greet_new_civilization"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `greet_new_civilization` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_FIRST_MEET` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-make_trade_route",
+      "action_family": "make_trade_route",
+      "expected_kind": "MAKE_TRADE_ROUTE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "make_trade_route"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `make_trade_route` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `MAKE_TRADE_ROUTE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-send_merchant",
+      "action_family": "send_merchant",
+      "expected_kind": "SEND_MERCHANT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "send_merchant"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `send_merchant` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-unit_order",
+      "action_family": "unit_order",
+      "expected_kind": "UNIT_ORDER",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "unit_order"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `unit_order` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 100,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-disband_unit",
+      "action_family": "disband_unit",
+      "expected_kind": "DISBAND_UNIT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "disband_unit"
+        ]
+      },
+      "consequence_class": "high",
+      "procedure": "take a `disband_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `DISBAND_UNIT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-assign_specialist",
+      "action_family": "assign_specialist",
+      "expected_kind": "ASSIGN_WORKER",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "assign_specialist"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `assign_specialist` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ASSIGN_WORKER` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 0,
+          "rejected": 1,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-cancel_alliance",
+      "action_family": "cancel_alliance",
+      "expected_kind": "CANCEL_ALLIANCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "cancel_alliance"
+        ]
+      },
+      "consequence_class": "high",
+      "procedure": "take a `cancel_alliance` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CANCEL_ALLIANCE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-attack",
+      "action_family": "attack",
+      "expected_kind": "ATTACK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "attack"
+        ]
+      },
+      "consequence_class": "high",
+      "procedure": "take a `attack` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ATTACK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-upgrade_unit",
+      "action_family": "upgrade_unit",
+      "expected_kind": "UPGRADE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "upgrade_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `upgrade_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UPGRADE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-pack_army",
+      "action_family": "pack_army",
+      "expected_kind": "PACK_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "pack_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `pack_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PACK_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-join_army",
+      "action_family": "join_army",
+      "expected_kind": "ADD_TO_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "join_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `join_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADD_TO_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-leave_army",
+      "action_family": "leave_army",
+      "expected_kind": "REMOVE_FROM_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "leave_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `leave_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REMOVE_FROM_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-unpack_army",
+      "action_family": "unpack_army",
+      "expected_kind": "UNPACK_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "unpack_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `unpack_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UNPACK_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-activate_great_person",
+      "action_family": "activate_great_person",
+      "expected_kind": "ACTIVATE_GREAT_PERSON",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "activate_great_person"
+        ]
+      },
+      "consequence_class": "high",
+      "procedure": "take a `activate_great_person` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ACTIVATE_GREAT_PERSON` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-respond_to_proposal",
+      "action_family": "respond_to_proposal",
+      "expected_kind": "RESPOND_DIPLOMATIC_ACTION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "respond_to_proposal"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `respond_to_proposal` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_ACTION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2,
+          "rejected": 0,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-found_religion",
+      "action_family": "found_religion",
+      "expected_kind": "FOUND_RELIGION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "found_religion"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `found_religion` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOUND_RELIGION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-add_belief",
+      "action_family": "add_belief",
+      "expected_kind": "ADD_BELIEF",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "add_belief"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `add_belief` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADD_BELIEF` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2,
+          "rejected": 0,
+          "unknown": 1
+        }
+      }
+    },
+    {
+      "case_id": "LT-start_diplomatic_action",
+      "action_family": "start_diplomatic_action",
+      "expected_kind": "START_DIPLOMATIC_ACTION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "start_diplomatic_action"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `start_diplomatic_action` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "PLAN-A01",
+      "action_family": "Captured settlement keep/raze/liberate",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Captured settlement keep/raze/liberate",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A02",
+      "action_family": "Peace deals: inspect, propose, accept, reject",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Peace deals: inspect, propose, accept, reject",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A03",
+      "action_family": "Ally at war / call to arms",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Ally at war / call to arms",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A04",
+      "action_family": "Choose city-state bonus",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Choose city-state bonus",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A05",
+      "action_family": "Support/oppose ongoing diplomatic actions",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Support/oppose ongoing diplomatic actions",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A06",
+      "action_family": "Diplomatic projects with secondary targets",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 1,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Diplomatic projects with secondary targets",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A07",
+      "action_family": "Advisor-warning acknowledgement",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Advisor-warning acknowledgement",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A08",
+      "action_family": "Pillage, coastal raid, route plunder",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Pillage, coastal raid, route plunder",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A09",
+      "action_family": "Religious spread and relics",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Religious spread and relics",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A10",
+      "action_family": "Production queue remove/reorder/move",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Production queue remove/reorder/move",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A11",
+      "action_family": "Policy deactivation and replacement",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Policy deactivation and replacement",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A12",
+      "action_family": "Resource unassign/clear/swap",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Resource unassign/clear/swap",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A13",
+      "action_family": "Town return to growth mode",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 2,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Town return to growth mode",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A14",
+      "action_family": "Wake/cancel orders and unit swap",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Wake/cancel orders and unit swap",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A15",
+      "action_family": "Capital selection",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Capital selection",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A16",
+      "action_family": "Syncretism choices",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Syncretism choices",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A17",
+      "action_family": "Legacy deck revise and placement effects",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Legacy deck revise and placement effects",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A18",
+      "action_family": "Resettle/migrant and alternate founding",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Resettle/migrant and alternate founding",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A19",
+      "action_family": "Army reinforcement, focused attacks, overrun",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Army reinforcement, focused attacks, overrun",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A20",
+      "action_family": "Roads, rail, bases, rebase, cargo",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 3,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Roads, rail, bases, rebase, cargo",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A21",
+      "action_family": "Civilization/unit-specific abilities",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Civilization/unit-specific abilities",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A22",
+      "action_family": "Tile actions: repair, remove, plant, disperse",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Tile actions: repair, remove, plant, disperse",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A23",
+      "action_family": "Artifacts and great-work relocation",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Artifacts and great-work relocation",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A24",
+      "action_family": "Air and specialized naval attacks",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Air and specialized naval attacks",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A25",
+      "action_family": "WMD and contamination cleanup",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "WMD and contamination cleanup",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A26",
+      "action_family": "City/district attacks and espionage units if player-facing",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "City/district attacks and espionage units if player-facing",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A27",
+      "action_family": "Standing multi-turn movement and automate-explore",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 4,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Standing multi-turn movement and automate-explore",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "PLAN-A28",
+      "action_family": "Custom religion name and renaming",
+      "expected_kind": null,
+      "variant": "plan-item",
+      "priority": 5,
+      "implementation_status": "unimplemented",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": []
+      },
+      "consequence_class": "medium",
+      "procedure": "Custom religion name and renaming",
+      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "evidence_refs": {}
+    }
+  ]
+}

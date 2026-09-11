@@ -127,3 +127,19 @@ the contract, the cards and the plan, framed as goals that outrank the seat's ow
 each turn, so an edit takes effect at the next seat without a restart; delete or empty the file to
 withdraw it. Use it to steer what gets exercised, such as opening a trade route the moment one is
 available and checking every turn until then. `--directives PATH` points the driver elsewhere.
+
+## The live-test ledger
+
+`docs/action-live-test-todo.json` is the repository's list of live-test cases: one per implemented
+action kind, plus one placeholder per item of the remaining-actions plan. `tools/build_test_ledger.py`
+regenerates it (keeping recorded evidence), along with the human checklist
+`docs/action-live-test-checklist.md` and the coverage table `docs/action-coverage.md`, and seeds live
+status from the seat journals on this host. Implementation status and live status are kept apart: an
+action is live-verified only by a confirmed receipt in a real game.
+
+Each seat turn, the driver picks at most two open cases whose kinds that seat is being offered right
+now and puts a short "testing opportunities" note in its prompt. After the turn it correlates the
+seat's receipts with the cases: a confirmed receipt of the case's kind passes it and it leaves the
+prompts; an unknown marks it inconclusive. Results live per match and per seat under
+`<state>/testing/<match>/`, with a sanitized `status.json` of counts only. The agent's own
+`TESTED:` line in its summary is a courtesy for the reader, not the evidence.
