@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -302,9 +302,11 @@ class ActionRegistry:
             if kind == "MAKE_TRADE_ROUTE" and isinstance(o.get("activeRoutes"), int):
                 rec["activeRoutes"] = o["activeRoutes"]
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
-            if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY", "PROMOTE_UNIT", "MAKE_TRADE_ROUTE"):
+            if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY", "PROMOTE_UNIT", "MAKE_TRADE_ROUTE", "UNIT_ORDER"):
                 if isinstance(o.get("unitId"), int):
                     entry["unitId"] = o["unitId"]
+                if "damage" in o:
+                    entry["damage"] = o["damage"]
                 if isinstance(o.get("from"), dict):
                     entry["from"] = o["from"]
             if kind == "MOVE_UNIT":
@@ -358,6 +360,13 @@ class ActionRegistry:
                     raise ObserverError("API_CONTRACT_MISMATCH", "narrative offer without an answer hash")
                 rec["arg2"] = o["arg2"]
                 for k in ("storyId", "storyKey", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "UNIT_ORDER":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "unit order offer without an operation")
+                rec["arg2"] = o["arg2"]
+                for k in ("orderKey", "description", "damage", "maxDamage"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "MAKE_TRADE_ROUTE":
@@ -553,7 +562,7 @@ class ActionRegistry:
                     effect = {"techResearching": offer["arg"]}
                 elif kind == "SET_CULTURE_TREE_NODE" and rb.get("civicResearching") == offer["arg"]:
                     effect = {"civicResearching": offer["arg"]}
-                elif kind == "SKIP_UNIT":
+                elif kind in ("SKIP_UNIT", "UNIT_ORDER"):
                     ready = rb.get("unitsReadyToMove")
                     if isinstance(ready, list) and offer["arg"] not in ready:
                         effect = {"unitNoLongerReady": offer["arg"]}

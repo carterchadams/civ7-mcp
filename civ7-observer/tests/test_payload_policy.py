@@ -23,7 +23,8 @@ FORBIDDEN_PATTERNS = {
     "raw visibility dump": r"\bgetRevealedStates\s*\(",
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
-    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations\.(?!canStart\b)\w+|CityOperations\.(?!canStart\b)\w+|CityCommands\.(?!canStart\b)\w+|UnitCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
+    # anchored on Game.* : the GameInfo.* tables of the same name are read-only definition lookups
+    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|Game\.PlayerOperations\.(?!canStart\b)\w+|Game\.UnitOperations\.(?!canStart\b)\w+|Game\.CityOperations\.(?!canStart\b)\w+|Game\.CityCommands\.(?!canStart\b)\w+|Game\.UnitCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
     "game setup writes": r"\bGameSetup\.(set\w+|loadCreateGameSettings|resetSavedCreateGameSettings)\s*\(",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
@@ -43,6 +44,9 @@ MUTATION_ALLOWLIST = (
     'Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs)',
     'Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false)',
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, foundArgs)',
+    # standing orders: the operation is a table hash the payload restricts to a fixed no-target set
+    'Game.UnitOperations.canStart(unitId, orderType, orderArgs, false)',
+    'Game.UnitOperations.sendRequest(unitId, orderType, orderArgs)',
     'Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, {}, false)',
     'Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, expandArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.EXPAND, expandArgs)',

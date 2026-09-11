@@ -325,3 +325,12 @@ def test_player_met_notification_is_a_supported_first_meet_decision(tmp_path):
     assert b["pause"] is None
     d = next(d for d in b["decisions"] if d["kind"] == "first_meet")
     assert d["required"] is True and d["options"][0]["greeting"] == "FRIENDLY" and "greets it" in d["note"]
+
+
+def test_a_wounded_unit_shows_its_damage_and_the_heal_order(tmp_path):
+    orders = [{"kind": "UNIT_ORDER", "arg": 5, "arg2": 1576905647, "pre": 2, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_SWORDSMAN", "movesRemaining": 2, "damage": 84, "maxDamage": 100, "orderKey": "UNITOPERATION_REST_UNTIL_HEALED", "displayName": "Heal", "description": "Rest until fully healed.", "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(orders, end_can_start=False, blocking="UNITS"))
+    unit = next(d for d in b["decisions"] if d["kind"] == "unit")
+    assert unit["options"][0]["displayName"] == "Heal" and unit["options"][0]["damage"] == 84
+    assert unit["entities"][0]["damage"] == 84
+    assert "Heal rests a damaged unit" in unit["note"]

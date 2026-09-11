@@ -71,6 +71,7 @@ DECISION_OF_KIND = {
     "skip_unit": "unit",
     "move_unit": "unit",
     "make_trade_route": "unit",
+    "unit_order": "unit",
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
@@ -104,7 +105,8 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
-                 "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
+                 "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -129,7 +131,9 @@ LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (
                  "takes that card's reward, then finish_legacy_deck once. Finishing forfeits any unspent points, so pick first")
 
 MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
-                  "that could found a settlement, and is the game's own minimum-distance rule for that plot")
+                  "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
+                  "standing order that also ends the unit's turn: Heal rests a damaged unit until full, Fortify and Alert hold "
+                  "ground, Sleep waits. A unit carrying `damage` is wounded")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
@@ -160,8 +164,11 @@ def _option(offer: dict[str, Any]) -> dict[str, Any]:
 def _entity(offer: dict[str, Any]) -> dict[str, Any] | None:
     if "unitId" not in offer:
         return None
-    return {"unitId": offer["unitId"], "typeKey": offer.get("unitTypeKey"),
-            "at": offer.get("from"), "movesRemaining": offer.get("movesRemaining")}
+    entity = {"unitId": offer["unitId"], "typeKey": offer.get("unitTypeKey"),
+              "at": offer.get("from"), "movesRemaining": offer.get("movesRemaining")}
+    if offer.get("damage"):
+        entity["damage"] = offer["damage"]
+    return entity
 
 
 def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode: str,

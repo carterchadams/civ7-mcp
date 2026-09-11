@@ -102,6 +102,7 @@
         const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false);
         const smoves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null;
         offers.push({ kind: "SKIP_UNIT", arg: u.id.id, pre: smoves === null ? -1 : smoves, unitId: u.id.id,
+          damage: u.Health && isInt(u.Health.damage) ? u.Health.damage : null,
           from: u.location && isInt(u.location.x) && isInt(u.location.y) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
           unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
           movesRemaining: smoves,
@@ -120,6 +121,30 @@
           if (ex && ex.Success === true) canFoundUnits[u.id.id] = true;
         }
       } catch (e) { /* no settler information available */ }
+    }
+    if (typeof UnitOperationTypes !== "undefined" && GameInfo.UnitOperations) {
+      // Standing orders a unit can be given any turn without a target: the shipped panel lists them from
+      // GameInfo.UnitOperations gated by canStart. Only this fixed set is offered; anything needing a plot
+      // (attacks, pillage, teleport) is a separate kind with its own legality.
+      const STANDING = ["UNITOPERATION_FORTIFY", "UNITOPERATION_ALERT", "UNITOPERATION_SLEEP", "UNITOPERATION_REST_UNTIL_HEALED"];
+      const orderArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const unitId = u.id;
+        const moves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : -1;
+        const damage = u.Health && isInt(u.Health.damage) ? u.Health.damage : null;
+        for (const name of STANDING) {
+          const row = GameInfo.UnitOperations.lookup(name);
+          if (!row || !isInt(row.$hash) || row.VisibleInUI !== true) continue;
+          const check = Game.UnitOperations.canStart(unitId, row.$hash, orderArgs, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "UNIT_ORDER", arg: u.id.id, arg2: row.$hash, pre: moves, unitId: u.id.id,
+            from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+            unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), movesRemaining: moves === -1 ? null : moves,
+            damage: damage, maxDamage: u.Health && isInt(u.Health.maxDamage) ? u.Health.maxDamage : null,
+            orderKey: name, displayName: compose(row.Name), description: compose(row.Description), canStart: true });
+        }
+      }
     }
     if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.MOVE_TO) && typeof RevealedStates !== "undefined" && isInt(RevealedStates.HIDDEN)) {
       for (const u of player.Units.getUnits()) {

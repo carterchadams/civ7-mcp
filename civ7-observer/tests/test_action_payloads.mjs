@@ -1486,3 +1486,59 @@ test("perform MAKE_TRADE_ROUTE re-checks the projection and the unit's plot, the
     assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- standing unit orders (fortify / alert / sleep / heal)
+function withOrders(g, { allow = ["UNITOPERATION_SLEEP", "UNITOPERATION_REST_UNTIL_HEALED"], damage = 84 } = {}) {
+  const units = [unit(5, { Health: { damage, maxDamage: 100 } })];
+  withUnits(g, units);
+  const rows = [
+    { $hash: -744032280, OperationType: "UNITOPERATION_FORTIFY", VisibleInUI: true, Name: "LOC_FORT", Description: "LOC_FORT_D" },
+    { $hash: -448283625, OperationType: "UNITOPERATION_ALERT", VisibleInUI: true, Name: "LOC_ALERT", Description: "LOC_ALERT_D" },
+    { $hash: -41338758, OperationType: "UNITOPERATION_SLEEP", VisibleInUI: true, Name: "LOC_SLEEP", Description: "LOC_SLEEP_D" },
+    { $hash: 1576905647, OperationType: "UNITOPERATION_REST_UNTIL_HEALED", VisibleInUI: true, Name: "LOC_HEAL", Description: "LOC_HEAL_D" },
+    { $hash: 999, OperationType: "UNITOPERATION_PILLAGE", VisibleInUI: true, Name: "LOC_PIL", Description: "LOC_PIL_D" },
+  ];
+  g.GameInfo.UnitOperations = { lookup: (k) => rows.find((r) => r.$hash === k || r.OperationType === k) ?? null };
+  g.GameInfo.UnitOperations[Symbol.iterator] = function* () { yield* rows; };
+  const inner = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => { const row = rows.find((r) => r.$hash === op); if (!row) return inner.canStart(uid, op, args, show);
+      g._log.push(`ocanStart(${JSON.stringify(uid)},${row.OperationType},${JSON.stringify(args)},${show})`); return { Success: allow.includes(row.OperationType) }; },
+    sendRequest: (uid, op, args) => { const row = rows.find((r) => r.$hash === op); if (!row) return inner.sendRequest(uid, op, args);
+      g._log.push(`osendRequest(${JSON.stringify(uid)},${row.OperationType},${JSON.stringify(args)})`); const u = units.find((x) => x.id.id === uid.id); if (u) u.isReadyToMove = false; },
+  };
+  return g;
+}
+
+test("standing orders are offered only where the engine accepts them, and carry the unit's damage", () => {
+  const log = [];
+  const g = withOrders(world({ log })); g._log = log;
+  const orders = runOffers(g).offers.filter((o) => o.kind === "UNIT_ORDER");
+  assert.deepEqual(orders.map((o) => [o.arg, o.arg2, o.pre, o.orderKey, o.displayName, o.description, o.damage, o.maxDamage, o.canStart]),
+    [[5, -41338758, 2, "UNITOPERATION_SLEEP", "LOC_SLEEP", "LOC_SLEEP_D", 84, 100, true],
+     [5, 1576905647, 2, "UNITOPERATION_REST_UNTIL_HEALED", "LOC_HEAL", "LOC_HEAL_D", 84, 100, true]]);
+  assert.ok(!orders.some((o) => o.orderKey === "UNITOPERATION_PILLAGE"), "an order needing a target is never offered here");
+  assert.ok(log.filter((e) => e.startsWith("ocanStart(")).every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')));
+  assert.ok(!log.some((e) => e.startsWith("osendRequest")));
+});
+
+test("perform UNIT_ORDER restricts the operation to the standing set, re-checks movement, and reads back", () => {
+  const log = [];
+  const g = withOrders(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "UNIT_ORDER", 5, 1576905647, 0, { pre: 2 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "UNIT_ORDER", arg: 5, order: "UNITOPERATION_REST_UNTIL_HEALED", isReadyToMove: false, matches: true });
+  assert.ok(log.find((e) => e.startsWith("osendRequest(") && e.includes("REST_UNTIL_HEALED")));
+  for (const [label, mk, uid, op, pre] of [
+    ["unknown unit", () => withOrders(world({ log: [] })), 9, 1576905647, 2],
+    ["movement changed", () => withOrders(world({ log: [] })), 5, 1576905647, 0],
+    ["not a standing order", () => withOrders(world({ log: [] })), 5, 999, 2],
+    ["not a definition", () => withOrders(world({ log: [] })), 5, 4242, 2],
+    ["canStart false", () => withOrders(world({ log: [] }), { allow: [] }), 5, 1576905647, 2],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "UNIT_ORDER", uid, op, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("osendRequest")), `${label}: must not send`);
+  }
+});

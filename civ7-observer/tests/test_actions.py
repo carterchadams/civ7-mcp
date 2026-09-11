@@ -1136,3 +1136,17 @@ def test_trade_route_offer_and_confirmation_on_the_seats_route_count(tmp_path):
         res = reg.perform(gs, action_id=tr["actionId"], request_id="tr-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
     assert res["confirmedBy"]["effect"] == {"tradeRouteStarted": {"unitId": 5, "x": 30, "y": 30, "routes": 1}}
+
+
+def test_unit_order_confirms_like_a_skip_and_carries_the_wound(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "UNIT_ORDER", "arg": 5, "arg2": 1576905647, "pre": 2, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_SWORDSMAN", "movesRemaining": 2, "damage": 84, "maxDamage": 100, "orderKey": "UNITOPERATION_REST_UNTIL_HEALED", "displayName": "Heal", "description": "Rest until fully healed.", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "UNIT_ORDER", "arg": 5, "order": "UNITOPERATION_REST_UNTIL_HEALED", "isReadyToMove": True, "matches": False}}
+    rb = {**RB, "unitsReadyToMove": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        uo = next(o for o in out["offers"] if o["kind"] == "unit_order")
+        assert uo["displayName"] == "Heal" and uo["damage"] == 84 and uo["unitId"] == 5 and "arg" not in uo and "arg2" not in uo
+        res = reg.perform(gs, action_id=uo["actionId"], request_id="uo-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"unitNoLongerReady": 5}

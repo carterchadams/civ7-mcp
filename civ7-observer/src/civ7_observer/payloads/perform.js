@@ -96,6 +96,29 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
+  if (KIND === "UNIT_ORDER") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "order arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !GameInfo.UnitOperations) return refuse("API_CONTRACT_MISMATCH", "unit operations unavailable");
+    // the payload itself restricts which operations a standing order may be: anything needing a target
+    // is not reachable through this kind
+    const STANDING = ["UNITOPERATION_FORTIFY", "UNITOPERATION_ALERT", "UNITOPERATION_SLEEP", "UNITOPERATION_REST_UNTIL_HEALED"];
+    const orow = GameInfo.UnitOperations.lookup(ARG2);
+    if (!orow || typeof orow.OperationType !== "string" || STANDING.indexOf(orow.OperationType) === -1) return refuse("UNKNOWN_ACTION", "that is not a standing unit order");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    if (!unit.Movement || unit.Movement.movementMovesRemaining !== PRE) return refuse("ACTION_EXPIRED", "unit movement changed since the order was offered");
+    const unitId = unit.id;
+    const orderType = orow.$hash;
+    const orderArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    const ocheck = Game.UnitOperations.canStart(unitId, orderType, orderArgs, false);
+    if (!ocheck || ocheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the order");
+    Game.UnitOperations.sendRequest(unitId, orderType, orderArgs);
+    result.outcome = "sent";
+    const ready = unit.isReadyToMove === true;
+    result.readback = { kind: KIND, arg: ARG, order: orow.OperationType, isReadyToMove: ready, matches: !ready };
+    return JSON.stringify(result);
+  }
   if (KIND === "MAKE_TRADE_ROUTE") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "trade route arguments are not integers");
     if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.MAKE_TRADE_ROUTE) || !player.Trade || typeof TradeRouteStatus === "undefined") return refuse("API_CONTRACT_MISMATCH", "trade route contract unavailable");
