@@ -174,3 +174,16 @@ Ekklesia) between the turn-14 probe and this capture.
 | completed civics | Chiefdom FULLY_UNLOCKED 1/1; **Discipline UNLOCKED 1 of 2 (state 4, partial mastery)**; Mysticism, Tactics, Agoge (OPEN) excluded |
 | trees | active `TREE_CIVICS_AQ_GREECE`, available main + Greece |
 | state source | payload state equals `getNode().state` for every node; the `getResearching()` record still reported state 0 |
+
+## Change 5: visible map (seat 2 = player 1 Alexander, turn 16)
+
+| test | result |
+|---|---|
+| `snapshot --mode local-hotseat` with the map section | PASS: 116 visible / 94 revealed / 3194 hidden of 3404 plots; 116 tile records; 45,323 bytes; 0.21 s wall time incl. process start; 0 warnings |
+| known visible coordinates | all 6 on-map units and the capital Athênai (67, 36) lie on exported tiles |
+| known hidden coordinates | no exported tile in the (x<5, y<5) or (x>68, y>40) corners |
+| tile keys | 6 terrain, 5 biome, 10 feature keys resolved; 18 river tiles; 0 unresolved hashes |
+| serialized tile fields | exactly x, y, index, terrain(+Key), biome(+Key), feature(+Key), elevation, isRiver, riverType; no resource, yield, unit, or owner fields |
+| omitted features | resources, foreign units/settlements, diplomacy, notifications, yields, hidden and fogged tiles, seed, other players |
+| fog regression | pending: move a scout out of an area, capture, confirm those tiles leave the export (no fresh fogged state) |
+| anti-leak fixtures (offline) | Node fixtures plant an omniscient opponent, global unit/city maps, a resource and bulk-visibility reader; tests fail if any is touched or if detail is read before visibility |

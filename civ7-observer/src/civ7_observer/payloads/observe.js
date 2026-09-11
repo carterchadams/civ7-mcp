@@ -6,7 +6,7 @@
 (() => {
   const ALLOWED = ALLOWED_MODE;
   const warnings = [];
-  const result = { payloadVersion: 1, refused: null, context: null, settlements: null, units: null, technology: null, civics: null, warnings: warnings };
+  const result = { payloadVersion: 1, refused: null, context: null, settlements: null, units: null, technology: null, civics: null, map: null, warnings: warnings };
   const refuse = (code, message) => {
     result.refused = { code: code, message: message };
     return JSON.stringify(result);
@@ -261,7 +261,57 @@
   }
   if (nodeDefMissing) warnings.push({ code: "NODE_DEFINITION_MISSING", message: "some progression nodes have no GameInfo definition; hash kept, keys null", count: nodeDefMissing });
 
-  // ---- 5. context after
+  // ---- 5. currently visible map. Visibility is read FIRST for every plot, keyed by the
+  // bound player; tile details are read only for plots whose state is exactly VISIBLE.
+  // No resources, yields, units, cities, or bulk visibility reads (v0.1 policy).
+  try {
+    need(typeof RevealedStates !== "undefined" && RevealedStates && Number.isInteger(RevealedStates.VISIBLE) && Number.isInteger(RevealedStates.REVEALED) && Number.isInteger(RevealedStates.HIDDEN), "RevealedStates enum unavailable");
+    const VISIBLE = RevealedStates.VISIBLE, REVEALED = RevealedStates.REVEALED, HIDDEN = RevealedStates.HIDDEN;
+    const width = GameplayMap.getGridWidth();
+    const height = GameplayMap.getGridHeight();
+    need(isInt(width) && isInt(height) && width > 0 && height > 0, "map dimensions are not positive integers");
+    let tileDefMissing = 0;
+    const key = (table, hash, field) => {
+      if (hash === -1) return null;
+      const k = lookupKey(table, hash, field);
+      if (k === null) tileDefMissing++;
+      return k;
+    };
+    const counts = { visible: 0, revealed: 0, hidden: 0 };
+    const tiles = [];
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, x, y);
+        need(isInt(state), "getRevealedState returned a non-integer at " + x + "," + y);
+        if (state === VISIBLE) counts.visible++;
+        else if (state === REVEALED) counts.revealed++;
+        else if (state === HIDDEN) counts.hidden++;
+        else need(false, "getRevealedState returned an unknown state " + state);
+        if (state !== VISIBLE) continue;
+        const terrain = GameplayMap.getTerrainType(x, y);
+        const biome = GameplayMap.getBiomeType(x, y);
+        const feature = GameplayMap.getFeatureType(x, y);
+        const elevation = GameplayMap.getElevation(x, y);
+        const isRiver = GameplayMap.isRiver(x, y);
+        const riverType = GameplayMap.getRiverType(x, y);
+        const index = GameplayMap.getIndexFromXY(x, y);
+        need(isInt(terrain) && isInt(biome) && isInt(feature) && isInt(elevation) && isBool(isRiver) && isInt(riverType) && isInt(index), "tile detail contract broken at " + x + "," + y);
+        tiles.push({
+          x: x, y: y, index: index,
+          terrain: terrain, terrainKey: key(GameInfo.Terrains, terrain, "TerrainType"),
+          biome: biome, biomeKey: key(GameInfo.Biomes, biome, "BiomeType"),
+          feature: feature === -1 ? null : feature, featureKey: key(GameInfo.Features, feature, "FeatureType"),
+          elevation: elevation, isRiver: isRiver, riverType: riverType === -1 ? null : riverType
+        });
+      }
+    }
+    result.map = { status: "supported", width: width, height: height, coverage: "currently-visible-only", counts: counts, tiles: tiles };
+    if (tileDefMissing) warnings.push({ code: "TILE_DEFINITION_MISSING", message: "some tile type hashes have no GameInfo definition; hash kept, key null", count: tileDefMissing });
+  } catch (e) {
+    return refuse("API_CONTRACT_MISMATCH", "map read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
+  }
+
+  // ---- 6. context after
   let turnAfter, lpAfter, loAfter;
   try { turnAfter = Game.turn; lpAfter = GameContext.localPlayerID; loAfter = GameContext.localObserverID; } catch (e) { return refuse("CONTEXT_CHANGED", "context unreadable after extraction"); }
   if (turnAfter !== turnBefore || lpAfter !== localPlayerId || loAfter !== localObserverId) {

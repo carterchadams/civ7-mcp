@@ -24,8 +24,11 @@ const base = () => {
     Players: { get: (id) => (id === 1 ? me : undefined) },
     Configuration: { getGame: () => ({ isHotseat: false, isLocalMultiplayer: false, isNetworkMultiplayer: false, isInternetMultiplayer: false, isLANMultiplayer: false, isAnyMultiplayer: false, isPlayByCloud: false, isMatchMaking: false }) },
     GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]),
+      Terrains: table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]), Biomes: table([{ $hash: 0, BiomeType: "BIOME_PLAINS" }]), Features: table([]),
       ProgressionTrees: table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }]),
       ProgressionTreeNodes: table([{ $hash: 700, ProgressionTreeNodeType: "NODE_TECH_AQ_AGRICULTURE", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_A" }, { $hash: 800, ProgressionTreeNodeType: "NODE_CIVIC_AQ_MAIN_CHIEFDOM", ProgressionTree: "TREE_CIVICS_AQ_MAIN", Name: "LOC_C" }]) },
+    GameplayMap: { getGridWidth: () => 2, getGridHeight: () => 2, getRevealedState: (pid, x, y) => (x === 0 && y === 0 ? 2 : 0), getTerrainType: () => 1, getBiomeType: () => 0, getFeatureType: () => -1, getElevation: () => 50, isRiver: () => false, getRiverType: () => -1, getIndexFromXY: (x, y) => y * 2 + x },
+    RevealedStates: { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 },
     Locale: { compose: (k) => (k === "LOC_MADRID" ? "Madrid" : k) },
     _me: me,
   };

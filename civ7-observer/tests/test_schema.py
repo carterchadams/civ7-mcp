@@ -34,6 +34,14 @@ GOOD = {
         "queuedTarget": None,
         "completed": [],
     },
+    "map": {
+        "status": "supported", "width": 6, "height": 4, "coverage": "currently-visible-only",
+        "counts": {"visible": 2, "revealed": 4, "hidden": 18},
+        "tiles": [
+            {"x": 2, "y": 1, "index": 8, "terrain": 5, "terrainKey": "TERRAIN_HILL", "biome": 0, "biomeKey": "BIOME_PLAINS", "feature": None, "featureKey": None, "elevation": 102, "isRiver": False, "riverType": None},
+            {"x": 3, "y": 1, "index": 9, "terrain": 1, "terrainKey": "TERRAIN_FLAT", "biome": 0, "biomeKey": "BIOME_PLAINS", "feature": 7, "featureKey": "FEATURE_FOREST", "elevation": 103, "isRiver": True, "riverType": 3},
+        ],
+    },
     "warnings": [],
 }
 
@@ -89,6 +97,19 @@ def mutate(path, value):
     (["civics", "trees", "active"], 600),
     (["civics", "trees", "available"], []),
     (["civics", "current", "depthUnlocked"], 3),
+    (["map"], schema.DELETE),
+    (["map", "status"], "unsupported"),
+    (["map", "coverage"], "full"),
+    (["map", "width"], 0),
+    (["map", "counts", "visible"], 3),
+    (["map", "counts", "hidden"], 17),
+    (["map", "tiles", 0, "x"], 6),
+    (["map", "tiles", 0, "y"], -1),
+    (["map", "tiles", 0, "index"], 9),
+    (["map", "tiles", 0, "resource"], 4),
+    (["map", "tiles", 0, "terrain"], schema.DELETE),
+    (["map", "tiles", 0, "elevation"], float("inf")),
+    (["map", "tiles", 1], {"x": 2, "y": 1, "index": 8, "terrain": 5, "terrainKey": "TERRAIN_HILL", "biome": 0, "biomeKey": "BIOME_PLAINS", "feature": None, "featureKey": None, "elevation": 102, "isRiver": False, "riverType": None}),
 ])
 def test_invalid_payloads_are_rejected(path, value):
     with pytest.raises(schema.InvalidObservation):
@@ -131,7 +152,8 @@ def test_build_observation_wraps_with_ids_and_markers():
     assert obs["sessionId"] == "s" and obs["observationId"] == "o"
     assert obs["technology"]["status"] == "supported" and obs["technology"]["current"]["typeKey"] == "NODE_TECH_AQ_POTTERY"
     assert obs["civics"]["status"] == "supported" and obs["civics"]["completed"] == []
-    assert obs["map"]["status"] == "unsupported"
+    assert obs["map"]["coverage"] == "currently-visible-only" and len(obs["map"]["tiles"]) == 2
+    assert "hidden-tiles" in obs["omittedFeatures"] and "resources" in obs["omittedFeatures"] and "map-tiles" not in obs["omittedFeatures"]
     assert "resources" in obs["omittedFeatures"] and "foreign-units" in obs["omittedFeatures"]
     json.dumps(obs)
 
@@ -145,3 +167,23 @@ def test_progression_current_may_be_null_and_active_tree_may_be_null():
 def test_completed_allows_unlocked_with_mastery_remaining():
     d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "NODE_TECH_AQ_SAILING", "displayName": "Sailing", "tree": "TREE_TECHS_AQ", "state": 4, "stateName": "NODE_STATE_UNLOCKED", "depthUnlocked": 1, "maxDepth": 2})
     schema.validate_payload(d)
+
+
+def test_map_tiles_may_be_empty_when_nothing_visible():
+    d = copy.deepcopy(GOOD)
+    d["map"]["tiles"] = []
+    d["map"]["counts"] = {"visible": 0, "revealed": 0, "hidden": 24}
+    schema.validate_payload(d)
+
+
+def test_map_tile_count_limit():
+    d = copy.deepcopy(GOOD)
+    d["map"]["width"], d["map"]["height"] = 2, 1
+    d["map"]["counts"] = {"visible": 2, "revealed": 0, "hidden": 0}
+    d["map"]["tiles"][0].update({"x": 0, "y": 0, "index": 0})
+    d["map"]["tiles"][1].update({"x": 1, "y": 0, "index": 1})
+    schema.validate_payload(d)
+    d["map"]["tiles"].append({**d["map"]["tiles"][1], "x": 1, "y": 0, "index": 1})
+    d["map"]["counts"]["visible"] = 3
+    with pytest.raises(schema.InvalidObservation):
+        schema.validate_payload(d)

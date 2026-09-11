@@ -46,8 +46,9 @@ function game({ log = [], flags = SP, local = 1, turnActive = true, units, citie
     GameContext: { localPlayerID: local, localObserverID: local },
     Players: { get: (id) => { log.push(`Players.get(${id})`); return id === local ? me : other; } },
     Configuration: { getGame: () => new Proxy({ ...flags, humanPlayerIDs: [0, 1], gameSeed: 1 }, { get(t, k) { log.push(`cfg.${String(k)}`); return t[k]; } }) },
-    GameplayMap: new Proxy({}, { get(_, k) { log.push(`map.${String(k)}`); return () => 0; } }),
-    GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }, { $hash: -1563767818, UnitType: "UNIT_HOPLITE" }]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]), ProgressionTrees: table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }]), ProgressionTreeNodes: table([]) },
+    GameplayMap: new Proxy({ getGridWidth: () => 2, getGridHeight: () => 2, getRevealedState: (pid, x, y) => { log.push(`map.getRevealedState(${pid})`); return x === 0 && y === 0 ? 2 : 0; }, getTerrainType: () => 1, getBiomeType: () => 0, getFeatureType: () => -1, getElevation: () => 50, isRiver: () => false, getRiverType: () => -1, getIndexFromXY: (x, y) => y * 2 + x }, { get(t, k) { log.push(`map.${String(k)}`); return t[k]; } }),
+    RevealedStates: { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 },
+    GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }, { $hash: -1563767818, UnitType: "UNIT_HOPLITE" }]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]), ProgressionTrees: table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }]), ProgressionTreeNodes: table([]), Terrains: table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]), Biomes: table([{ $hash: 0, BiomeType: "BIOME_PLAINS" }]), Features: table([]) },
     Locale: { compose: (k) => ({ LOC_MADRID: "Madrid", LOC_SEVILLA: "Sevilla" })[k] ?? k },
   };
 }
@@ -60,6 +61,8 @@ test("serializes the bound player's settlements and units with stable ids", () =
   assert.equal(r.technology.status, "supported");
   assert.equal(r.technology.current, null);
   assert.equal(r.civics.status, "supported");
+  assert.equal(r.map.status, "supported");
+  assert.equal(r.map.tiles.length, 1);
   assert.equal(r.settlements.length, 2);
   const [madrid, sevilla] = r.settlements;
   assert.deepEqual(madrid.id, { owner: 1, id: 65536, type: 1 });
@@ -92,7 +95,7 @@ test("never touches other players, roster lists, seeds, or the map", () => {
   assert.ok(log.filter((e) => e.startsWith("Players.get(")).every((e) => e === "Players.get(1)"));
   assert.ok(!log.some((e) => e.startsWith("other.")));
   assert.ok(!log.includes("cfg.humanPlayerIDs") && !log.includes("cfg.gameSeed"));
-  assert.ok(!log.some((e) => e.startsWith("map.")), `map must not be read in Change 3: ${log}`);
+  assert.ok(log.filter((e) => e.startsWith("map.getRevealedState(")).every((e) => e === "map.getRevealedState(1)"), `map visibility must be keyed by the bound player: ${log}`);
 });
 
 test("refuses when the bound id is not the local seat, reading nothing", () => {
@@ -154,7 +157,7 @@ test("a throwing roster read fails the capture instead of returning an empty lis
 });
 
 test("payload source contains no forbidden operations", () => {
-  for (const bad of ["sendRequest", "PlayerOperations", "UnitOperations", "revealTree", "localStorage", "setTimeout", "import ", "humanPlayerIDs", "gameSeed", "getResourceType", "getRevealedState", "Players.get(GameContext"]) {
+  for (const bad of ["sendRequest", "PlayerOperations", "UnitOperations", "revealTree", "localStorage", "setTimeout", "import ", "humanPlayerIDs", "gameSeed", "getResourceType", "getRevealedStates(", "Players.get(GameContext"]) {
     assert.ok(!raw.includes(bad), `forbidden token in payload: ${bad}`);
   }
 });

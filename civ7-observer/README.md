@@ -6,8 +6,9 @@ game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
 Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
 **connection doctor**), Change 2 (the developer **capability probe** and the runtime
 contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
-and units), and Change 4 (technology and civics in the same snapshot). The map is
-reported as `unsupported` until Change 5. `serve` is registered but not implemented.
+and units), Change 4 (technology and civics), and Change 5 (the currently visible map with
+visibility-first filtering and anti-leak fixtures). `serve` is registered but not
+implemented.
 
 ## Install (Linux, this repo)
 
@@ -96,7 +97,10 @@ server) on an ephemeral port; no game installation is needed.
 `UNSUPPORTED_GAME_MODE` (the game's mode flags must match `--mode`), `TURN_NOT_READY`,
 and `CONTEXT_CHANGED` (turn or seat moved during the read), validates the payload
 against a strict schema (`schema.py`: exact key sets, finite ints, size limits, owner
-checks), and writes the observation atomically. Each observation carries a fresh
+checks), and writes the observation atomically. The map section scans every plot, reads visibility first with the bound id,
+and exports terrain/biome/feature/elevation/river keys only for tiles that are VISIBLE
+right now (`coverage: "currently-visible-only"`); fogged and hidden tiles, resources,
+yields, and foreign objects are listed under `omittedFeatures`. Each observation carries a fresh
 `observationId`; the `sessionId` is fixed for the process, so restart the service after
 loading another save. `omittedFeatures` lists what is deliberately not exported.
 

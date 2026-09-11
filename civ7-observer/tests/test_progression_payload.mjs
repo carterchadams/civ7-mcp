@@ -50,8 +50,10 @@ function game({ log = [], techs, culture, nodes = NODES, noEnum = false } = {}) 
     GameContext: { localPlayerID: 1, localObserverID: 1 },
     Players: { get: (id) => { log.push(`Players.get(${id})`); return id === 1 ? me : undefined; } },
     Configuration: { getGame: () => SP },
+    GameplayMap: { getGridWidth: () => 1, getGridHeight: () => 1, getRevealedState: () => 0, getIndexFromXY: () => 0 },
+    RevealedStates: { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 },
     GameInfo: {
-      Units: table([]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]),
+      Units: table([]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]), Terrains: table([]), Biomes: table([]), Features: table([]),
       ProgressionTrees: table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }, { $hash: 601, ProgressionTreeType: "TREE_CIVICS_AQ_GREECE" }]),
       ProgressionTreeNodes: table([
         { $hash: 700, ProgressionTreeNodeType: "NODE_TECH_AQ_AGRICULTURE", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_AGRI" },

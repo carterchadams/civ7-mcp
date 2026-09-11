@@ -19,9 +19,11 @@ MAX_NODES = 500
 MAX_TREES = 20
 NODE_STATES = {0: "NODE_STATE_INVALID", 1: "NODE_STATE_CLOSED", 2: "NODE_STATE_OPEN", 3: "NODE_STATE_IN_PROGRESS", 4: "NODE_STATE_UNLOCKED", 5: "NODE_STATE_FULLY_UNLOCKED"}
 COMPLETED_STATES = (4, 5)
+MAX_MAP_DIM = 512
+COVERAGE = "currently-visible-only"
 OMITTED_FEATURES = [
     "resources", "foreign-units", "foreign-settlements", "diplomacy", "notifications",
-    "yields", "map-tiles", "hidden-tiles", "game-seed", "other-players",
+    "yields", "hidden-tiles", "fogged-tiles", "game-seed", "other-players",
 ]
 DELETE = object()
 
@@ -270,6 +272,48 @@ def _progression(v: Any, path: str, *, civics: bool) -> dict[str, Any]:
     return out
 
 
+def _tile(v: Any, path: str, width: int, height: int) -> dict[str, Any]:
+    o = _obj(v, path, ("x", "y", "index", "terrain", "terrainKey", "biome", "biomeKey", "feature", "featureKey", "elevation", "isRiver", "riverType"))
+    t = {
+        "x": _int(o["x"], path + ".x", minimum=0), "y": _int(o["y"], path + ".y", minimum=0),
+        "index": _int(o["index"], path + ".index", minimum=0),
+        "terrain": _int(o["terrain"], path + ".terrain"), "terrainKey": _opt(_str, o["terrainKey"], path + ".terrainKey"),
+        "biome": _int(o["biome"], path + ".biome"), "biomeKey": _opt(_str, o["biomeKey"], path + ".biomeKey"),
+        "feature": _opt(_int, o["feature"], path + ".feature"), "featureKey": _opt(_str, o["featureKey"], path + ".featureKey"),
+        "elevation": _int(o["elevation"], path + ".elevation"), "isRiver": _bool(o["isRiver"], path + ".isRiver"),
+        "riverType": _opt(_int, o["riverType"], path + ".riverType"),
+    }
+    if t["x"] >= width or t["y"] >= height:
+        _fail(path, "tile outside the grid")
+    if t["index"] != t["y"] * width + t["x"]:
+        _fail(path + ".index", "does not match y*width+x")
+    return t
+
+
+def _map(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("status", "width", "height", "coverage", "counts", "tiles"))
+    if o["status"] != "supported":
+        _fail(path + ".status", "map must be supported")
+    if o["coverage"] != COVERAGE:
+        _fail(path + ".coverage", f"must be {COVERAGE!r}")
+    width = _int(o["width"], path + ".width", minimum=1)
+    height = _int(o["height"], path + ".height", minimum=1)
+    if width > MAX_MAP_DIM or height > MAX_MAP_DIM:
+        _fail(path, "map dimensions exceed the supported maximum")
+    c = _obj(o["counts"], path + ".counts", ("visible", "revealed", "hidden"))
+    counts = {k: _int(c[k], f"{path}.counts.{k}", minimum=0) for k in ("visible", "revealed", "hidden")}
+    if counts["visible"] + counts["revealed"] + counts["hidden"] != width * height:
+        _fail(path + ".counts", "do not sum to the plot count")
+    if not isinstance(o["tiles"], list) or len(o["tiles"]) > width * height:
+        _fail(path + ".tiles", "expected a list no larger than the grid")
+    if len(o["tiles"]) != counts["visible"]:
+        _fail(path + ".tiles", "tile count must equal counts.visible")
+    tiles = [_tile(t, f"{path}.tiles[{i}]", width, height) for i, t in enumerate(o["tiles"])]
+    if len({(t["x"], t["y"]) for t in tiles}) != len(tiles):
+        _fail(path + ".tiles", "duplicate coordinates")
+    return {"status": "supported", "width": width, "height": height, "coverage": COVERAGE, "counts": counts, "tiles": tiles}
+
+
 def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[str, Any]:
     """Validate the raw observe.js result. Raises PayloadRefused for typed refusals."""
     if not isinstance(data, dict):
@@ -279,7 +323,7 @@ def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[s
     if data.get("refused") is not None:
         r = _obj(data["refused"], "payload.refused", ("code", "message"))
         raise PayloadRefused(_str(r["code"], "payload.refused.code"), _str(r["message"], "payload.refused.message"))
-    o = _obj(data, "payload", ("payloadVersion", "refused", "context", "settlements", "units", "technology", "civics", "warnings"))
+    o = _obj(data, "payload", ("payloadVersion", "refused", "context", "settlements", "units", "technology", "civics", "map", "warnings"))
     ctx = _context(o["context"], "payload.context", bound_player_id)
     bound = ctx["playerId"]
     for name, limit in (("settlements", MAX_SETTLEMENTS), ("units", MAX_UNITS), ("warnings", MAX_WARNINGS)):
@@ -292,7 +336,8 @@ def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[s
     warnings = [_warning(w, f"payload.warnings[{i}]") for i, w in enumerate(o["warnings"])]
     technology = _progression(o["technology"], "payload.technology", civics=False)
     civics = _progression(o["civics"], "payload.civics", civics=True)
-    return {"context": ctx, "settlements": settlements, "units": units, "technology": technology, "civics": civics, "warnings": warnings}
+    game_map = _map(o["map"], "payload.map")
+    return {"context": ctx, "settlements": settlements, "units": units, "technology": technology, "civics": civics, "map": game_map, "warnings": warnings}
 
 
 def build_observation(validated: dict[str, Any], *, session_id: str, observation_id: str, captured_at: str) -> dict[str, Any]:
@@ -306,7 +351,7 @@ def build_observation(validated: dict[str, Any], *, session_id: str, observation
         "units": validated["units"],
         "technology": validated["technology"],
         "civics": validated["civics"],
-        "map": {"status": "unsupported", "reason": "not implemented until Change 5"},
+        "map": validated["map"],
         "omittedFeatures": list(OMITTED_FEATURES),
         "warnings": validated["warnings"],
     }
