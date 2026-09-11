@@ -218,3 +218,42 @@ Ekklesia) between the turn-14 probe and this capture.
 | new session identity | new `sessionId`s (`3af37b5f…`, `6acd0700…`) vs the previous game's `0ab1b507…`; nothing from the old game (Athênai, 6 units, 112 tiles) appears |
 | server bound to player 1 (negative) | `WRONG_PLAYER`, no data |
 | open question from the previous game | the human believed a hoplite had been moved before demo run 2, but both captures showed it at (65, 37) with 0 of 2 moves; it could not have moved that turn, and a queued order would not show because the observation does not read `hasPendingOperations` / `operationQueueSize`. Consider exporting pending-operation flags in a later change so "ordered but not yet moved" is visible |
+
+## Hotseat robustness matrix (fresh game)
+
+Rows are appended by `demo/hotseat-round.py` to `runs/hotseat-matrix.jsonl`; each round
+captures on the expected seat and attempts the other seat.
+
+| round | seat | result |
+|---|---|---|
+| r1 | player 0, turn 1 | capture ok (1 settlement, 0 units, 19 visible, 197 ms); wrong seat `WRONG_PLAYER`, no file |
+| handoff, curtain up (before dismissal on seat 2) | — | `doctor` already reports localPlayerId 1 / localObserverId 1 and `Players.get(1).isTurnActive true`; snapshot bound to player 0 refused `WRONG_PLAYER`; **snapshot bound to player 1 succeeded while the curtain was still displayed**. No mixed-seat observation is possible, but the engine switches the seat before the human dismisses the pass-device screen, so a bound service can read its own seat before the human has "arrived". The plan's C1 note stands: captures are manually requested after dismissal in this phase, and a later automatic service needs a separate readiness gate (a UI predicate for the curtain, not `localPlayerID`) |
+| r2-p1-t1 | player 1, turn 1 | ok: 0 settlement(s), 1 unit(s), 7 visible, 204 ms; wrong seat `WRONG_PLAYER`, no file |
+| r3-p0-t2 | player 0, turn 2 | ok: 1 settlement(s), 1 unit(s), 35 visible, 178 ms; wrong seat `WRONG_PLAYER`, no file |
+| r4-p1-t2 | player 1, turn 2 | ok: 1 settlement(s), 1 unit(s), 19 visible, 186 ms; wrong seat `WRONG_PLAYER`, no file |
+| r5-p0-t3 | player 0, turn 3 | ok: 1 settlement(s), 1 unit(s), 27 visible, 183 ms; wrong seat `WRONG_PLAYER`, no file |
+| r6-p1-t3 | player 1, turn 3 | ok: 1 settlement(s), 1 unit(s), 19 visible, 181 ms; wrong seat `WRONG_PLAYER`, no file |
+| r7-p0-t4 | player 0, turn 4 | ok: 1 settlement(s), 1 unit(s), 32 visible, 188 ms; wrong seat `WRONG_PLAYER`, no file |
+| r8-p1-t4 | player 1, turn 4 | ok: 1 settlement(s), 1 unit(s), 38 visible, 188 ms; wrong seat `WRONG_PLAYER`, no file |
+| r9-p0-t5 | player 0, turn 5 | ok: 1 settlement(s), 2 unit(s), 45 visible, 187 ms; wrong seat `WRONG_PLAYER`, no file |
+| r10-p1-t5 | player 1, turn 5 | ok: 1 settlement(s), 2 unit(s), 39 visible, 198 ms; wrong seat `WRONG_PLAYER`, no file |
+| under-curtain vs after-dismissal (r2) | player 1, turn 1 | every section identical; only the observation id differs |
+
+**Matrix result:** 10 of 10 rounds captured the intended seat with a fresh observation id,
+0 warnings, 178-204 ms per capture; 10 of 10 wrong-seat attempts refused with
+`WRONG_PLAYER` and no file written. Raw rows: `docs/hotseat-matrix.jsonl`.
+
+## Phase 1 definition of done (plan section "Definition of done")
+
+| requirement | evidence |
+|---|---|
+| validated observation with all five categories for the configured active player | Changes 3-5 live captures; hotseat matrix above |
+| obtained through the debugger without the LLM seeing executable code | MCP server exposes only `get_observation` / `get_status`, no arguments; payloads are packaged |
+| ordinary and negative hotseat tests pass | matrix: 10 positive, 10 negative, plus the handoff attempt |
+| one LLM client produces an accurate report | demo run 1 (`runs/demo-1.txt`), spot-checked claim by claim |
+| a human-performed change is reflected in the next observation | demo run 2: wonder started and commander moved, both reported |
+| no autonomous gameplay actions | none exist; mutators are blocked by the payload policy test |
+
+Still open, as the plan anticipates: automatic curtain detection (the engine switches
+seats before the human dismisses the pass-device screen), pending-operation visibility,
+the `UIDebugger 0` relaunch, and the blank DLC/mod/version fields in the environment table.
