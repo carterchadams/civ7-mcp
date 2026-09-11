@@ -1036,3 +1036,24 @@ test("perform PROMOTE_UNIT refuses an unknown unit, a changed promotion count, a
   assert.equal(r.outcome, "sent");
   assert.equal(r.readback.matches, false);
 });
+
+test("a plot another player occupies is never offered as a move, and nothing about the occupant is exposed", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  // live (turn 34): a Modifiers:NONE move into an independent's tile was accepted and silently dropped
+  g.Game.Combat = { getBestDefender: (loc, uid) => { g._log.push(`defender(${loc.x},${loc.y})`); return (loc.x === 11 && loc.y === 10) ? { owner: 13, id: 393221, type: 1 } : { owner: -1, id: -1, type: 0 }; } };
+  const r = runOffers(g);
+  const moves = r.offers.filter((o) => o.kind === "MOVE_UNIT");
+  assert.ok(!moves.some((o) => o.x === 11 && o.y === 10), "the occupied plot must not be offered");
+  assert.ok(moves.length > 0, "the other neighbours are still offered");
+  const dump = JSON.stringify(r.offers);
+  assert.ok(!dump.includes("393221") && !dump.includes('"owner"'), "no occupant identity may reach the client");
+  assert.ok(log.some((e) => e.startsWith("defender(")), "the engine's own defender query is what decides");
+});
+
+test("a plot the bound player's own unit stands on is still offered", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  g.Game.Combat = { getBestDefender: () => ({ owner: 1, id: 77, type: 1 }) };
+  assert.ok(runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT").length > 0);
+});

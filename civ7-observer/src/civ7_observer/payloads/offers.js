@@ -16,6 +16,15 @@
   const plotYields = (x, y) => { const out = {}; try { for (const row of yieldRows) { const v = GameplayMap.getYield(x, y, row.$hash, BOUND_PLAYER_ID); if (typeof v === "number") out[row.YieldType.replace("YIELD_", "").toLowerCase()] = v; } } catch (e) { /* decorative: a realm without yields still gets offers */ } return out; };
   const plotYieldsNonZero = (x, y) => { const all = plotYields(x, y); const out = {}; for (const k of Object.keys(all)) { if (all[k] !== 0) out[k] = all[k]; } return out; };
   const plotIsRiver = (x, y) => { try { return GameplayMap.isRiver(x, y) === true; } catch (e) { return null; } };
+  // True when a visible plot holds a unit belonging to someone else. Used only to withhold a move that
+  // the engine would silently drop; the defender's identity is never read out of this function.
+  const occupiedByOther = (unitId, x, y) => {
+    try {
+      const d = Game.Combat.getBestDefender({ x: x, y: y }, unitId);
+      const owner = d && typeof d.owner === "number" ? d.owner : -1;
+      return Number.isInteger(owner) && owner >= 0 && owner !== BOUND_PLAYER_ID;
+    } catch (e) { return false; }
+  };
   const curtain = () => { try { return typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null; } catch (e) { return null; } };
 
   // ---- guards (same as observe.js)
@@ -107,6 +116,10 @@
           const plots = path && Array.isArray(path.plots) ? path.plots : [];
           const turns = path && Array.isArray(path.turns) ? path.turns : [];
           if (plots.length === 0 || turns.length === 0 || turns[turns.length - 1] !== 1) continue;   // unreachable this turn
+          // A plot held by another player is silently dropped by a Modifiers:NONE move (live: a warrior
+          // "moved" into an independent's tile and nothing happened, outcome unknown). Only the boolean
+          // is used and nothing about the occupant is ever exposed.
+          if (occupiedByOther(unitId, loc.x, loc.y)) continue;
           const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
           const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
           offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),

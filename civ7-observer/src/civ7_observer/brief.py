@@ -96,7 +96,8 @@ RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity 
                   "the resource's effect), then consider_resources; it is not startable while a resource can still be assigned")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
-                   "order); a city with a non-empty queue needs no production action this turn")
+                   "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
+                   "settlement are shown: call get_city_options with a cityId for everything it can build")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "

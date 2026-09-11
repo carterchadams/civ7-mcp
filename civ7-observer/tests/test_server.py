@@ -158,7 +158,7 @@ def test_read_only_server_exposes_no_action_tools():
 def test_acting_server_exposes_the_action_tools_with_honest_annotations(tmp_path):
     s, _ = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
     names = sorted(t.name for t in s._tool_manager.list_tools())
-    assert names == ["get_action_result", "get_observation", "get_plan", "get_status", "get_turn_brief", "get_unit_options", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
+    assert names == ["get_action_result", "get_city_options", "get_observation", "get_plan", "get_status", "get_turn_brief", "get_unit_options", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
     perform = tool(s, "perform_action")
     assert perform.annotations.readOnlyHint is False and perform.annotations.idempotentHint is True
     assert perform.annotations.openWorldHint is False
@@ -260,3 +260,17 @@ def test_get_unit_options_returns_only_that_units_offers(tmp_path):
     assert [o["kind"] for o in out["options"]] == ["skip_unit"]
     assert all(o["unitId"] == 9 for o in out["options"])
     assert tool(s, "get_unit_options").fn(unit_id="5")["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_get_city_options_returns_only_that_settlements_offers(tmp_path):
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    payload = json.dumps(offers_with([
+        {"kind": "PRODUCE_UNIT", "arg": 65536, "arg2": 100, "pre": 0, "cityId": 65536, "cityName": "Tokyo", "queue": [], "queueLength": 0, "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "canStart": True},
+        {"kind": "PRODUCE_UNIT", "arg": 131073, "arg2": 100, "pre": 0, "cityId": 131073, "cityName": "Kyoto", "queue": [], "queueLength": 0, "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "canStart": True},
+    ], end_can_start=False, blocking="PRODUCTION"))
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)]}, journal=tmp_path / "j.jsonl")
+    assert tool(s, "get_city_options").annotations.readOnlyHint is True
+    out = tool(s, "get_city_options").fn(city_id=65536)
+    assert out["cityId"] == 65536 and out["count"] == 1 and out["options"][0]["cityName"] == "Tokyo"
+    assert tool(s, "get_city_options").fn(city_id=None)["error"]["code"] == "INVALID_ARGUMENT"

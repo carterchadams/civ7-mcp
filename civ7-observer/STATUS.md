@@ -51,7 +51,8 @@ engine player id and must equal both `localPlayerID` and `localObserverID` at th
 
 Read-only by default: `get_observation`, `get_status`. With `--allow-actions` the seat's action
 catalog is added: `get_turn_brief` (start here each turn), `list_actions`, `get_unit_options`
-(one unit's own choices, for when the brief's bounded options do not show them), `perform_action`
+and `get_city_options` (one unit's or one settlement's own choices, for when the brief's bounded
+options do not show them), `perform_action`
 (`action_id` + a caller-chosen `request_id` that makes it idempotent) and `get_action_result`, plus
 the runner's own tools, which never touch the game: `load_skill`, `get_plan`, `update_plan` and
 `report_friction` (the seat's plan and friction backlog live in the host workspace).

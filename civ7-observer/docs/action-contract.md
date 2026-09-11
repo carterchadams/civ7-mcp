@@ -148,6 +148,16 @@ which is what the offers gate on. Note also that `getStoredPromotionPoints`, `ge
 `getNumPromotions`, `getStoredCommendations` and `getTotalPromotionsEarned` are **properties, not
 methods**, on this build; calling them returns nothing.
 
+## Lesson: a move into an occupied plot is silently dropped
+
+Live (turn 34): a warrior's `MOVE_TO` with `Modifiers: NONE` into an adjacent visible plot passed
+`canStart` and had a one-turn native path, yet nothing happened; the unit kept its position, its
+movement and no pending operation, so the outcome was `unknown` and the seat halted. The plot held a
+unit owned by another player (`Game.Combat.getBestDefender({x, y}, unitId)` reported owner 13, an
+independent). Move offers now withhold any plot whose best defender belongs to someone else. Only
+that boolean is used: the occupant's owner and id never reach a client, and a plot held by the bound
+player's own unit is still offered.
+
 ## Lesson: the ATTACK modifier is not a target test either
 
 Live (turn 28): `canStart(unitId, MOVE_TO, {X, Y, Modifiers: UnitOperationMoveModifiers.ATTACK})`

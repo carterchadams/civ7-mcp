@@ -37,8 +37,11 @@ PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs" / "agent-game"
 SERVER = "civ7"
-TOOLS = ("get_turn_brief", "list_actions", "get_unit_options", "perform_action", "get_action_result", "get_observation",
-         "load_skill", "get_plan", "update_plan", "report_friction")
+TOOLS = ("get_turn_brief", "list_actions", "get_unit_options", "get_city_options", "perform_action", "get_action_result",
+         "get_observation", "load_skill", "get_plan", "update_plan", "report_friction")
+# `--tools ""` empties the built-in set, but the harness still offers Read/Grep over a tool result it
+# spilled to disk (seen live on turn 34), which would let a seat read anything on this machine.
+DENIED = ("Read", "Grep", "Glob", "Bash", "Edit", "Write", "WebFetch", "WebSearch", "Task", "NotebookEdit", "TodoWrite")
 
 INSTRUCTIONS = """You are playing one seat of a Civilization VII game through the civ7 MCP tools. You control \
 only that seat; nothing else is reachable, and every fact you have belongs to it.
@@ -51,7 +54,8 @@ Choose only action ids the host has offered you in this turn. Never invent one, 
 action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \
 report_friction rather than guessing, then continue with the least committal legal option if you \
 can. get_observation is large: call it only when a specific decision needs map detail, and use \
-get_unit_options(unit_id) rather than list_actions when you need one unit's choices.
+get_unit_options(unit_id) or get_city_options(city_id) rather than list_actions when you need one \
+unit's or one settlement's choices.
 
 Keep a short plan across turns with get_plan / update_plan (at most three commitments). Keep your \
 visible output short: a line per decision saying what you chose and why, and a closing summary under \
@@ -136,6 +140,7 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     cmd = ["claude", "-p", prompt, "--model", model, "--tools", "",
            "--mcp-config", str(mcp_config(seat, mode)), "--strict-mcp-config",
            "--allowedTools", *[f"mcp__{SERVER}__{t}" for t in TOOLS],
+           "--disallowedTools", *DENIED,
            "--append-system-prompt-file", str(system_path),
            "--max-budget-usd", str(budget),
            "--output-format", "stream-json", "--verbose"]

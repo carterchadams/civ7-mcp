@@ -79,6 +79,12 @@ UNIT_OPTIONS_DESCRIPTION = (
     "skip, found settlement, promotion), by `unit_id` as shown in a brief's `entities`. Use this when the brief's "
     "bounded options do not show what a particular unit can do; it is far smaller than list_actions."
 )
+CITY_OPTIONS_DESCRIPTION = (
+    "Read-only. Every currently legal action for ONE of this seat's settlements (production of units and buildings "
+    "with their placement plots, population placement, resource assignment), by `cityId` as shown in a brief option. "
+    "Use this when the brief's bounded options do not show everything a settlement could build; far smaller than "
+    "list_actions, which can run to hundreds of options."
+)
 RESULT_DESCRIPTION = (
     "Read-only. The recorded outcome of one of this seat's earlier actions by `request_id`: confirmed, "
     "rejected, unknown, or no_such_request. Use it after a transport failure rather than repeating the action."
@@ -232,6 +238,19 @@ def build_server(
             last["attachment"] = listing["attachment"]
         options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
         return {"unitId": unit_id, "attachment": listing["attachment"], "count": len(options), "options": options,
+                "reconciliationRequired": listing["reconciliationRequired"]}
+
+    @mcp.tool(name="get_city_options", description=CITY_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
+    def get_city_options(city_id: int) -> dict[str, Any]:
+        if isinstance(city_id, bool) or not isinstance(city_id, int):
+            return {"error": {"code": "INVALID_ARGUMENT", "message": "city_id must be an integer, as shown in a brief option"}}
+        listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
+        if "error" in listing:
+            return listing
+        if isinstance(listing.get("attachment"), dict):
+            last["attachment"] = listing["attachment"]
+        options = [o for o in listing["offers"] if o.get("cityId") == city_id]
+        return {"cityId": city_id, "attachment": listing["attachment"], "count": len(options), "options": options,
                 "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
