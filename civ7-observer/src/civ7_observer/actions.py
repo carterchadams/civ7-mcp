@@ -402,7 +402,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "promotion offer without a promotion and discipline")
                 rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
-                for k in ("discipline", "disciplineName", "description", "commendation", "promotionPoints", "commendationPoints", "unitLevel"):
+                for k in ("discipline", "disciplineName", "description", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "ASSIGN_RESOURCE":

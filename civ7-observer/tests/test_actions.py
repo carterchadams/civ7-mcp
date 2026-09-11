@@ -1004,8 +1004,8 @@ def test_resource_assignment_confirms_on_the_assignment_map_and_consider_on_the_
 
 
 def test_promotion_offer_and_confirmation_on_the_units_promotion_count(tmp_path):
-    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionPoints": 1, "commendationPoints": 0, "unitLevel": 2, "canStart": True}]}
-    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "held": 0, "hasPromotion": False, "matches": False}}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionsEarned": 0, "promotionPoints": 1, "commendationPoints": 0, "unitLevel": 2, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "earned": 0, "hasPromotion": False, "matches": False}}
     rb = {**RB, "unitPromotions": {"5": 1}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
@@ -1023,7 +1023,7 @@ def test_promotion_offer_and_confirmation_on_the_units_promotion_count(tmp_path)
 
 def test_promotion_poll_does_not_confirm_while_the_count_is_unchanged(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "canStart": True}]}
-    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "held": 0, "hasPromotion": False, "matches": False}}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "earned": 0, "hasPromotion": False, "matches": False}}
     rb = {**RB, "unitPromotions": {"5": 0}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})

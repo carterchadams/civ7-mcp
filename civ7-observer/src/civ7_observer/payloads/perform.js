@@ -134,7 +134,7 @@
     if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
     const xp = unit.Experience;
     if (!xp || xp.canPromote !== true) return refuse("ACTION_NOT_STARTABLE", "unit cannot be promoted");
-    if ((isInt(xp.getNumPromotions) ? xp.getNumPromotions : 0) !== PRE) return refuse("ACTION_EXPIRED", "the unit's promotions changed since the offer was made");
+    if ((isInt(xp.getTotalPromotionsEarned) ? xp.getTotalPromotionsEarned : 0) !== PRE) return refuse("ACTION_EXPIRED", "the unit's promotions changed since the offer was made");
     const prow = GameInfo.UnitPromotions.lookup(ARG2);
     const drow = GameInfo.UnitPromotionDisciplines.lookup(ARG3);
     if (!prow || !drow || typeof prow.UnitPromotionType !== "string" || typeof drow.UnitPromotionDisciplineType !== "string") return refuse("UNKNOWN_ACTION", "promotion or discipline is not a definition");
@@ -151,7 +151,7 @@
     Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs);
     result.outcome = "sent";
     let has = null; try { has = xp.hasPromotion(drow.UnitPromotionDisciplineType, prow.UnitPromotionType) === true; } catch (e) { has = null; }
-    result.readback = { kind: KIND, arg: ARG, promotion: ARG2, discipline: ARG3, held: isInt(xp.getNumPromotions) ? xp.getNumPromotions : null, hasPromotion: has, matches: has === true };
+    result.readback = { kind: KIND, arg: ARG, promotion: ARG2, discipline: ARG3, earned: isInt(xp.getTotalPromotionsEarned) ? xp.getTotalPromotionsEarned : null, hasPromotion: has, matches: has === true };
     return JSON.stringify(result);
   }
   if (KIND === "FOUND_CITY") {

@@ -982,13 +982,13 @@ function withPromotions(g, { canPromote = true, earnable = ["PROMOTION_A"], held
   g.UnitCommandTypes = { PROMOTE: -1259482049, DELETE: 1 };
   const state = { held, has: {} };
   units[0].Experience = {
-    canPromote, getNumPromotions: state.held, getStoredPromotionPoints: 1, getStoredCommendations: 0, getLevel: 2,
+    canPromote, getNumPromotions: 10, getTotalPromotionsEarned: state.held, getStoredPromotionPoints: 1, getStoredCommendations: 0, getLevel: 2,
     canEarnPromotion: (d, p) => d === "DISCIPLINE_X" && earnable.includes(p),
     hasPromotion: (d, p) => !!state.has[p],
   };
   g.Game.UnitCommands = {
     canStart: (uid, cmd, args, show) => { g._log.push(`pcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`); return { Success: allow && cmd === -1259482049 && uid.owner === 1 }; },
-    sendRequest: (uid, cmd, args) => { g._log.push(`psendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`); if (applies) { const row = promos.find((p) => p.$hash === args.PromotionType); state.has[row.UnitPromotionType] = true; units[0].Experience.getNumPromotions = state.held + 1; units[0].Experience.hasPromotion = (d, p) => !!state.has[p]; } },
+    sendRequest: (uid, cmd, args) => { g._log.push(`psendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`); if (applies) { const row = promos.find((p) => p.$hash === args.PromotionType); state.has[row.UnitPromotionType] = true; units[0].Experience.getTotalPromotionsEarned = state.held + 1; units[0].Experience.hasPromotion = (d, p) => !!state.has[p]; } },
   };
   return g;
 }
@@ -998,8 +998,8 @@ test("promotion offers pair each earnable promotion with its discipline, carryin
   const g = withPromotions(world({ log })); g._log = log;
   const r = runOffers(g);
   const pr = r.offers.filter((o) => o.kind === "PROMOTE_UNIT");
-  assert.deepEqual(pr.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.unitId, o.discipline, o.disciplineName, o.typeKey, o.displayName, o.description, o.commendation, o.promotionPoints, o.unitLevel, o.canStart]),
-    [[5, 7101, 8101, 0, 5, "DISCIPLINE_X", "LOC_DX", "PROMOTION_A", "LOC_PA", "LOC_PA_D", false, 1, 2, true]]);
+  assert.deepEqual(pr.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.unitId, o.discipline, o.disciplineName, o.typeKey, o.displayName, o.description, o.commendation, o.promotionsEarned, o.promotionPoints, o.unitLevel, o.canStart]),
+    [[5, 7101, 8101, 0, 5, "DISCIPLINE_X", "LOC_DX", "PROMOTION_A", "LOC_PA", "LOC_PA_D", false, 0, 1, 2, true]]);
   assert.ok(log.filter((e) => e.startsWith("pcanStart(")).every((e) => e.includes('"PromotionType":7101,"PromotionDisciplineType":8101')), "hashes only, never type strings");
   assert.ok(!log.some((e) => e.startsWith("psendRequest")));
   const none = withPromotions(world({ log: [] }), { canPromote: false }); none._log = [];
@@ -1012,7 +1012,7 @@ test("perform PROMOTE_UNIT re-checks the pair, the promotion count and canStart,
   const r = runPerformArgs(g, "PROMOTE_UNIT", 5, 7101, 8101, { pre: 0 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "PROMOTE_UNIT", arg: 5, promotion: 7101, discipline: 8101, held: 1, hasPromotion: true, matches: true });
+  assert.deepEqual(r.readback, { kind: "PROMOTE_UNIT", arg: 5, promotion: 7101, discipline: 8101, earned: 1, hasPromotion: true, matches: true });
   const i = log.findIndex((e) => e.startsWith("pcanStart("));
   const j = log.findIndex((e) => e.startsWith("psendRequest("));
   assert.ok(i !== -1 && j !== -1 && i < j);

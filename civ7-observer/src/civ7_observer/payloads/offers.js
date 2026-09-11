@@ -160,7 +160,9 @@
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
         const e = u.Experience;
         if (!e || e.canPromote !== true) continue;
-        const held = isInt(e.getNumPromotions) ? e.getNumPromotions : 0;
+        // getNumPromotions does not count taken promotions (live: it stayed at 10 across one), so the
+        // earned total is both the precondition and the signal.
+        const held = isInt(e.getTotalPromotionsEarned) ? e.getTotalPromotionsEarned : 0;
         const unitId = u.id;
         for (const det of GameInfo.UnitPromotionDisciplineDetails) {
           if (!det || typeof det.UnitPromotionDisciplineType !== "string" || typeof det.UnitPromotionType !== "string") continue;
@@ -177,7 +179,7 @@
             from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
             unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), discipline: drow.UnitPromotionDisciplineType, disciplineName: compose(drow.Name),
             typeKey: prow.UnitPromotionType, displayName: compose(prow.Name), description: compose(prow.Description),
-            commendation: prow.Commendation === true, promotionPoints: isInt(e.getStoredPromotionPoints) ? e.getStoredPromotionPoints : null,
+            commendation: prow.Commendation === true, promotionsEarned: held, promotionPoints: isInt(e.getStoredPromotionPoints) ? e.getStoredPromotionPoints : null,
             commendationPoints: isInt(e.getStoredCommendations) ? e.getStoredCommendations : null, unitLevel: isInt(e.getLevel) ? e.getLevel : null, canStart: true });
         }
       }

@@ -235,7 +235,7 @@ def test_new_resources_notification_is_a_supported_resources_decision(tmp_path):
 
 
 def test_unit_promotion_notification_is_a_supported_promotion_decision(tmp_path):
-    promo = [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "movesRemaining": 2, "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionPoints": 1, "unitLevel": 2, "canStart": True}]
+    promo = [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "movesRemaining": 2, "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionsEarned": 0, "promotionPoints": 1, "unitLevel": 2, "canStart": True}]
     payload = offers_with(promo, end_can_start=False, blocking="UNIT_PROMOTION")
     b, _, _ = build(tmp_path, payload)
     assert b["pause"] is None

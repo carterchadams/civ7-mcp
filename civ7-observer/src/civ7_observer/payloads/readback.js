@@ -24,7 +24,7 @@
     tradeRoutes: player ? t(() => player.Trade.countPlayerTradeRoutes()) : null,
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
-    unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Experience) m[String(u.id.id)] = Number.isInteger(u.Experience.getNumPromotions) ? u.Experience.getNumPromotions : null; } return m; }) : null,
+    unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Experience) m[String(u.id.id)] = Number.isInteger(u.Experience.getTotalPromotionsEarned) ? u.Experience.getTotalPromotionsEarned : null; } return m; }) : null,
     unitsReadyToMove: player ? t(() => player.Units.getUnits().filter((u) => u.isReadyToMove === true).map((u) => u.id.id)) : null,
     cityQueues: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.getQueue().map((it) => it.type); } return m; }) : null,
     cityProduction: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.currentProductionTypeHash; } return m; }) : null,
