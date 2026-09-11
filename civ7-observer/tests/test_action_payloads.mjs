@@ -1225,3 +1225,77 @@ test("the offers context lists the seat's own unit ids", () => {
   const g = withUnits(world({ log: [] }), [unit(5), unit(6)]); g._log = [];
   assert.deepEqual(runOffers(g).context.unitIds, [5, 6]);
 });
+
+// ---- age transition: civilization choice (a setup parameter) and the one-way finish
+function withAgeTransition(g, { current = "RANDOM", valid = ["CIVILIZATION_ABBASID", "CIVILIZATION_CHOLA"], blocking = true, finishOk = true } = {}) {
+  let value = current;
+  const rows = [{ $hash: 125352635, CivilizationType: "CIVILIZATION_ABBASID", Name: "LOC_AB", FullName: "LOC_AB_F", Description: "LOC_AB_D" }, { $hash: -12769722, CivilizationType: "CIVILIZATION_CHOLA", Name: "LOC_CH", FullName: "LOC_CH_F", Description: "LOC_CH_D" }, { $hash: 2053970112, CivilizationType: "CIVILIZATION_GREECE", Name: "LOC_GR", FullName: "LOC_GR_F", Description: "LOC_GR_D" }, { $hash: -1634075386, CivilizationType: "CIVILIZATION_PERSIA", Name: "LOC_PE", FullName: "LOC_PE_F", Description: "LOC_PE_D" }];
+  g.GameInfo.Civilizations = { lookup: (k) => rows.find((r) => r.$hash === k || r.CivilizationType === k) ?? null };
+  const domain = [{ value: "RANDOM", invalidReason: 0 }, ...rows.map((r) => ({ value: r.CivilizationType, invalidReason: valid.includes(r.CivilizationType) ? 0 : 4 }))];
+  g.GameSetup = {
+    findPlayerParameter: (pid, id) => { g._log.push(`findParam(${pid},${id})`); if (id === "AgeTransitionPlayerCivilization") return { value: { value }, domain: { possibleValues: domain } }; if (id === "PlayerCivilization") return { value: { value: "CIVILIZATION_PERSIA" } }; return null; },
+    setPlayerParameterValue: (pid, id, v) => { g._log.push(`setParam(${pid},${id},${v})`); if (id === "AgeTransitionPlayerCivilization") value = v; },
+  };
+  g.Database = { query: (db, sql) => [{ CivilizationType: "CIVILIZATION_PERSIA", Type: "CIVILIZATION_ABBASID", Name: "LOC_AB", Description: "LOC_AB_D" }] };
+  g.PlayerOperationTypes.SET_AGE_TRANSITION_DATA = 850178580;
+  if (blocking) { g.Game.Notifications.getEndTurnBlockingType = () => 779; g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 8, type: 20 }]; g.Game.Notifications.find = () => ({ Type: 3, BlocksTurnAdvancement: true }); g.Game.Notifications.getTypeName = () => "NOTIFICATION_CHOOSE_CIVILIZATION"; }
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 850178580) return inner.canStart(pid, op, args, show); g._log.push(`fcanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: finishOk }; },
+    sendRequest: (pid, op, args) => { if (op !== 850178580) return inner.sendRequest(pid, op, args); g._log.push(`fsendRequest(${pid},${JSON.stringify(args)})`); },
+  };
+  return g;
+}
+
+test("age transition offers list the seat's valid next-age civilizations with text and the historical flag, and gate the finish on a choice", () => {
+  const log = [];
+  const g = withAgeTransition(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const civs = r.offers.filter((o) => o.kind === "CHOOSE_AGE_CIVILIZATION");
+  assert.deepEqual(civs.map((o) => [o.arg, o.pre, o.typeKey, o.displayName, o.description, o.historical, o.selected, o.invalidReason, o.canStart]),
+    [[125352635, -1, "CIVILIZATION_ABBASID", "LOC_AB", "LOC_AB_D", true, false, 0, true], [-12769722, -1, "CIVILIZATION_CHOLA", "LOC_CH", "LOC_CH_D", false, false, 0, true],
+     [2053970112, -1, "CIVILIZATION_GREECE", "LOC_GR", "LOC_GR_D", false, false, 4, false], [-1634075386, -1, "CIVILIZATION_PERSIA", "LOC_PE", "LOC_PE_D", false, false, 4, false]]);
+  assert.ok(!civs.some((o) => o.typeKey === "RANDOM"), "RANDOM is never offered: the seat must choose");
+  const fin = r.offers.find((o) => o.kind === "SET_AGE_TRANSITION_DATA");
+  assert.deepEqual([fin.canStart, fin.selectedCivilization, fin.pre], [false, "RANDOM", -1], "nothing chosen yet: the finish is withheld");
+  assert.ok(!log.some((e) => e.startsWith("setParam") || e.startsWith("fsendRequest")));
+  const h = withAgeTransition(world({ log: [] }), { blocking: false }); h._log = [];
+  assert.equal(runOffers(h).offers.filter((o) => o.kind === "CHOOSE_AGE_CIVILIZATION" || o.kind === "SET_AGE_TRANSITION_DATA").length, 0, "only while the game asks");
+  const k = withAgeTransition(world({ log: [] }), { current: "CIVILIZATION_CHOLA" }); k._log = [];
+  const kr = runOffers(k);
+  assert.equal(kr.offers.find((o) => o.kind === "SET_AGE_TRANSITION_DATA").canStart, true);
+  assert.equal(kr.offers.find((o) => o.typeKey === "CIVILIZATION_CHOLA").selected, true);
+  assert.equal(kr.offers.find((o) => o.typeKey === "CIVILIZATION_CHOLA").canStart, false, "the selected civilization is not re-offered");
+});
+
+test("perform CHOOSE_AGE_CIVILIZATION writes only the bound seat's age-transition parameter after re-validating, and reads it back", () => {
+  const log = [];
+  const g = withAgeTransition(world({ log })); g._log = log;
+  const r = runPerform(g, "CHOOSE_AGE_CIVILIZATION", 125352635, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CHOOSE_AGE_CIVILIZATION", arg: 125352635, civilization: "CIVILIZATION_ABBASID", selected: "CIVILIZATION_ABBASID", matches: true });
+  assert.deepEqual(log.filter((e) => e.startsWith("setParam")), ["setParam(1,AgeTransitionPlayerCivilization,CIVILIZATION_ABBASID)"]);
+  for (const [label, mk, hash, pre] of [
+    ["not a civilization", () => withAgeTransition(world({ log: [] })), 4242, -1],
+    ["selection changed", () => withAgeTransition(world({ log: [] })), 125352635, 99],
+    ["unavailable for this seat", () => withAgeTransition(world({ log: [] })), 2053970112, -1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerform(h, "CHOOSE_AGE_CIVILIZATION", hash, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("setParam")), `${label}: must not write`);
+  }
+});
+
+test("perform SET_AGE_TRANSITION_DATA refuses until a civilization is chosen, then sends Finished after canStart", () => {
+  const g = withAgeTransition(world({ log: [] })); g._log = [];
+  const none = runPerform(g, "SET_AGE_TRANSITION_DATA", 0, { pre: -1 });
+  assert.equal(none.refused.code, "ACTION_NOT_STARTABLE");
+  assert.ok(!g._log.some((e) => e.startsWith("fsendRequest")));
+  const h = withAgeTransition(world({ log: [] }), { current: "CIVILIZATION_ABBASID" }); h._log = [];
+  const ok = runPerform(h, "SET_AGE_TRANSITION_DATA", 0, { pre: 125352635 });
+  assert.equal(ok.outcome, "sent");
+  assert.ok(h._log.find((e) => e === 'fsendRequest(1,{"Finished":true})'));
+  const stale = withAgeTransition(world({ log: [] }), { current: "CIVILIZATION_ABBASID" }); stale._log = [];
+  assert.equal(runPerform(stale, "SET_AGE_TRANSITION_DATA", 0, { pre: -1 }).refused.code, "ACTION_EXPIRED");
+});

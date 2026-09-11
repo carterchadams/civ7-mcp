@@ -15,6 +15,7 @@
     pendingStories: player ? t(() => { const out = []; const st = player.Stories; const first = st.getFirstPendingDiscoveryLastMetID(); if (first && Number.isInteger(first.id)) out.push(first.id); const met = st.getPendingMetIds(); if (Array.isArray(met)) for (const m of met) if (m && Number.isInteger(m.id) && out.indexOf(m.id) === -1) out.push(m.id); return out; }) : null,
     attributeNodes: player ? t(() => { const m = {}; for (const nd of GameInfo.ProgressionTreeNodes) { if (nd && typeof nd.ProgressionTree === "string" && nd.ProgressionTree.indexOf("TREE_ATTRIBUTE") === 0) { const ns = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, nd.$hash); m[String(nd.$hash)] = ns && Number.isInteger(ns.state) ? ns.state : null; } } return m; }) : null,
     resourceAssignments: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Resources) for (const ar of c.Resources.getAssignedResources()) { if (ar && Number.isInteger(ar.value)) m[String(ar.value)] = c.id.id; } } return m; }) : null,
+    ageTransitionCivilization: t(() => { const p = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); return p && p.value ? p.value.value : null; }),
     goldenAgeChoices: player ? t(() => player.Culture.getGoldenAgeChoices().length) : null,
     governmentType: player ? t(() => player.Culture.getGovernmentType()) : null,
     pantheons: player ? t(() => player.Religion.getPantheons()) : null,

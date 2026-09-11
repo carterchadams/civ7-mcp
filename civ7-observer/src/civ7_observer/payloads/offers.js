@@ -415,6 +415,31 @@
         offers.push({ kind: "CONSIDER_ASSIGN_RESOURCE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) && !(rpre > 0 && assignable > 0), toAssign: rpre, assignable: assignable });
       }
     }
+    if (isInt(PlayerOperationTypes.SET_AGE_TRANSITION_DATA) && typeof GameSetup !== "undefined" && typeof GameSetup.findPlayerParameter === "function" && blockingNotifications.indexOf("NOTIFICATION_CHOOSE_CIVILIZATION") !== -1) {
+      // Age transition: the shipped in-game screen sets the bound player's AgeTransitionPlayerCivilization
+      // setup parameter (its domain carries a validity reason per civilization) and then sends
+      // SET_AGE_TRANSITION_DATA {Finished: true}. The choice is reversible until the finish is sent.
+      let param = null; try { param = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); } catch (e) { param = null; }
+      const domain = param && param.domain && Array.isArray(param.domain.possibleValues) ? param.domain.possibleValues : null;
+      if (!param || !domain) throw new Error("age transition civilization parameter unavailable");
+      const current = param.value && typeof param.value.value === "string" ? param.value.value : null;
+      const currentRow = current ? GameInfo.Civilizations.lookup(current) : null;
+      const cpre = currentRow && isInt(currentRow.$hash) ? currentRow.$hash : -1;
+      let unlocks = null; try { unlocks = Database.query("config", "select CivilizationType, Type, Name, Description from CivilizationUnlocks where Kind='KIND_CIVILIZATION'"); } catch (e) { unlocks = null; }
+      let mine = null; try { const pc = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "PlayerCivilization"); mine = pc && pc.value ? pc.value.value : null; } catch (e) { mine = null; }
+      const chosenOne = current !== null && current !== "RANDOM";
+      for (const v of domain) {
+        if (!v || typeof v.value !== "string" || v.value === "RANDOM") continue;
+        const row = GameInfo.Civilizations.lookup(v.value);
+        if (!row || !isInt(row.$hash)) continue;
+        const valid = v.invalidReason === 0;
+        let historical = false; try { if (Array.isArray(unlocks)) for (const u of unlocks) { if (u && u.Type === v.value && u.CivilizationType === mine) { historical = true; break; } } } catch (e) { historical = false; }
+        offers.push({ kind: "CHOOSE_AGE_CIVILIZATION", arg: row.$hash, pre: cpre, typeKey: v.value, displayName: compose(row.Name), fullName: compose(row.FullName), description: compose(row.Description),
+          historical: historical, selected: current === v.value, invalidReason: isInt(v.invalidReason) ? v.invalidReason : null, canStart: valid && current !== v.value });
+      }
+      const fcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.SET_AGE_TRANSITION_DATA, { Finished: true }, false);
+      offers.push({ kind: "SET_AGE_TRANSITION_DATA", arg: 0, pre: cpre, selectedCivilization: current, canStart: !!(fcheck && fcheck.Success === true) && chosenOne });
+    }
     if (isInt(PlayerOperationTypes.CHOOSE_GOLDEN_AGE) && typeof player.Culture.getGoldenAgeChoices === "function" && GameInfo.GoldenAges) {
       // Celebration: the shipped chooser lists Culture.getGoldenAgeChoices() (type strings) and sends
       // CHOOSE_GOLDEN_AGE {GoldenAgeType: hash} after canStart.

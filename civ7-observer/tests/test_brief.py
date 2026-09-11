@@ -293,3 +293,14 @@ def test_crisis_cards_answer_the_crisis_blocker_and_ordinary_cards_stay_in_polic
     assert [o["displayName"] for o in kinds["crisis"]["options"]] == ["Incompetent Ministers"]
     assert [o["displayName"] for o in kinds["policies"]["options"]] == ["Honor"]
     assert kinds["crisis"]["options"][0]["isCrisis"] is True
+
+
+def test_choose_civilization_is_a_supported_age_transition_decision(tmp_path):
+    at = [{"kind": "CHOOSE_AGE_CIVILIZATION", "arg": 125352635, "pre": -1, "typeKey": "CIVILIZATION_ABBASID", "displayName": "Abbasid", "fullName": "Abbasid Empire", "description": "d", "historical": True, "selected": False, "invalidReason": 0, "canStart": True},
+          {"kind": "SET_AGE_TRANSITION_DATA", "arg": 0, "pre": -1, "selectedCivilization": "RANDOM", "canStart": False}]
+    payload = offers_with(at, end_can_start=False, blocking="-2084516792")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_CIVILIZATION"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "age_transition")
+    assert d["required"] is True and d["options"][0]["historical"] is True and "one-way" in d["note"]

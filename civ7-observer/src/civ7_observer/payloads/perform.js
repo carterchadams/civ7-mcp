@@ -310,6 +310,41 @@
     result.readback = { kind: KIND, arg: 0, matches: false };
     return JSON.stringify(result);
   }
+  if (KIND === "CHOOSE_AGE_CIVILIZATION") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "civilization argument is not an integer");
+    if (typeof GameSetup === "undefined" || typeof GameSetup.findPlayerParameter !== "function" || typeof GameSetup.setPlayerParameterValue !== "function") return refuse("API_CONTRACT_MISMATCH", "game setup parameters unavailable");
+    const crow = GameInfo.Civilizations.lookup(ARG);
+    if (!crow || typeof crow.CivilizationType !== "string") return refuse("UNKNOWN_ACTION", "hash is not a civilization definition");
+    let param = null; try { param = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); } catch (e) { param = null; }
+    const domain = param && param.domain && Array.isArray(param.domain.possibleValues) ? param.domain.possibleValues : null;
+    if (!param || !domain) return refuse("API_CONTRACT_MISMATCH", "age transition civilization parameter unavailable");
+    const current = param.value && typeof param.value.value === "string" ? param.value.value : null;
+    const currentRow = current ? GameInfo.Civilizations.lookup(current) : null;
+    if ((currentRow && isInt(currentRow.$hash) ? currentRow.$hash : -1) !== PRE) return refuse("ACTION_EXPIRED", "the selected civilization changed since the offer was made");
+    let entry = null; for (const v of domain) { if (v && v.value === crow.CivilizationType) { entry = v; break; } }
+    if (!entry) return refuse("ACTION_NOT_STARTABLE", "that civilization is not in this seat's choices");
+    if (entry.invalidReason !== 0) return refuse("ACTION_NOT_STARTABLE", "the game marks that civilization unavailable for this seat", { invalidReason: entry.invalidReason });
+    const civKey = crow.CivilizationType;
+    GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey);
+    result.outcome = "sent";
+    let after = null; try { const p2 = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); after = p2 && p2.value ? p2.value.value : null; } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, civilization: civKey, selected: after, matches: after === civKey };
+    return JSON.stringify(result);
+  }
+  if (KIND === "SET_AGE_TRANSITION_DATA") {
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof GameSetup === "undefined") return refuse("API_CONTRACT_MISMATCH", "age transition contract unavailable");
+    let current = null; try { const p3 = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); current = p3 && p3.value ? p3.value.value : null; } catch (e) { current = null; }
+    const currentRow = current ? GameInfo.Civilizations.lookup(current) : null;
+    if ((currentRow && isInt(currentRow.$hash) ? currentRow.$hash : -1) !== PRE) return refuse("ACTION_EXPIRED", "the selected civilization changed since the offer was made");
+    if (current === null || current === "RANDOM") return refuse("ACTION_NOT_STARTABLE", "choose a civilization before finishing the age transition");
+    const args = { Finished: true };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused finishing the age transition");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    result.readback = { kind: KIND, arg: 0, civilization: current, matches: false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CHOOSE_GOLDEN_AGE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "celebration argument is not an integer");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof player.Culture.getGoldenAgeChoices !== "function") return refuse("API_CONTRACT_MISMATCH", "celebration operation contract unavailable");

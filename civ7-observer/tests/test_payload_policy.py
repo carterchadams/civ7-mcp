@@ -24,6 +24,7 @@ FORBIDDEN_PATTERNS = {
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
     "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations\.(?!canStart\b)\w+|CityOperations\.(?!canStart\b)\w+|CityCommands\.(?!canStart\b)\w+|UnitCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
+    "game setup writes": r"\bGameSetup\.(set\w+|loadCreateGameSettings|resetSavedCreateGameSettings)\s*\(",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
 }
@@ -50,11 +51,12 @@ MUTATION_ALLOWLIST = (
     'Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs)',
     'Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs)',
+    'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false)',
     'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs)',
 )
 MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
-ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
+ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 
 def violations(source: str) -> list[str]:

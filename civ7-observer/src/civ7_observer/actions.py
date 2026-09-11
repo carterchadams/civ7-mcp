@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -358,6 +358,12 @@ class ActionRegistry:
                 for k in ("storyId", "storyKey", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "CHOOSE_AGE_CIVILIZATION":
+                for k in ("fullName", "description", "historical", "selected", "invalidReason"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "SET_AGE_TRANSITION_DATA" and "selectedCivilization" in o:
+                entry["selectedCivilization"] = o["selectedCivilization"]
             if kind == "PURCHASE_UNIT":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "purchase offer without a unit type")
@@ -500,7 +506,18 @@ class ActionRegistry:
             if not all(isinstance(v, int) and not isinstance(v, bool) for v in (turn, age, seat, observer)):
                 continue
             effect: dict[str, Any] | None = None
-            if kind == "END_TURN":
+            if kind == "SET_AGE_TRANSITION_DATA":
+                # finishing the transition can hand the seat over or change the age itself
+                notes = rb.get("blockingNotifications")
+                if (turn, age, seat, observer) == (offer["turn"], offer["age"], player, player) and isinstance(notes, list) and "NOTIFICATION_CHOOSE_CIVILIZATION" not in notes:
+                    effect = {"civilizationChoiceClosed": True}
+                elif age != offer["age"]:
+                    effect = {"ageAdvancedTo": age}
+                elif seat != player and turn >= offer["turn"]:
+                    effect = {"seatHandedOffTo": seat}
+                elif turn > offer["turn"]:
+                    effect = {"turnAdvancedTo": turn}
+            elif kind == "END_TURN":
                 # positively identified progression only: completion flagged on the same seat/turn,
                 # the turn counter advanced, or the seat handed off to another integer seat
                 if rb.get("hasSentTurnComplete") is True and seat == player and turn == offer["turn"]:
@@ -531,6 +548,10 @@ class ActionRegistry:
                     plots = rb.get("expandPlots")
                     if isinstance(plots, dict) and isinstance(plots.get(str(offer["arg"])), list) and offer["pre"] not in plots[str(offer["arg"])]:
                         effect = {"populationPlaced": {"cityId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "plotIndex": offer["pre"]}}
+                elif kind == "CHOOSE_AGE_CIVILIZATION":
+                    chosen = rb.get("ageTransitionCivilization")
+                    if isinstance(chosen, str) and chosen == (readback.get("civilization") if isinstance(readback, dict) else None):
+                        effect = {"ageTransitionCivilization": chosen}
                 elif kind == "PURCHASE_UNIT":
                     count = rb.get("unitCount")
                     if isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:

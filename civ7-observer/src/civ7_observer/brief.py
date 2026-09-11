@@ -36,6 +36,8 @@ BLOCKER_DECISION = {
     "NOTIFICATION_UNIT_PROMOTION_AVAILABLE": "promotion",
     "CHOOSE_GOLDEN_AGE": "celebration",
     "ASSIGN_NEW_RESOURCES": "resources",
+    "CHOOSE_CIVILIZATION": "age_transition",
+    "NOTIFICATION_CHOOSE_CIVILIZATION": "age_transition",
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_ASSIGN_NEW_RESOURCES": "resources",
@@ -77,6 +79,8 @@ DECISION_OF_KIND = {
     "consider_attributes": "attributes",
     "choose_celebration": "celebration",
     "promote_unit": "promotion",
+    "choose_age_civilization": "age_transition",
+    "finish_age_transition": "age_transition",
     "town_project": "town_project",
     "assign_resource": "resources",
     "consider_resources": "resources",
@@ -89,7 +93,8 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
+                 "fullName", "historical", "selected", "invalidReason", "selectedCivilization", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -100,6 +105,11 @@ ATTRIBUTES_NOTE = ("buy a node whose attribute has a point available (wildcard p
 
 RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity (`cityCap` minus `cityAssigned`; `description` is "
                   "the resource's effect), then consider_resources; it is not startable while a resource can still be assigned")
+
+AGE_TRANSITION_NOTE = ("the age is over: choose the civilization this seat becomes in the next age (each option's `description` is its "
+                       "unique ability; `historical: true` marks the choices the game considers this civilization's natural successors), "
+                       "then finish_age_transition. Choosing is reversible; finishing is one-way and starts the new age once every seat "
+                       "has finished. Mementos are left as they are")
 
 MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot")
@@ -214,6 +224,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         group.setdefault("_buckets", {}).setdefault(bucket_of(offer), []).append(offer)
         if decision == "unit":
             group["note"] = MOVE_HINT_NOTE
+        if decision == "age_transition":
+            group["note"] = AGE_TRANSITION_NOTE
         if decision == "production":
             group["note"] = PRODUCTION_NOTE
         if decision in ("policies", "crisis"):

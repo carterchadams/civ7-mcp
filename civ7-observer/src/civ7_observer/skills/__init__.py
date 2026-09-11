@@ -28,6 +28,7 @@ DECISION_SKILL = {
     "population": "civ7-growth-and-specialists",
     "policies": "civ7-happiness-and-government",
     "crisis": "civ7-ages-and-crises",
+    "age_transition": "civ7-ages-and-crises",
     # Narrative events have no card in the guide; the turn-management card (always loaded) is the
     # procedure: take the reward that serves the current commitments, never stall the turn on it.
     "narrative": "civ7-turn-management",
