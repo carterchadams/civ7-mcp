@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from functools import lru_cache
 from importlib import resources
 
@@ -34,13 +35,20 @@ def _int_token(value: object, what: str) -> str:
     return str(value)
 
 
-def render_action_payload(*, bound_player_id: int, allowed_mode: str, kind: str, arg: int, expected_turn: int, expected_age: int, arg2: int = 0, arg3: int = 0) -> str:
+MATCH_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
+
+
+def render_action_payload(*, bound_player_id: int, allowed_mode: str, kind: str, arg: int, expected_turn: int, expected_age: int,
+                          expected_match: str, pre: int, arg2: int = 0, arg3: int = 0) -> str:
     """Render perform.js. Every token is validated here; no caller-supplied text reaches the game."""
     if kind not in ACTION_KINDS:
         raise ValueError(f"kind must be one of {ACTION_KINDS}, got {kind!r}")
     text = render_payload("perform.js", bound_player_id=bound_player_id, allowed_mode=allowed_mode)
     text = text.replace("OP_KIND", json.dumps(kind)).replace("OP_ARG2", _int_token(arg2, "arg2")).replace("OP_ARG3", _int_token(arg3, "arg3")).replace("OP_ARG", _int_token(arg, "arg"))
     text = text.replace("EXPECTED_TURN", _int_token(expected_turn, "expected_turn")).replace("EXPECTED_AGE", _int_token(expected_age, "expected_age"))
+    if not isinstance(expected_match, str) or not MATCH_ID.match(expected_match):
+        raise ValueError("expected_match must be a short alphanumeric match id")
+    text = text.replace("EXPECTED_GUID", json.dumps(expected_match)).replace("OP_PRE", _int_token(pre, "pre"))
     return text
 
 

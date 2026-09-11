@@ -7,8 +7,8 @@ from civ7_observer.payloads import load_payload
 from scripted_socket import ScriptedSocket
 
 GAME = {"probeVersion": 1, "hasUI": True, "hasGameContext": True, "hasGame": True, "inGame": True,
-        "hasPlayers": True, "hasMap": True, "localPlayerId": 1, "localObserverId": 1, "turn": 12, "age": 4242, "href": "coui://ui/x"}
-MENU = {**GAME, "inGame": False, "hasGameContext": False, "hasGame": False, "localPlayerId": None, "localObserverId": None, "turn": None, "age": None}
+        "hasPlayers": True, "hasMap": True, "localPlayerId": 1, "localObserverId": 1, "turn": 12, "age": 4242, "gameGuid": "ABCDEF0123456789", "href": "coui://ui/x"}
+MENU = {**GAME, "inGame": False, "hasGameContext": False, "hasGame": False, "localPlayerId": None, "localObserverId": None, "turn": None, "age": None, "gameGuid": None}
 NON_GAME = {**MENU, "hasUI": False, "hasPlayers": False, "hasMap": False}
 INCONSISTENT = {**GAME, "hasPlayers": False}
 
@@ -93,6 +93,12 @@ def test_parse_exposes_age():
 def test_game_realm_requires_age():
     probe = targets.parse_realm_probe(json.dumps({**GAME, "age": None}))
     assert targets.classify(probe) == targets.RealmKind.INCONSISTENT
+
+
+def test_parse_exposes_game_guid_and_game_realm_requires_it():
+    assert targets.parse_realm_probe(json.dumps(GAME)).game_guid == "ABCDEF0123456789"
+    assert targets.classify(targets.parse_realm_probe(json.dumps({**GAME, "gameGuid": None}))) == targets.RealmKind.INCONSISTENT
+    assert targets.classify(targets.parse_realm_probe(json.dumps({**GAME, "gameGuid": ""}))) == targets.RealmKind.INCONSISTENT
 
 
 def test_parse_accepts_in_game_null_as_unknown():

@@ -65,25 +65,35 @@ test("throwing accessors degrade to null instead of failing the probe", () => {
   assert.equal(r.turn, null);
 });
 
-test("payload never enumerates or mutates hidden globals", () => {
+test("payload never enumerates or mutates hidden globals; only the match identity is read from the configuration", () => {
   const touched = [];
   const spy = new Proxy({}, { get(_, k) { touched.push(String(k)); return undefined; } });
+  const cfgReads = [];
+  const cfg = new Proxy({ campaignSetupGUID: "ABC", gameGUIDHexString: "" }, { get(t, k) { cfgReads.push(String(k)); return t[k]; } });
   const r = run({
     UI: { isInGame: () => true },
     GameContext: { localPlayerID: 0, localObserverID: 0 },
-    Game: { turn: 1 },
+    Game: { turn: 1, age: 1 },
     Players: spy,
     GameplayMap: spy,
-    Configuration: spy,
+    Configuration: { getGame: () => cfg },
   });
   assert.equal(r.inGame, true);
+  assert.equal(r.gameGuid, "ABC");
   assert.deepEqual(touched, [], "probe must only test presence, not read members of game collections");
+  assert.ok(cfgReads.every((k) => k === "campaignSetupGUID" || k === "gameGUIDHexString"), `only the match id fields may be read from the game configuration: ${cfgReads}`);
 });
 
 test("payload source contains no forbidden operations", () => {
-  for (const bad of ["Game.PlayerOperations", "sendRequest", "revealAll", "localStorage", "setTimeout", "import ", "document.", "Players.get(", "humanPlayerIDs", "aiPlayerIDs", "getRevealedState", "Configuration.getGame"]) {
+  for (const bad of ["Game.PlayerOperations", "sendRequest", "revealAll", "localStorage", "setTimeout", "import ", "document.", "Players.get(", "humanPlayerIDs", "aiPlayerIDs", "getRevealedState", "gameSeed"]) {
     assert.ok(!source.includes(bad), `forbidden token in payload: ${bad}`);
   }
+});
+
+test("context probe reports the game guid from the configuration", () => {
+  const r = run({ UI: { isInGame: () => true }, Players: {}, GameplayMap: {}, GameContext: { localPlayerID: 1, localObserverID: 1 }, Game: { turn: 4, age: 1 }, Configuration: { getGame: () => ({ gameGUIDHexString: "ABC123" }) } });
+  assert.equal(r.gameGuid, "ABC123");
+  assert.equal(run({}).gameGuid, null);
 });
 
 test("context probe reports the age hash", () => {

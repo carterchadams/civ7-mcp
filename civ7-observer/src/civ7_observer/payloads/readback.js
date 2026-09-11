@@ -4,6 +4,7 @@
   const player = t(() => Players.get(BOUND_PLAYER_ID));
   return JSON.stringify({
     turn: t(() => Game.turn), age: t(() => Game.age),
+    gameGuid: t(() => { const g = Configuration.getGame(); return (typeof g.campaignSetupGUID === "string" && g.campaignSetupGUID) ? g.campaignSetupGUID : ((typeof g.gameGUIDHexString === "string" && g.gameGUIDHexString) ? g.gameGUIDHexString : null); }),
     localPlayerId: t(() => GameContext.localPlayerID), localObserverId: t(() => GameContext.localObserverID),
     isTurnActive: player ? t(() => player.isTurnActive) : null,
     techResearching: player ? t(() => player.Techs.getResearching().type) : null,

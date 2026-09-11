@@ -33,7 +33,7 @@ def test_in_game():
     assert r.status is doctor.DoctorStatus.IN_GAME
     assert r.ok is True and r.exit_code() == 0
     assert r.selected["id"] == "b"
-    assert r.context == {"turn": 12, "age": 4242, "localPlayerId": 1, "localObserverId": 1}
+    assert r.context == {"turn": 12, "age": 4242, "localPlayerId": 1, "localObserverId": 1, "gameGuid": "ABCDEF0123456789"}
     assert len(r.targets) == 2
 
 

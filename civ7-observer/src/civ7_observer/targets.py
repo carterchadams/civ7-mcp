@@ -20,7 +20,7 @@ PROBE_VERSION = 1
 _BOOL_KEYS = ("hasUI", "hasGameContext", "hasGame", "hasPlayers", "hasMap")
 _OPT_BOOL_KEYS = ("inGame",)
 _OPT_INT_KEYS = ("localPlayerId", "localObserverId", "turn", "age")
-_OPT_STR_KEYS = ("href",)
+_OPT_STR_KEYS = ("href", "gameGuid")
 _ALL_KEYS = frozenset(("probeVersion",) + _BOOL_KEYS + _OPT_BOOL_KEYS + _OPT_INT_KEYS + _OPT_STR_KEYS)
 
 
@@ -40,6 +40,7 @@ class RealmProbe:
     local_observer_id: int | None
     turn: int | None
     age: int | None
+    game_guid: str | None
     href: str | None
 
     def to_dict(self) -> dict[str, Any]:
@@ -47,7 +48,7 @@ class RealmProbe:
             "inGame": self.in_game, "hasUI": self.has_ui, "hasGameContext": self.has_game_context,
             "hasGame": self.has_game, "hasPlayers": self.has_players, "hasMap": self.has_map,
             "localPlayerId": self.local_player_id, "localObserverId": self.local_observer_id,
-            "turn": self.turn, "age": self.age, "href": self.href,
+            "turn": self.turn, "age": self.age, "gameGuid": self.game_guid, "href": self.href,
         }
 
 
@@ -86,7 +87,7 @@ def parse_realm_probe(value: object) -> RealmProbe:
         in_game=data["inGame"], has_ui=data["hasUI"], has_game_context=data["hasGameContext"],
         has_game=data["hasGame"], has_players=data["hasPlayers"], has_map=data["hasMap"],
         local_player_id=data["localPlayerId"], local_observer_id=data["localObserverId"],
-        turn=data["turn"], age=data["age"], href=data["href"],
+        turn=data["turn"], age=data["age"], game_guid=data["gameGuid"], href=data["href"],
     )
 
 
@@ -101,7 +102,7 @@ class RealmKind(StrEnum):
 def _valid_context(probe: RealmProbe) -> bool:
     """A loaded game must report a non-negative turn, non-negative seat ids, and an integer age hash."""
     return (all(_is_int(v) and v >= 0 for v in (probe.turn, probe.local_player_id, probe.local_observer_id))
-            and _is_int(probe.age))
+            and _is_int(probe.age) and isinstance(probe.game_guid, str) and probe.game_guid != "")
 
 
 def classify(probe: RealmProbe) -> RealmKind:

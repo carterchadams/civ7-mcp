@@ -94,3 +94,12 @@ def test_open_game_session_detects_age_only_change_on_reopen():
     with pytest.raises(service.ObserverError) as ei:
         service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f)
     assert ei.value.code == "CONTEXT_CHANGED"
+
+
+def test_open_game_session_detects_game_guid_change_on_reopen():
+    changed = {**GAME, "gameGuid": "FFFF000011112222"}
+    f = Factory({"a": [reply(1, json.dumps(GAME)), reply(1, json.dumps(changed))]})
+    tl = [target("a")]
+    with pytest.raises(service.ObserverError) as ei:
+        service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f)
+    assert ei.value.code == "CONTEXT_CHANGED"

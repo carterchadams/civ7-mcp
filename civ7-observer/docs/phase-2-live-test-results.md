@@ -105,3 +105,12 @@ With `hotseat-screen-curtain` present throughout:
 
 This is the first turn where every mandatory decision the game raised (research already set,
 units, production) was handled by the action catalog alone.
+
+## Preliminary action-layer review fixes verified live (game 2, player 1, turn 13, curtain up)
+
+| check | result |
+|---|---|
+| doctor / offers context | `gameGuid` = campaign setup GUID `83853C0C…` present in the doctor context and every offers context |
+| offers | skip and move offers carry `unitId` and `from`; end turn blocked by `UNITS` |
+| `skip_unit` perform | `confirmed` with `confirmedBy: {source: poll, gameGuid: 83853C0C…, turn: 13, localPlayerId: 1}` |
+| files | `actions.jsonl`, `actions.offers.json`, `actions.lock` |

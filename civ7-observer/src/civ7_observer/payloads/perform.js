@@ -9,6 +9,8 @@
   const ARG = OP_ARG;
   const ARG2 = OP_ARG2;
   const ARG3 = OP_ARG3;
+  const EXPECTED_MATCH = EXPECTED_GUID;
+  const PRE = OP_PRE;
   const result = { payloadVersion: 1, refused: null, context: null, outcome: null, readback: null };
   const refuse = (code, message, extra) => { result.refused = Object.assign({ code: code, message: message }, extra || {}); return JSON.stringify(result); };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
@@ -23,6 +25,8 @@
   if (!isInt(turn) || !isInt(age) || !isInt(lp) || !isInt(lo)) return refuse("NOT_IN_GAME", "turn, age or seat identity missing");
   if (lp !== BOUND_PLAYER_ID || lo !== BOUND_PLAYER_ID) return refuse("WRONG_PLAYER", "bound player " + BOUND_PLAYER_ID + " is not the local seat (localPlayerId=" + lp + ", localObserverId=" + lo + ")");
   if (turn !== EXPECTED_TURN || age !== EXPECTED_AGE) return refuse("ACTION_EXPIRED", "game turn/age differ from the offer's (turn " + turn + ", expected " + EXPECTED_TURN + ")");
+  const matchId = (typeof flags.campaignSetupGUID === "string" && flags.campaignSetupGUID) ? flags.campaignSetupGUID : ((typeof flags.gameGUIDHexString === "string" && flags.gameGUIDHexString) ? flags.gameGUIDHexString : null);
+  if (matchId === null || matchId !== EXPECTED_MATCH) return refuse("ACTION_EXPIRED", "the offer belongs to a different match");
   for (const k of ["isHotseat", "isLocalMultiplayer", "isNetworkMultiplayer", "isInternetMultiplayer", "isLANMultiplayer", "isAnyMultiplayer", "isPlayByCloud"]) {
     if (!isBool(flags[k])) return refuse("UNSUPPORTED_GAME_MODE", "game mode flag " + k + " is not a boolean");
   }
@@ -32,9 +36,9 @@
   let player; try { player = Players.get(BOUND_PLAYER_ID); } catch (e) { player = null; }
   if (!player || player.isValid === false) return refuse("WRONG_PLAYER", "bound player object is invalid");
   if (player.isTurnActive !== true) return refuse("TURN_NOT_READY", "bound player's turn is not active");
-  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain() };
+  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain(), gameGuid: matchId };
 
-  // ---- execute exactly one operation
+  // ---- execute exactly one operation; every kind re-checks the state the offer was made against
   if (KIND === "END_TURN") {
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
@@ -53,6 +57,7 @@
     let unit = null;
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
     if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    if (!unit.Movement || unit.Movement.movementMovesRemaining !== PRE) return refuse("ACTION_EXPIRED", "unit movement changed since the skip was offered");
     const unitId = unit.id;
     const ucheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false);
     if (!ucheck || ucheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the skip");
@@ -70,6 +75,7 @@
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
     if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
     if (unit.isOnMap !== true || !unit.location || !isInt(unit.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
+    if (GameplayMap.getIndexFromXY(unit.location.x, unit.location.y) !== PRE) return refuse("ACTION_EXPIRED", "unit is no longer where it was when the move was offered");
     let adjacent = false;
     for (let d = 0; d < 6; d++) { const loc = GameplayMap.getAdjacentPlotLocation(unit.location, d); if (loc && loc.x === ARG2 && loc.y === ARG3) { adjacent = true; break; } }
     if (!adjacent) return refuse("ACTION_NOT_STARTABLE", "target plot is not adjacent to the unit");
@@ -97,6 +103,7 @@
     if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
     const row = GameInfo.Units.lookup(ARG2);
     if (!row || typeof row.UnitType !== "string") return refuse("UNKNOWN_ACTION", "unit type is not a unit definition");
+    if (!city.BuildQueue || city.BuildQueue.currentProductionTypeHash !== PRE) return refuse("ACTION_EXPIRED", "city production changed since the build was offered");
     const cityId = city.id;
     const buildArgs = { UnitType: ARG2 };
     const bcheck = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
@@ -111,6 +118,11 @@
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");
   if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
   if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+  {
+    const comp = KIND === "SET_TECH_TREE_NODE" ? player.Techs : player.Culture;
+    let cur = null; try { cur = comp.getResearching().type; } catch (e) { cur = null; }
+    if (cur !== PRE) return refuse("ACTION_EXPIRED", "current research changed since the offer was made");
+  }
   const args = { ProgressionTreeNodeType: ARG };
   const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
   if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the operation");

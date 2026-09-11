@@ -89,7 +89,7 @@ def test_get_status_reports_readiness_without_other_seats():
     st = tool(s, "get_status").fn()
     assert st["status"] == "IN_GAME" and st["ready"] is True
     assert st["boundPlayerId"] == 1 and st["allowedMode"] == "singleplayer"
-    assert st["context"] == {"turn": 12, "age": 4242, "localPlayerId": 1, "localObserverId": 1}
+    assert st["context"] == {"turn": 12, "age": 4242, "localPlayerId": 1, "localObserverId": 1, "gameGuid": "ABCDEF0123456789"}
     assert "targets" not in st and "ws://" not in json.dumps(st)
 
 

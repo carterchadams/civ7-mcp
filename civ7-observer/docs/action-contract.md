@@ -18,11 +18,40 @@ Blocking types observed: `UNITS` (23669119) while any unit has moves and no orde
 `RESEARCH` (-286188551) while no research is selected. `Game.Notifications.getTypeName`
 does not name blocking types; the `EndTurnBlockingTypes` key does.
 
-Host-side rules (`actions.ActionRegistry`): opaque ids bound to (seat, turn, age) and persisted
-next to the journal; a request id is idempotent and may not be reused for a different action;
-`pending → confirmed | rejected | unknown` journal rows; an `unknown` outcome (transport loss
-after send, or read-back never matching) blocks further actions until a human reconciles it;
-no retry through any transport.
+## Binding, identity and outcome rules (`actions.ActionRegistry`)
+
+- **Match identity**: `Configuration.getGame().campaignSetupGUID` (the `gameGUIDHexString`
+  field is empty on this build; it is used only as a fallback). Read by the context probe, so
+  the doctor, session reopen, capture integrity and every action check compare it.
+- **Offer binding**: each opaque id resolves host-side to (kind, args, seat, turn, age, match,
+  precondition). `perform` refuses `ACTION_EXPIRED` unless the live session matches all of
+  turn, age and match, and the payload re-checks match and the precondition inside the game.
+- **Preconditions** (`pre`): research/civic = the current researching node at offer time;
+  `skip_unit` = the unit's movement remaining; `move_unit` = the unit's plot index;
+  `produce_unit` = the city's current production hash; `end_turn` = 0. A stale offer cannot
+  overwrite a newer decision.
+- **Serialization**: an interprocess `flock` on `<journal>.lock` covers reload + check + pending
+  + dispatch + outcome, so overlapping CLI/MCP invocations sharing a journal cannot dispatch
+  the same request twice; the second caller sees the first's result.
+- **Journal**: `pending → confirmed | rejected | unknown`, each row carrying the full action
+  identity (request id, action id, kind, args, precondition, seat, turn, age, match). A
+  pending row without a final row after a restart becomes `unknown` with its identity intact;
+  after human reconciliation an identical retry returns the recorded result without dispatch.
+- **After dispatch, only an explicit, well-formed payload refusal proves nothing was sent.**
+  Transport loss, malformed or shape-invalid responses, and missing `outcome` are `unknown`.
+- **Read-back**: the in-payload read is a hint. A poll counts only when it reports the same
+  match and integer turn/age/seat. `end_turn` confirms only on positively identified
+  progression (completion flagged on the same seat and turn, the turn counter advanced, or a
+  handoff to another seat); nulls never confirm. The poll that established success is stored
+  as `confirmedBy` in the receipt.
+- **Unit and city identity**: offers expose `unitId` / `cityId` matching the observation's
+  `id.id`, plus `from` for unit offers, so a client can join offers to observed entities;
+  mutation parameters stay host-side.
+- **Move destinations**: currently VISIBLE plots only. REVEALED (fogged) plots are excluded
+  because the native path preview could reflect hidden occupants; this is a policy choice to
+  revisit with a derived-query leakage test, not a capability limit.
+- No retry through any transport; `RECONCILIATION_REQUIRED` blocks every action while an
+  `unknown` outcome exists.
 
 ## Lesson: `canStart(MOVE_TO)` does not validate the destination
 

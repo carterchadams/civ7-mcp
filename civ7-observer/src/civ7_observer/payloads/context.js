@@ -30,6 +30,17 @@
       localObserverId = null;
     }
   }
+  let gameGuid = null;
+  if (has("Configuration")) {
+    try {
+      const g = Configuration.getGame();
+      const a = typeof g.campaignSetupGUID === "string" && g.campaignSetupGUID ? g.campaignSetupGUID : null;
+      const b = typeof g.gameGUIDHexString === "string" && g.gameGUIDHexString ? g.gameGUIDHexString : null;
+      gameGuid = a || b;
+    } catch (e) {
+      gameGuid = null;
+    }
+  }
   let turn = null;
   let age = null;
   if (has("Game")) {
@@ -56,6 +67,7 @@
     localObserverId: localObserverId === undefined ? null : localObserverId,
     turn: turn === undefined ? null : turn,
     age: age === undefined ? null : age,
+    gameGuid: gameGuid,
     href: (typeof location !== "undefined" && location && location.href) ? String(location.href) : null
   });
 })()

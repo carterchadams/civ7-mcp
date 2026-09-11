@@ -10,7 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const offersRaw = readFileSync(join(here, "..", "src", "civ7_observer", "payloads", "offers.js"), "utf8");
 const performRaw = readFileSync(join(here, "..", "src", "civ7_observer", "payloads", "perform.js"), "utf8");
 const table = (rows) => ({ length: rows.length, lookup: (h) => rows.find((r) => r.$hash === h) ?? null });
-const SP = { isHotseat: false, isLocalMultiplayer: false, isNetworkMultiplayer: false, isInternetMultiplayer: false, isLANMultiplayer: false, isAnyMultiplayer: false, isPlayByCloud: false, isMatchMaking: false };
+const SP = { isHotseat: false, isLocalMultiplayer: false, isNetworkMultiplayer: false, isInternetMultiplayer: false, isLANMultiplayer: false, isAnyMultiplayer: false, isPlayByCloud: false, isMatchMaking: false, campaignSetupGUID: "ABCDEF0123456789", gameGUIDHexString: "" };
 const STATE = { NODE_STATE_INVALID: 0, NODE_STATE_CLOSED: 1, NODE_STATE_OPEN: 2, NODE_STATE_IN_PROGRESS: 3, NODE_STATE_UNLOCKED: 4, NODE_STATE_FULLY_UNLOCKED: 5 };
 
 function world({ log = [], local = 1, turnActive = true, curtain = false, blocking = false, sentComplete = false, canStartFail = false, researchAfter = 701 } = {}) {
@@ -39,10 +39,11 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
   };
 }
 const renderOffers = (id, mode) => offersRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
-const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0) => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age));
-const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242 } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3), vm.createContext({ ...g }), { timeout: 2000 }));
+const PRE_DEFAULT = { SET_TECH_TREE_NODE: 701, SET_CULTURE_TREE_NODE: -1, END_TURN: 0, SKIP_UNIT: 2, MOVE_UNIT: 1010, PRODUCE_UNIT: -1 };
+const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0, pre = PRE_DEFAULT[kind] ?? 0, match = "ABCDEF0123456789") => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age)).replaceAll("EXPECTED_GUID", JSON.stringify(match)).replaceAll("OP_PRE", String(pre));
+const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3, pre, match), vm.createContext({ ...g }), { timeout: 2000 }));
 const runOffers = (g, id = 1, mode = "singleplayer") => JSON.parse(vm.runInContext(renderOffers(id, mode), vm.createContext({ ...g }), { timeout: 2000 }));
-const runPerform = (g, kind, arg, { id = 1, mode = "singleplayer", turn = 10, age = 4242 } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age), vm.createContext({ ...g }), { timeout: 2000 }));
+const runPerform = (g, kind, arg, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, 0, 0, pre, match), vm.createContext({ ...g }), { timeout: 2000 }));
 
 // ---- offers.js
 
@@ -50,12 +51,13 @@ test("offers enumerate research/civic choices with native canStart and an end-tu
   const log = [];
   const r = runOffers(world({ log }));
   assert.equal(r.refused, null);
-  assert.deepEqual(r.context, { turn: 10, age: 4242, playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false });
+  assert.deepEqual(r.context, { turn: 10, age: 4242, playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789" });
+  assert.ok(r.offers.every((o) => typeof o.pre === "number"));
   const research = r.offers.filter((o) => o.kind === "SET_TECH_TREE_NODE");
   assert.deepEqual(research.map((o) => [o.arg, o.typeKey, o.displayName, o.tree, o.cost, o.turns, o.canStart]), [[701, "NODE_TECH_AQ_POTTERY", "Pottery", "TREE_TECHS_AQ", 60, 4, true], [702, "NODE_TECH_AQ_WRITING", "Writing", "TREE_TECHS_AQ", 100, 7, true]]);
   assert.deepEqual(r.offers.filter((o) => o.kind === "SET_CULTURE_TREE_NODE").map((o) => o.typeKey), ["NODE_CIVIC_AQ_MAIN_MYSTICISM"]);
   const end = r.offers.find((o) => o.kind === "END_TURN");
-  assert.deepEqual(end, { kind: "END_TURN", arg: 0, canStart: true, blockingType: null, alreadySent: false });
+  assert.deepEqual(end, { kind: "END_TURN", arg: 0, pre: 0, canStart: true, blockingType: null, alreadySent: false });
   assert.ok(log.filter((e) => e.startsWith("canStart(")).every((e) => e.startsWith("canStart(1,") && e.endsWith(",false)")));
   assert.ok(!log.some((e) => e.startsWith("sendRequest") || e === "sendTurnComplete"), "offers must never mutate");
   assert.ok(!log.some((e) => e.startsWith("other.")));
@@ -75,6 +77,13 @@ test("offers apply the same guards as observe and report the curtain", () => {
 });
 
 // ---- perform.js
+
+test("perform refuses when the match id or the precondition differ from the offer", () => {
+  assert.equal(runPerform(world({}), "SET_TECH_TREE_NODE", 701, { match: "OTHER" }).refused.code, "ACTION_EXPIRED");
+  assert.equal(runPerform(world({}), "SET_TECH_TREE_NODE", 701, { pre: 702 }).refused.code, "ACTION_EXPIRED");
+  const g = withUnits(world({ log: [] }), [unit(5)]); g._log = [];
+  assert.equal(runPerformArgs(g, "SKIP_UNIT", 5, 0, 0, { pre: 1 }).refused.code, "ACTION_EXPIRED");
+});
 
 test("perform re-checks guards and canStart immediately before sendRequest, then reports the read-back", () => {
   const log = [];
@@ -120,7 +129,7 @@ test("perform end turn checks native blockers and hasSentTurnComplete first", ()
 });
 
 test("perform reports a mismatched read-back as unknown, not success", () => {
-  const r = runPerform(world({ researchAfter: 702 }), "SET_TECH_TREE_NODE", 701);
+  const r = runPerform(world({ researchAfter: 702 }), "SET_TECH_TREE_NODE", 701, { pre: 702 });
   assert.equal(r.outcome, "sent");
   assert.equal(r.readback.matches, false);
 });
@@ -182,7 +191,7 @@ function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [] } = {}) {
   g.RevealedStates = { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 };
   g.DirectionTypes = { NO_DIRECTION: -1, DIRECTION_NORTHEAST: 0, DIRECTION_EAST: 1, DIRECTION_SOUTHEAST: 2, DIRECTION_SOUTHWEST: 3, DIRECTION_WEST: 4, DIRECTION_NORTHWEST: 5, NUM_DIRECTION_TYPES: 6 };
   const neighbours = (loc, d) => [{ x: loc.x, y: loc.y + 1 }, { x: loc.x + 1, y: loc.y }, { x: loc.x, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y }, { x: loc.x - 1, y: loc.y + 1 }][d];
-  g.GameplayMap = { getAdjacentPlotLocation: (loc, d) => { g._log.push(`adj(${loc.x},${loc.y},${d})`); return neighbours(loc, d); }, getRevealedState: (pid, x, y) => { g._log.push(`vis(${pid},${x},${y})`); return hiddenAt.some(([hx, hy]) => hx === x && hy === y) ? 0 : 2; }, getTerrainType: () => 1 };
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getAdjacentPlotLocation: (loc, d) => { g._log.push(`adj(${loc.x},${loc.y},${d})`); return neighbours(loc, d); }, getRevealedState: (pid, x, y) => { g._log.push(`vis(${pid},${x},${y})`); return hiddenAt.some(([hx, hy]) => hx === x && hy === y) ? 0 : 2; }, getTerrainType: () => 1 };
   g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
   const prev = g.Game.UnitOperations;
   g.Game.UnitOperations = {

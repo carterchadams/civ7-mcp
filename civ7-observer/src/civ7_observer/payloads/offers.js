@@ -30,7 +30,9 @@
   let player; try { player = Players.get(BOUND_PLAYER_ID); } catch (e) { player = null; }
   if (!player || player.isValid === false) return refuse("WRONG_PLAYER", "bound player object is invalid");
   if (player.isTurnActive !== true) return refuse("TURN_NOT_READY", "bound player's turn is not active");
-  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain() };
+  const matchId = (typeof flags.campaignSetupGUID === "string" && flags.campaignSetupGUID) ? flags.campaignSetupGUID : ((typeof flags.gameGUIDHexString === "string" && flags.gameGUIDHexString) ? flags.gameGUIDHexString : null);
+  if (matchId === null) return refuse("NOT_IN_GAME", "no match identity available");
+  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain(), gameGuid: matchId };
 
   // ---- offers
   const offers = [];
@@ -42,12 +44,14 @@
       if (!isInt(opType)) throw new Error("PlayerOperationTypes." + kind + " missing");
       const avail = comp.getAllAvailableNodeTypes();
       if (!Array.isArray(avail)) throw new Error(kind + " getAllAvailableNodeTypes() is not an array");
+      const currentRec = comp.getResearching();
+      const pre = currentRec && isInt(currentRec.type) ? currentRec.type : -1;
       for (const hash of avail) {
         if (!isInt(hash)) throw new Error(kind + " node hash is not an integer");
         const row = GameInfo.ProgressionTreeNodes.lookup(hash);
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, opType, { ProgressionTreeNodeType: hash }, false);
         offers.push({
-          kind: kind, arg: hash,
+          kind: kind, arg: hash, pre: pre,
           typeKey: row && typeof row.ProgressionTreeNodeType === "string" ? row.ProgressionTreeNodeType : null,
           displayName: row && typeof row.Name === "string" ? compose(row.Name) : null,
           tree: row && typeof row.ProgressionTree === "string" ? row.ProgressionTree : null,
@@ -63,8 +67,11 @@
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
         const unitId = u.id;
         const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false);
-        offers.push({ kind: "SKIP_UNIT", arg: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
-          movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null,
+        const smoves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null;
+        offers.push({ kind: "SKIP_UNIT", arg: u.id.id, pre: smoves === null ? -1 : smoves, unitId: u.id.id,
+          from: u.location && isInt(u.location.x) && isInt(u.location.y) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+          unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+          movesRemaining: smoves,
           location: u.location && isInt(u.location.x) && isInt(u.location.y) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
           canStart: !!(check && check.Success === true) });
       }
@@ -79,7 +86,7 @@
           const loc = GameplayMap.getAdjacentPlotLocation(u.location, d);
           if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0 || loc.y < 0) continue;
           const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, loc.x, loc.y);
-          if (!isInt(state) || state === RevealedStates.HIDDEN) continue;   // never offer unknown land
+          if (!isInt(state) || state !== RevealedStates.VISIBLE) continue;   // currently visible plots only (fogged plots could leak via the native path preview)
           // canStart(MOVE_TO) does not validate the destination (live: it accepted an impassable
           // mountain that the engine then silently dropped). The shipped path preview does.
           const path = Units.getPathTo(unitId, { x: loc.x, y: loc.y });
@@ -88,7 +95,7 @@
           if (plots.length === 0 || turns.length === 0 || turns[turns.length - 1] !== 1) continue;   // unreachable this turn
           const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
           const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
-          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1],
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
         }
@@ -100,12 +107,13 @@
       for (const c of cities) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
         const cityId = c.id;
+        const ppre = c.BuildQueue && isInt(c.BuildQueue.currentProductionTypeHash) ? c.BuildQueue.currentProductionTypeHash : -1;
         for (const row of GameInfo.Units) {
           if (!row || !isInt(row.$hash) || typeof row.UnitType !== "string") continue;
           const buildArgs = { UnitType: row.$hash };
           const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
           if (!check || check.Success !== true) continue;   // only buildable units are offered
-          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, cityId: c.id.id, cityName: typeof c.name === "string" ? c.name : null,
+          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: typeof c.name === "string" ? c.name : null,
             unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
         }
       }
@@ -116,7 +124,7 @@
     if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
     const blocked = blockingType !== none;
     const alreadySent = GameContext.hasSentTurnComplete() === true;
-    offers.push({ kind: "END_TURN", arg: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? blockerName(blockingType) : null, alreadySent: alreadySent });
+    offers.push({ kind: "END_TURN", arg: 0, pre: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? blockerName(blockingType) : null, alreadySent: alreadySent });
   } catch (e) {
     return refuse("API_CONTRACT_MISMATCH", "offer enumeration failed: " + String(e && e.message ? e.message : e).slice(0, 160));
   }
