@@ -30,9 +30,18 @@ does not name blocking types; the `EndTurnBlockingTypes` key does.
   `skip_unit` = the unit's movement remaining; `move_unit` = the unit's plot index;
   `produce_unit` = the city's current production hash; `end_turn` = 0. A stale offer cannot
   overwrite a newer decision.
-- **Serialization**: an interprocess `flock` on `<journal>.lock` covers reload + check + pending
-  + dispatch + outcome, so overlapping CLI/MCP invocations sharing a journal cannot dispatch
-  the same request twice; the second caller sees the first's result.
+- **Serialization (game-wide)**: one interprocess `flock` on `<state>/game.lock`, where `<state>`
+  is `$CIV7_OBSERVER_STATE_DIR` or `~/.local/state/civ7-observer`, covers reload + check +
+  pending + dispatch + outcome for every registry on the host regardless of journal, so
+  seat-private journals still serialize against the shared game instance.
+- **Unresolved-write barrier (game-wide)**: `<state>/unresolved.json` records every `unknown`
+  outcome from any journal; every registry refuses `RECONCILIATION_REQUIRED` while it is
+  non-empty, and reconciliation from the owning journal clears it.
+- **Attachment generation**: `<state>/generations.json` keeps, per match id, a generation number
+  and the highest turn observed. A session whose turn is lower than that maximum (a reload of
+  an earlier save) bumps the generation and reports `reattached: true`; offers and receipts
+  carry the generation and offers from an older generation are refused. This closes the
+  same-campaign reload gap that a campaign id alone cannot.
 - **Journal**: `pending → confirmed | rejected | unknown`, each row carrying the full action
   identity (request id, action id, kind, args, precondition, seat, turn, age, match). A
   pending row without a final row after a restart becomes `unknown` with its identity intact;
@@ -40,16 +49,19 @@ does not name blocking types; the `EndTurnBlockingTypes` key does.
 - **After dispatch, only an explicit, well-formed payload refusal proves nothing was sent.**
   Transport loss, malformed or shape-invalid responses, and missing `outcome` are `unknown`.
 - **Read-back**: the in-payload read is a hint. A poll counts only when it reports the same
-  match and integer turn/age/seat. `end_turn` confirms only on positively identified
-  progression (completion flagged on the same seat and turn, the turn counter advanced, or a
-  handoff to another seat); nulls never confirm. The poll that established success is stored
-  as `confirmedBy` in the receipt.
+  match and integer turn/age/seat/observer. Ordinary actions additionally require the complete
+  originating context (turn, age, player and observer equal to the offer's). `end_turn`
+  confirms only on positively identified progression (completion flagged on the same seat and
+  turn, the turn counter advanced, or a handoff to another seat); nulls never confirm. The
+  poll that established success is stored as `confirmedBy` with the specific matched
+  `effect` (e.g. `{"techResearching": hash}`), never the whole roster.
 - **Unit and city identity**: offers expose `unitId` / `cityId` matching the observation's
   `id.id`, plus `from` for unit offers, so a client can join offers to observed entities;
   mutation parameters stay host-side.
-- **Move destinations**: currently VISIBLE plots only. REVEALED (fogged) plots are excluded
-  because the native path preview could reflect hidden occupants; this is a policy choice to
-  revisit with a derived-query leakage test, not a capability limit.
+- **Move destinations**: currently VISIBLE plots only, enforced at enumeration **and** at
+  execution (the payload requires an integer `RevealedStates.VISIBLE` and an exact match before
+  the path lookup and the send). REVEALED (fogged) plots are excluded because the native path
+  preview could reflect hidden occupants; a policy choice to revisit with a leakage test.
 - No retry through any transport; `RECONCILIATION_REQUIRED` blocks every action while an
   `unknown` outcome exists.
 

@@ -298,3 +298,19 @@ test("perform PRODUCE_UNIT refuses unknown city, unbuildable unit, and never use
     assert.ok(!log.some((e) => e.startsWith("csendRequest") || e.startsWith("Cities.")), label);
   }
 });
+
+
+test("perform MOVE_UNIT requires the destination to be exactly VISIBLE at execution, before any path lookup or send", () => {
+  for (const [label, mutate] of [
+    ["fogged since the offer", (g) => { const inner = g.GameplayMap.getRevealedState; g.GameplayMap.getRevealedState = (pid, x, y) => (x === 11 && y === 10 ? 1 : inner(pid, x, y)); }],
+    ["enum without integer VISIBLE", (g) => { g.RevealedStates = { HIDDEN: 0, REVEALED: 1 }; }],
+    ["non-integer visibility result", (g) => { g.GameplayMap.getRevealedState = () => "2"; }],
+  ]) {
+    const log = [];
+    const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+    mutate(g);
+    const r = runPerformArgs(g, "MOVE_UNIT", 5, 11, 10);
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("path(") || e.startsWith("usendRequest")), `${label}: no path lookup or send after refusal: ${log}`);
+  }
+});

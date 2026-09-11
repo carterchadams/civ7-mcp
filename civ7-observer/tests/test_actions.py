@@ -3,6 +3,13 @@ import json
 import pytest
 
 from civ7_observer import actions, service
+
+
+@pytest.fixture(autouse=True)
+def _state_dir(tmp_path, monkeypatch):
+    # every test gets its own game-wide state directory (lock, unresolved barrier, generations)
+    monkeypatch.setenv("CIV7_OBSERVER_STATE_DIR", str(tmp_path / "state"))
+    yield
 from test_targets import GAME, Factory, reply, target
 
 CTX = {"turn": 12, "age": 4242, "playerId": 1, "localPlayerId": 1, "localObserverId": 1, "mode": "singleplayer", "isTurnActive": True, "curtainDisplayed": False, "gameGuid": "ABCDEF0123456789"}
@@ -350,3 +357,122 @@ def test_unit_offers_carry_unit_identity_and_source_location(tmp_path):
     assert mv["unitId"] == 5 and mv["from"] == {"x": 10, "y": 10} and mv["to"] == {"x": 11, "y": 10}
     assert sk["unitId"] == 6 and sk["from"] == {"x": 10, "y": 10}
     assert "arg" not in mv and "pre" not in mv
+
+
+# ---- action-layer fix review
+
+def test_unknown_outcome_in_one_journal_blocks_actions_from_another_journal_on_the_same_game(tmp_path):
+    import websocket
+    reg_a = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), websocket.WebSocketConnectionClosedException()]})
+    with gs:
+        offers = reg_a.list_offers(gs, player=1, mode="singleplayer")
+        end = next(o for o in offers["offers"] if o["kind"] == "end_turn")
+        with pytest.raises(service.ObserverError):
+            reg_a.perform(gs, action_id=end["actionId"], request_id="a-unknown", player=1, mode="singleplayer")
+    reg_b = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs2:
+        out = reg_b.list_offers(gs2, player=1, mode="singleplayer")
+        assert out["reconciliationRequired"] == ["a-unknown"]
+        with pytest.raises(service.ObserverError) as ei:
+            reg_b.perform(gs2, action_id=out["offers"][0]["actionId"], request_id="b-1", player=1, mode="singleplayer")
+    assert ei.value.code == "RECONCILIATION_REQUIRED"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+    reg_a.reconcile("a-unknown", "rejected", note="verified")
+    assert reg_b.needs_reconciliation() == []
+
+
+def test_dispatch_is_serialized_across_journals_by_the_game_lock(tmp_path):
+    import threading, time
+    order, errors = [], []
+    reg_a = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    reg_b = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+
+    END_PERFORMED = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "END_TURN", "arg": 0, "sentComplete": True}}
+
+    def run(tag, reg, kind_key, rid):
+        try:
+            done = END_PERFORMED if kind_key == "end_turn" else PERFORMED
+            s, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(done)), ctx_reply(5)]})
+            with s:
+                offers = reg.list_offers(s, player=1, mode="singleplayer")
+                action_id = next(o["actionId"] for o in offers["offers"] if o.get("typeKey", o["kind"]) == kind_key)
+                sock = f.all_sockets[-1]
+                original = sock.recv
+
+                def recv():
+                    item = original()
+                    if isinstance(item, str) and "outcome" in item and "sent" in item and "readback" in item:
+                        order.append(f"{tag}-dispatch"); time.sleep(0.3); order.append(f"{tag}-done")
+                    return item
+                sock.recv = recv
+                reg.perform(s, action_id=action_id, request_id=rid, player=1, mode="singleplayer")
+        except Exception as exc:  # noqa: BLE001
+            errors.append(f"{tag}: {exc!r}")
+
+    ta = threading.Thread(target=run, args=("a", reg_a, "NODE_TECH_AQ_POTTERY", "a-1"))
+    tb = threading.Thread(target=run, args=("b", reg_b, "end_turn", "b-1"))
+    ta.start(); time.sleep(0.05); tb.start(); ta.join(); tb.join()
+    assert errors == [], errors
+    assert order in (["a-dispatch", "a-done", "b-dispatch", "b-done"], ["b-dispatch", "b-done", "a-dispatch", "a-done"]), order
+
+
+def test_turn_regression_bumps_generation_and_expires_offers(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    gen0 = offers["generation"]
+    earlier = {**GAME, "turn": 11}
+    gs2, _ = open_session({"a": [reply(1, json.dumps(earlier)), reply(1, json.dumps(earlier)), reply(2, json.dumps({**OFFERS, "context": {**CTX, "turn": 11}})), reply(3, json.dumps(earlier))]})
+    with gs2:
+        offers2 = reg.list_offers(gs2, player=1, mode="singleplayer")
+    assert offers2["generation"] == gen0 + 1
+    assert offers2["reattached"] is True
+    # back at turn 12 (same as the original offers): the old offers must still be dead
+    gs3, f3 = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs3, pytest.raises(service.ObserverError) as ei:
+        reg.perform(gs3, action_id=offers["offers"][0]["actionId"], request_id="gen-1", player=1, mode="singleplayer")
+    assert ei.value.code in ("ACTION_EXPIRED", "UNKNOWN_ACTION")   # pruned or generation-mismatched: never dispatched
+    assert not any("sendRequest" in m for sock in f3.all_sockets for m in sock.sent)
+
+
+def test_generation_is_recorded_in_journal_rows(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(PERFORMED)), ctx_reply(5)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        res = reg.perform(gs, action_id=pottery["actionId"], request_id="g-1", player=1, mode="singleplayer")
+    assert res["generation"] == offers["generation"]
+
+
+@pytest.mark.parametrize("field, value", [("age", 999), ("localObserverId", 0)])
+def test_poll_confirmation_requires_the_originating_age_and_observer(tmp_path, field, value):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    sent_no_match = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_NODE", "arg": 701, "observedType": -1, "matches": False}}
+    rb = {**RB, "techResearching": 701, field: value}
+    scripts = {"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(sent_no_match))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]}
+    gs, _ = open_session(scripts)
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        with pytest.raises(service.ObserverError) as ei:
+            reg.perform(gs, action_id=pottery["actionId"], request_id=f"ctx-{field}", player=1, mode="singleplayer")
+    assert ei.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_confirming_poll_records_the_relevant_effect(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    sent_no_match = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_NODE", "arg": 701, "observedType": -1, "matches": False}}
+    rb = {**RB, "techResearching": 701, "unitLocations": {"5": [1, 1]}, "cityProduction": {"65536": 9}}
+    scripts = {"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(sent_no_match)), reply(5, json.dumps(rb))]}
+    gs, _ = open_session(scripts)
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        res = reg.perform(gs, action_id=pottery["actionId"], request_id="eff-1", player=1, mode="singleplayer")
+    cb = res["confirmedBy"]
+    assert cb["source"] == "poll" and cb["effect"] == {"techResearching": 701}
+    assert "unitLocations" not in cb and "cityProduction" not in cb

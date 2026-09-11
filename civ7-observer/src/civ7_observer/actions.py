@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import fcntl
 import json
+import os
 import re
 import secrets
 import time
@@ -16,6 +17,11 @@ from civ7_observer import cdp
 from civ7_observer.payloads import load_payload, render_action_payload, render_payload
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
+
+def state_dir() -> Path:
+    """Game-wide host state: one lock, one unresolved-write barrier, attachment generations."""
+    return Path(os.environ.get("CIV7_OBSERVER_STATE_DIR") or Path.home() / ".local" / "state" / "civ7-observer")
+
 
 PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -73,14 +79,18 @@ class ActionRegistry:
         self._offers: dict[str, dict[str, Any]] = {}
         self._results: dict[str, dict[str, Any]] = {}
         self._pending: set[str] = set()
-        self.lock_path = self.journal_path.with_name(self.journal_path.stem + ".lock")
+        self.state_dir = state_dir()
+        self.lock_path = self.state_dir / "game.lock"
+        self.unresolved_path = self.state_dir / "unresolved.json"
+        self.generations_path = self.state_dir / "generations.json"
         self._load_journal()
         self._load_offers()
 
     @contextmanager
     def _locked(self):
-        """Interprocess lock: every registry sharing this journal serializes its reads and writes."""
-        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        """One interprocess lock for the whole game: every registry, whatever journal it uses,
+        serializes reload + check + pending + dispatch + outcome against the shared instance."""
+        self.state_dir.mkdir(parents=True, exist_ok=True)
         with open(self.lock_path, "a+") as fh:
             fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
             try:
@@ -95,6 +105,50 @@ class ActionRegistry:
         self._pending = set()
         self._load_journal()
         self._load_offers()
+
+    # ---- shared, game-wide state (read/written only under the lock)
+    def _read_shared(self, path: Path) -> dict[str, Any]:
+        if not path.exists():
+            return {}
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            return {}
+        return data if isinstance(data, dict) else {}
+
+    def _write_shared(self, path: Path, data: dict[str, Any]) -> None:
+        write_atomic(path, json.dumps(data))
+
+    def _mark_unresolved(self, request_id: str, entry: dict[str, Any]) -> None:
+        shared = self._read_shared(self.unresolved_path)
+        shared[request_id] = {"journal": str(self.journal_path), "match": entry.get("match"), "seat": entry.get("seat"), "kind": entry.get("kind")}
+        self._write_shared(self.unresolved_path, shared)
+
+    def _clear_unresolved(self, request_id: str) -> None:
+        shared = self._read_shared(self.unresolved_path)
+        if request_id in shared:
+            del shared[request_id]
+            self._write_shared(self.unresolved_path, shared)
+
+    def _generation(self, gs: GameSession, *, advance: bool) -> tuple[int, bool]:
+        """Host attachment generation per match. Bumps when the observed turn goes backwards
+        (a reload of an earlier save) so offers and receipts from before the reload die."""
+        gens = self._read_shared(self.generations_path)
+        key = str(gs.context.game_guid)
+        rec = gens.get(key) if isinstance(gens.get(key), dict) else None
+        reattached = False
+        if rec is None:
+            rec = {"generation": 1, "maxTurn": gs.context.turn}
+            reattached = True
+        elif gs.context.turn < rec.get("maxTurn", gs.context.turn):
+            rec = {"generation": rec["generation"] + 1, "maxTurn": gs.context.turn}
+            reattached = True
+        elif gs.context.turn > rec.get("maxTurn", 0):
+            rec = {**rec, "maxTurn": gs.context.turn}
+        if advance or reattached:
+            gens[key] = rec
+            self._write_shared(self.generations_path, gens)
+        return rec["generation"], reattached
 
     def _load_offers(self) -> None:
         if self.offers_path.exists():
@@ -129,6 +183,7 @@ class ActionRegistry:
         for rid in list(self._pending):
             self._results[rid] = {**self._pending_rows[rid], "status": "unknown", "note": "process ended before the outcome was recorded"}
             self._pending.discard(rid)
+            self._mark_unresolved(rid, self._results[rid])
 
     def _journal(self, entry: dict[str, Any]) -> None:
         self.journal_path.parent.mkdir(parents=True, exist_ok=True)
@@ -136,7 +191,9 @@ class ActionRegistry:
             fh.write(json.dumps(entry) + "\n")
 
     def needs_reconciliation(self) -> list[str]:
-        return sorted(rid for rid, r in self._results.items() if r["status"] == "unknown")
+        local = {rid for rid, r in self._results.items() if r["status"] == "unknown"}
+        shared = set(self._read_shared(self.unresolved_path))
+        return sorted(local | shared)
 
     def reconcile(self, request_id: str, status: str, *, note: str) -> None:
         with self._locked():
@@ -151,6 +208,7 @@ class ActionRegistry:
         entry = {**prior, "status": status, "reconciled": True, "note": note, "at": _now()}
         self._results[request_id] = entry
         self._journal(entry)
+        self._clear_unresolved(request_id)
 
     def get_result(self, request_id: str) -> dict[str, Any] | None:
         with self._locked():
@@ -173,6 +231,7 @@ class ActionRegistry:
             raise ObserverError("API_CONTRACT_MISMATCH", "offers payload malformed")
         if ctx.get("turn") != gs.context.turn or ctx.get("age") != gs.context.age or ctx.get("gameGuid") != gs.context.game_guid:
             raise ObserverError("CONTEXT_CHANGED", "offers were enumerated for a different turn or match")
+        generation, reattached = self._generation(gs, advance=True)
         public = []
         for o in offers:
             kind = o.get("kind")
@@ -180,7 +239,7 @@ class ActionRegistry:
                 raise ObserverError("API_CONTRACT_MISMATCH", "offer entry malformed")
             action_id = secrets.token_urlsafe(18)
             rec = {"kind": kind, "arg": o["arg"], "pre": o["pre"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
-                   "match": gs.context.game_guid, "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
+                   "match": gs.context.game_guid, "generation": generation, "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
             if kind in ("MOVE_UNIT", "SKIP_UNIT"):
                 if isinstance(o.get("unitId"), int):
@@ -210,9 +269,9 @@ class ActionRegistry:
                     entry[k] = o[k]
             public.append(entry)
         # offers from earlier turns or other matches can never be performed; drop them so the file stays small
-        self._offers = {k: v for k, v in self._offers.items() if (v.get("turn"), v.get("age"), v.get("match")) == (gs.context.turn, gs.context.age, gs.context.game_guid)}
+        self._offers = {k: v for k, v in self._offers.items() if (v.get("turn"), v.get("age"), v.get("match"), v.get("generation")) == (gs.context.turn, gs.context.age, gs.context.game_guid, generation)}
         self._save_offers()
-        return {"context": ctx, "offers": public, "reconciliationRequired": self.needs_reconciliation()}
+        return {"context": ctx, "offers": public, "generation": generation, "reattached": reattached, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform
     def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str) -> dict[str, Any]:
@@ -237,12 +296,13 @@ class ActionRegistry:
             raise ObserverError("UNKNOWN_ACTION", "no such offered action")
         if offer["seat"] != player:
             raise ObserverError("WRONG_PLAYER", "offer belongs to another seat")
-        if (offer.get("turn"), offer.get("age"), offer.get("match")) != (gs.context.turn, gs.context.age, gs.context.game_guid) or not gs.context.game_guid:
-            raise ObserverError("ACTION_EXPIRED", "the offer was made on a different turn or match; request fresh offers")
+        generation, _ = self._generation(gs, advance=True)
+        if (offer.get("turn"), offer.get("age"), offer.get("match"), offer.get("generation")) != (gs.context.turn, gs.context.age, gs.context.game_guid, generation) or not gs.context.game_guid:
+            raise ObserverError("ACTION_EXPIRED", "the offer was made on a different turn, match or attachment generation; request fresh offers")
         if not offer["canStart"]:
             raise ObserverError("ACTION_NOT_STARTABLE", "the offer was not startable when enumerated; request fresh offers")
         base = {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"], "arg2": offer.get("arg2", 0), "arg3": offer.get("arg3", 0),
-                "pre": offer["pre"], "seat": player, "turn": offer["turn"], "age": offer["age"], "match": offer["match"]}
+                "pre": offer["pre"], "seat": player, "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"]}
         self._journal({**base, "status": "pending", "at": _now()})
         self._pending.add(request_id)
         expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"],
@@ -290,32 +350,39 @@ class ActionRegistry:
                 return None
             if rb.get("gameGuid") != offer["match"]:
                 continue
-            turn, age, seat = rb.get("turn"), rb.get("age"), rb.get("localPlayerId")
-            if not all(isinstance(v, int) and not isinstance(v, bool) for v in (turn, age, seat)):
+            turn, age, seat, observer = rb.get("turn"), rb.get("age"), rb.get("localPlayerId"), rb.get("localObserverId")
+            if not all(isinstance(v, int) and not isinstance(v, bool) for v in (turn, age, seat, observer)):
                 continue
-            hit = False
+            effect: dict[str, Any] | None = None
             if kind == "END_TURN":
                 # positively identified progression only: completion flagged on the same seat/turn,
                 # the turn counter advanced, or the seat handed off to another integer seat
-                if (rb.get("hasSentTurnComplete") is True and seat == player and turn == offer["turn"]) \
-                        or (turn > offer["turn"]) or (seat != player and turn >= offer["turn"]):
-                    hit = True
-            elif turn == offer["turn"] and seat == player:
+                if rb.get("hasSentTurnComplete") is True and seat == player and turn == offer["turn"]:
+                    effect = {"hasSentTurnComplete": True}
+                elif turn > offer["turn"]:
+                    effect = {"turnAdvancedTo": turn}
+                elif seat != player and turn >= offer["turn"]:
+                    effect = {"seatHandedOffTo": seat}
+            elif (turn, age, seat, observer) == (offer["turn"], offer["age"], player, player):
+                # ordinary actions: the complete originating context must still hold
                 if kind == "SET_TECH_TREE_NODE" and rb.get("techResearching") == offer["arg"]:
-                    hit = True
+                    effect = {"techResearching": offer["arg"]}
                 elif kind == "SET_CULTURE_TREE_NODE" and rb.get("civicResearching") == offer["arg"]:
-                    hit = True
+                    effect = {"civicResearching": offer["arg"]}
                 elif kind == "SKIP_UNIT":
                     ready = rb.get("unitsReadyToMove")
-                    hit = isinstance(ready, list) and offer["arg"] not in ready
+                    if isinstance(ready, list) and offer["arg"] not in ready:
+                        effect = {"unitNoLongerReady": offer["arg"]}
                 elif kind == "MOVE_UNIT":
                     locs = rb.get("unitLocations")
-                    hit = isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]
+                    if isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]:
+                        effect = {"unitLocation": {"unitId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"]}}
                 elif kind == "PRODUCE_UNIT":
                     prod = rb.get("cityProduction")
-                    hit = isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]
-            if hit:
-                return {"source": "poll", "gameGuid": rb.get("gameGuid"), "turn": turn, "age": age, "localPlayerId": seat, "hasSentTurnComplete": rb.get("hasSentTurnComplete")}
+                    if isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]:
+                        effect = {"cityProduction": {"cityId": offer["arg"], "unitType": offer["arg2"]}}
+            if effect is not None:
+                return {"source": "poll", "gameGuid": rb.get("gameGuid"), "turn": turn, "age": age, "localPlayerId": seat, "localObserverId": observer, "effect": effect}
         return None
 
     def _finish(self, base: dict[str, Any], status: str, *, error: dict[str, Any] | None = None, readback: dict[str, Any] | None = None,
@@ -330,6 +397,10 @@ class ActionRegistry:
         self._journal(entry)
         self._pending.discard(base["requestId"])
         self._results[base["requestId"]] = entry
+        if status == "unknown":
+            self._mark_unresolved(base["requestId"], entry)
+        else:
+            self._clear_unresolved(base["requestId"])
         if raise_code:
             raise ObserverError(raise_code, f"action {base['requestId']} outcome is {status}; reconcile before acting again", result=entry)
         return entry

@@ -70,7 +70,7 @@
   if (KIND === "MOVE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "move arguments are not integers");
     if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.MOVE_TO)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.MOVE_TO unavailable");
-    if (typeof RevealedStates === "undefined" || !isInt(RevealedStates.HIDDEN)) return refuse("API_CONTRACT_MISMATCH", "RevealedStates unavailable");
+    if (typeof RevealedStates === "undefined" || !isInt(RevealedStates.VISIBLE)) return refuse("API_CONTRACT_MISMATCH", "RevealedStates unavailable");
     let unit = null;
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
     if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
@@ -80,7 +80,7 @@
     for (let d = 0; d < 6; d++) { const loc = GameplayMap.getAdjacentPlotLocation(unit.location, d); if (loc && loc.x === ARG2 && loc.y === ARG3) { adjacent = true; break; } }
     if (!adjacent) return refuse("ACTION_NOT_STARTABLE", "target plot is not adjacent to the unit");
     const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, ARG2, ARG3);
-    if (!isInt(state) || state === RevealedStates.HIDDEN) return refuse("ACTION_NOT_STARTABLE", "target plot is unknown to the bound player");
+    if (!isInt(state) || state !== RevealedStates.VISIBLE) return refuse("ACTION_NOT_STARTABLE", "target plot is not currently visible to the bound player");
     const unitId = unit.id;
     const path = Units.getPathTo(unitId, { x: ARG2, y: ARG3 });
     const pplots = path && Array.isArray(path.plots) ? path.plots : [];
