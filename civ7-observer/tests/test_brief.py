@@ -417,3 +417,18 @@ def test_a_wounded_unit_shows_its_damage_and_the_heal_order(tmp_path):
     assert unit["options"][0]["displayName"] == "Heal" and unit["options"][0]["damage"] == 84
     assert unit["entities"][0]["damage"] == 84
     assert "Heal rests a damaged unit" in unit["note"]
+
+
+def test_an_unplaced_resource_is_listed_before_a_reassignment_in_the_same_settlement(tmp_path):
+    rs = [{"kind": "ASSIGN_RESOURCE", "arg": 494, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": True, "canStart": True},
+          {"kind": "ASSIGN_RESOURCE", "arg": 613, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": True, "canStart": True},
+          {"kind": "ASSIGN_RESOURCE", "arg": 732, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": False, "canStart": True}]
+    rs += [{"kind": "ASSIGN_RESOURCE", "arg": 494, "arg2": cid, "pre": 1, "cityId": cid, "cityName": f"Town{cid}", "reassignment": True, "canStart": True} for cid in range(131073, 131073 + 8)]
+    rs.append({"kind": "CONSIDER_ASSIGN_RESOURCE", "arg": 0, "pre": 0, "toAssign": 1, "assignable": 1, "canStart": True})
+    payload = offers_with(rs, end_can_start=False, blocking="NOTIFICATION_ASSIGN_NEW_RESOURCES")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_ASSIGN_NEW_RESOURCES"]}
+    b, _, _ = build(tmp_path, payload)
+    d = next(d for d in b["decisions"] if d["kind"] == "resources")
+    capital = [o for o in d["options"] if o.get("cityId") == 65536]
+    assert capital and capital[0]["reassignment"] is False, "the option that answers the blocker is the settlement's representative"
+    assert d["options"][-1]["kind"] == "consider_resources" and "reassignment" in d["note"]

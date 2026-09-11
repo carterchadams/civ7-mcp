@@ -453,6 +453,11 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         # Round-robin across entities: a settler whose own moves sat behind six other units' options
         # was invisible to the seat (live friction, turn 33), so every entity is represented first.
         buckets = [list(v) for v in group.pop("_buckets", {}).values()]
+        # Within an entity, an option that answers the blocker goes before one that merely rearranges:
+        # live (turn 85) a settlement's first listed option was moving an ivory it already held, and
+        # the unplaced camels that would have closed the decision sat behind it and were dropped.
+        for b in buckets:
+            b.sort(key=lambda o: 1 if o.get("reassignment") is True else 0)
         # A blocker-clearing option keeps a reserved slot: it is taken out of the competition for room
         # and put back at the end, so it is never the one dropped and still reads after the choices.
         resolvers: list[dict[str, Any]] = []
