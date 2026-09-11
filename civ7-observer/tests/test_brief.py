@@ -222,3 +222,13 @@ def test_golden_age_notification_is_a_supported_celebration_decision(tmp_path):
     payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_GOLDEN_AGE"]}
     b, _, _ = build(tmp_path, payload)
     assert b["pause"] is None and [d["kind"] for d in b["decisions"] if d["required"]] == ["celebration"]
+
+
+def test_new_resources_notification_is_a_supported_resources_decision(tmp_path):
+    res = [{"kind": "ASSIGN_RESOURCE", "arg": 1637, "arg2": 131073, "pre": 1, "plotIndex": 1637, "from": {"x": 17, "y": 27}, "resourceKey": "RESOURCE_RUBIES", "displayName": "Rubies", "resourceClass": "RESOURCECLASS_BONUS", "description": "+4 Gold", "assignedCityId": None, "originCityName": "Pārsa", "cityId": 131073, "cityName": "Bactria", "cityIsTown": True, "cityCap": 1, "cityAssigned": 0, "toAssign": 1, "canStart": True}]
+    payload = offers_with(res, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_ASSIGN_NEW_RESOURCES"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "resources")
+    assert d["required"] is True and d["options"][0]["cityCap"] == 1 and "capacity" in d["note"]

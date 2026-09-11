@@ -980,3 +980,24 @@ def test_celebration_offer_and_confirmation(tmp_path):
         assert ce["description"] == "+100 Influence" and "arg" not in ce
         res = reg.perform(gs, action_id=ce["actionId"], request_id="ce-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"celebrationChosen": 5001}
+
+
+def test_resource_assignment_confirms_on_the_assignment_map_and_consider_on_the_notification_leaving(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "ASSIGN_RESOURCE", "arg": 1637, "arg2": 131073, "pre": 1, "plotIndex": 1637, "from": {"x": 17, "y": 27}, "resourceKey": "RESOURCE_RUBIES", "displayName": "Rubies", "resourceClass": "RESOURCECLASS_BONUS", "description": "+4 Gold", "assignedCityId": None, "originCityName": "Pārsa", "cityId": 131073, "cityName": "Bactria", "cityIsTown": True, "cityCap": 1, "cityAssigned": 0, "toAssign": 1, "canStart": True},
+        {"kind": "CONSIDER_ASSIGN_RESOURCE", "arg": 0, "pre": 0, "toAssign": 1, "assignable": 1, "canStart": True}]}
+    assigned = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ASSIGN_RESOURCE", "arg": 1637, "city": 131073, "assignedTo": -1, "matches": False}}
+    considered = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CONSIDER_ASSIGN_RESOURCE", "arg": 0, "matches": False}}
+    rb1 = {**RB, "resourceAssignments": {"1637": 131073}, "blockingNotifications": ["NOTIFICATION_ASSIGN_NEW_RESOURCES"]}
+    rb2 = {**RB, "resourceAssignments": {"1637": 131073}, "blockingNotifications": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(assigned)), reply(5, json.dumps(rb1)), reply(6, json.dumps(considered)), reply(7, json.dumps(rb2))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        ar = next(o for o in out["offers"] if o["kind"] == "assign_resource")
+        assert ar["cityName"] == "Bactria" and ar["description"] == "+4 Gold" and ar["cityCap"] == 1 and "arg" not in ar and "arg2" not in ar
+        res = reg.perform(gs, action_id=ar["actionId"], request_id="ar-1", player=1, mode="singleplayer")
+        assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"resourceAssigned": {"plotIndex": 1637, "cityId": 131073}}
+        cr = next(o for o in out["offers"] if o["kind"] == "consider_resources")
+        res2 = reg.perform(gs, action_id=cr["actionId"], request_id="cr-1", player=1, mode="singleplayer")
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"resourceNotificationCleared": True}

@@ -899,3 +899,59 @@ test("perform CHOOSE_GOLDEN_AGE re-checks the choice list and canStart, sends th
     assert.ok(!l.some((e) => e.startsWith("csendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- resource assignment
+function withResources(g, { toAssign = 1, legal = { "1637:131073": true, "1752:65536": true }, blocked = true } = {}) {
+  const me = g.Players.get(1);
+  const assigned = { 1698: 65536 };
+  const cities = [{ id: { owner: 1, id: 65536, type: 1 }, name: "LOC_C", isTown: false, Resources: { getAssignedResourcesCap: () => 4, getTotalCountAssignedResources: () => 1 } }, { id: { owner: 1, id: 131073, type: 1 }, name: "LOC_B", isTown: true, Resources: { getAssignedResourcesCap: () => 1, getTotalCountAssignedResources: () => 0 } }];
+  me.Cities = { getCities: () => cities };
+  me.Resources = { getResources: () => [{ uniqueResource: { resource: 601 }, value: 1637 }, { uniqueResource: { resource: 602 }, value: 1698 }, { uniqueResource: { resource: 603 }, value: 1752 }], getCountResourcesToAssign: () => toAssign, getCityIDAssigned: (v) => (assigned[v] !== undefined ? { owner: 1, id: assigned[v], type: 1 } : { owner: -1, id: -1, type: 0 }) };
+  g.Game.Resources = { getOriginCity: () => ({ owner: 1, id: 65536, type: 1 }) };
+  g.GameInfo.Resources = table([{ $hash: 601, ResourceType: "RESOURCE_RUBIES", Name: "LOC_RUBIES", ResourceClassType: "RESOURCECLASS_BONUS", Tooltip: "LOC_RUBIES_T" }, { $hash: 602, ResourceType: "RESOURCE_IVORY", Name: "LOC_IVORY", ResourceClassType: "RESOURCECLASS_EMPIRE", Tooltip: "LOC_IVORY_T" }, { $hash: 603, ResourceType: "RESOURCE_PEARLS", Name: "LOC_PEARLS", ResourceClassType: "RESOURCECLASS_CITY", Tooltip: "LOC_PEARLS_T" }]);
+  g.GameplayMap = { getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getIndexFromXY: (x, y) => y * 100 + x };
+  g.PlayerOperationTypes.ASSIGN_RESOURCE = -727226626; g.PlayerOperationTypes.CONSIDER_ASSIGN_RESOURCE = -2020490726;
+  if (blocked) { g.Game.Notifications.getEndTurnBlockingType = () => 778; g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 6, type: 20 }]; g.Game.Notifications.find = () => ({ Type: 2, BlocksTurnAdvancement: true }); g.Game.Notifications.getTypeName = () => "NOTIFICATION_ASSIGN_NEW_RESOURCES"; }
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== -727226626 && op !== -2020490726) return inner.canStart(pid, op, args, show); g._log.push(`rcanStart(${pid},${op},${JSON.stringify(args)},${show})`); if (op === -2020490726) return { Success: true }; const key = `${args.Location.y * 100 + args.Location.x}:${args.City}`; return { Success: !!legal[key] }; },
+    sendRequest: (pid, op, args) => { if (op !== -727226626 && op !== -2020490726) return inner.sendRequest(pid, op, args); g._log.push(`rsendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === -727226626) assigned[args.Location.y * 100 + args.Location.x] = args.City; },
+  };
+  return g;
+}
+
+test("resource offers pair each resource with every city the native check accepts, skipping its current city, with effect text and capacity", () => {
+  const log = [];
+  const g = withResources(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const res = r.offers.filter((o) => o.kind === "ASSIGN_RESOURCE");
+  assert.deepEqual(res.map((o) => [o.arg, o.arg2, o.pre, o.resourceKey, o.description, o.resourceClass, o.cityName, o.cityIsTown, o.cityCap, o.cityAssigned, o.assignedCityId, o.canStart]),
+    [[1637, 131073, 1, "RESOURCE_RUBIES", "LOC_RUBIES_T", "RESOURCECLASS_BONUS", "LOC_B", true, 1, 0, null, true], [1752, 65536, 1, "RESOURCE_PEARLS", "LOC_PEARLS_T", "RESOURCECLASS_CITY", "Cordoba", false, 4, 1, null, true]]);
+  assert.ok(!log.some((e) => e.startsWith("rcanStart(") && e.includes('"City":65536') && e.includes('"x":98,"y":16')), "an assigned resource is not offered to the city it is already in");
+  const consider = r.offers.find((o) => o.kind === "CONSIDER_ASSIGN_RESOURCE");
+  assert.deepEqual([consider.canStart, consider.toAssign, consider.assignable], [false, 1, 2]);
+  const done = withResources(world({ log: [] }), { toAssign: 0 }); done._log = [];
+  assert.equal(runOffers(done).offers.find((o) => o.kind === "CONSIDER_ASSIGN_RESOURCE").canStart, true);
+});
+
+test("perform ASSIGN_RESOURCE checks ownership, the pending count and canStart, sends Location and City, and reads back the assignment", () => {
+  const log = [];
+  const g = withResources(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "ASSIGN_RESOURCE", 1637, 131073, 0, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "ASSIGN_RESOURCE", arg: 1637, city: 131073, assignedTo: 131073, matches: true });
+  assert.ok(log.find((e) => e.startsWith("rsendRequest(1,") && e.includes('"Location":{"x":37,"y":16},"City":131073')));
+  for (const [label, mk, v, cid, pre] of [
+    ["not ours", () => withResources(world({ log: [] })), 9999, 131073, 1],
+    ["unknown city", () => withResources(world({ log: [] })), 1637, 7, 1],
+    ["pending count changed", () => withResources(world({ log: [] })), 1637, 131073, 0],
+    ["canStart false", () => withResources(world({ log: [] }), { legal: {} }), 1637, 131073, 1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "ASSIGN_RESOURCE", v, cid, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("rsendRequest")), `${label}: must not send`);
+  }
+  const c = runPerform(g, "CONSIDER_ASSIGN_RESOURCE", 0, { pre: 0 });
+  assert.equal(c.outcome, "sent");
+});

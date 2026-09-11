@@ -31,6 +31,8 @@ BLOCKER_DECISION = {
     "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
     "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL": "attributes",
     "CHOOSE_GOLDEN_AGE": "celebration",
+    "ASSIGN_NEW_RESOURCES": "resources",
+    "NOTIFICATION_ASSIGN_NEW_RESOURCES": "resources",
     "NOTIFICATION_CHOOSE_GOLDEN_AGE": "celebration",
     # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
     # notification's type (live: the civic blocker on turn 8 came back as a raw value), so every
@@ -67,6 +69,8 @@ DECISION_OF_KIND = {
     "buy_attribute": "attributes",
     "consider_attributes": "attributes",
     "choose_celebration": "celebration",
+    "assign_resource": "resources",
+    "consider_resources": "resources",
     "end_turn": "end_turn",
 }
 
@@ -76,7 +80,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -84,6 +88,9 @@ POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts 
 
 ATTRIBUTES_NOTE = ("buy a node whose attribute has a point available (wildcard points count for any attribute), then "
                    "consider_attributes to close the decision; nodes cost one point each")
+
+RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity (`cityCap` minus `cityAssigned`; `description` is "
+                  "the resource's effect), then consider_resources; it is not startable while a resource can still be assigned")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn")
@@ -175,6 +182,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = POLICIES_NOTE
         if decision == "attributes":
             group["note"] = ATTRIBUTES_NOTE
+        if decision == "resources":
+            group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1
         if len(group["options"]) < max_options:
             group["options"].append(_option(offer))

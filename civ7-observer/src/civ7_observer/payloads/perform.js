@@ -211,6 +211,36 @@
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
     return JSON.stringify(result);
   }
+  if (KIND === "ASSIGN_RESOURCE") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "resource arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Resources || typeof player.Resources.getResources !== "function") return refuse("API_CONTRACT_MISMATCH", "resource operation contract unavailable");
+    let own = false; try { for (const r of player.Resources.getResources()) { if (r && r.value === ARG) { own = true; break; } } } catch (e) { own = false; }
+    if (!own) return refuse("UNKNOWN_ACTION", "resource is not among the bound player's resources");
+    let rcity = null; try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG2 && c.id.owner === BOUND_PLAYER_ID) { rcity = c; break; } } } catch (e) { rcity = null; }
+    if (!rcity) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    let toAssign = null; try { toAssign = player.Resources.getCountResourcesToAssign(); } catch (e) { toAssign = null; }
+    if ((isInt(toAssign) ? toAssign : 0) !== PRE) return refuse("ACTION_EXPIRED", "the number of resources to assign changed since the offer was made");
+    const rloc = GameplayMap.getLocationFromIndex(ARG);
+    if (!rloc || !isInt(rloc.x) || !isInt(rloc.y) || rloc.x < 0) return refuse("ACTION_NOT_STARTABLE", "resource plot is not a valid map plot");
+    const args = { Location: { x: rloc.x, y: rloc.y }, City: ARG2 };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused assigning that resource there");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let now = -1; try { const a = player.Resources.getCityIDAssigned(ARG); now = a && isInt(a.id) ? a.id : (isInt(a) ? a : -1); } catch (e) { now = -1; }
+    result.readback = { kind: KIND, arg: ARG, city: ARG2, assignedTo: now, matches: now === ARG2 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CONSIDER_ASSIGN_RESOURCE") {
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const args = {};
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused considering resources");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    result.readback = { kind: KIND, arg: 0, matches: false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CHOOSE_GOLDEN_AGE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "celebration argument is not an integer");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof player.Culture.getGoldenAgeChoices !== "function") return refuse("API_CONTRACT_MISMATCH", "celebration operation contract unavailable");

@@ -267,6 +267,40 @@
         offers.push({ kind: "CONSIDER_ASSIGN_ATTRIBUTE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
       }
     }
+    if (isInt(PlayerOperationTypes.ASSIGN_RESOURCE) && player.Resources && typeof player.Resources.getResources === "function") {
+      // Resources: the shipped allocation screen sends ASSIGN_RESOURCE {Location: {x, y}, City: cityId}
+      // per drop after canStart, and CONSIDER_ASSIGN_RESOURCE {} on close.
+      const R = player.Resources;
+      let toAssign = null; try { toAssign = R.getCountResourcesToAssign(); } catch (e) { toAssign = null; }
+      const rpre = isInt(toAssign) ? toAssign : 0;
+      const cities = player.Cities.getCities();
+      const cityInfo = cities.filter((c) => c && c.id && isInt(c.id.id) && c.id.owner === BOUND_PLAYER_ID).map((c) => { let cap = null, cnt = null; try { cap = c.Resources.getAssignedResourcesCap(); cnt = c.Resources.getTotalCountAssignedResources(); } catch (e) { /* unknown */ } return { c: c, cap: isInt(cap) ? cap : null, cnt: isInt(cnt) ? cnt : null }; });
+      const cityName = (cid) => { for (const ci of cityInfo) if (ci.c.id.id === cid) return compose(ci.c.name); return null; };
+      let assignable = 0;
+      const all = R.getResources();
+      if (Array.isArray(all)) for (const r of all) {
+        if (!r || !isInt(r.value) || !r.uniqueResource || !isInt(r.uniqueResource.resource)) continue;
+        const def = GameInfo.Resources.lookup(r.uniqueResource.resource);
+        const loc = GameplayMap.getLocationFromIndex(r.value);
+        if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0) continue;
+        let assignedTo = -1; try { const a = R.getCityIDAssigned(r.value); assignedTo = a && isInt(a.id) ? a.id : (isInt(a) ? a : -1); } catch (e) { assignedTo = -1; }
+        let originName = null; try { const o = Game.Resources.getOriginCity(r.value); originName = o && isInt(o.id) ? cityName(o.id) : null; } catch (e) { originName = null; }
+        for (const ci of cityInfo) {
+          if (assignedTo === ci.c.id.id) continue;
+          const rargs = { Location: { x: loc.x, y: loc.y }, City: ci.c.id.id };
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ASSIGN_RESOURCE, rargs, false);
+          if (!check || check.Success !== true) continue;
+          assignable += 1;
+          offers.push({ kind: "ASSIGN_RESOURCE", arg: r.value, arg2: ci.c.id.id, pre: rpre, plotIndex: r.value, from: { x: loc.x, y: loc.y }, resourceKey: def && typeof def.ResourceType === "string" ? def.ResourceType : null,
+            displayName: def ? compose(def.Name) : null, resourceClass: def && typeof def.ResourceClassType === "string" ? def.ResourceClassType : null, description: def ? compose(def.Tooltip) : null,
+            assignedCityId: assignedTo === -1 ? null : assignedTo, originCityName: originName, cityId: ci.c.id.id, cityName: compose(ci.c.name), cityIsTown: ci.c.isTown === true, cityCap: ci.cap, cityAssigned: ci.cnt, toAssign: rpre, canStart: true });
+        }
+      }
+      if (blocked && blockingNotifications.indexOf("NOTIFICATION_ASSIGN_NEW_RESOURCES") !== -1 && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_RESOURCE)) {
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_RESOURCE, {}, false);
+        offers.push({ kind: "CONSIDER_ASSIGN_RESOURCE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) && !(rpre > 0 && assignable > 0), toAssign: rpre, assignable: assignable });
+      }
+    }
     if (isInt(PlayerOperationTypes.CHOOSE_GOLDEN_AGE) && typeof player.Culture.getGoldenAgeChoices === "function" && GameInfo.GoldenAges) {
       // Celebration: the shipped chooser lists Culture.getGoldenAgeChoices() (type strings) and sends
       // CHOOSE_GOLDEN_AGE {GoldenAgeType: hash} after canStart.
