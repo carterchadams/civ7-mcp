@@ -91,3 +91,17 @@ scenario needs.
 | verification | unit still at (19, 32), 2/2 moves, `hasPendingOperations false`, `operationQueueSize 0`; `Units.getPathTo` returns an empty path for the mountain and a 1-turn path for a coast neighbour |
 | `act reconcile --status rejected` | accepted with the note above; actions unblocked |
 | fix | move offers/performs now require a native one-turn path (tests added) |
+
+## Game 2, player 0, turn 13: complete agent turn under the curtain, no takeover
+
+With `hotseat-screen-curtain` present throughout:
+
+| step | result |
+|---|---|
+| `move_unit` scout → (19, 31) flat, native path 1 turn | `confirmed` (read-back poll) |
+| `skip_unit` × 3 | `confirmed` |
+| `produce_unit` Scout in the Abbasid capital (offers listed Scout, Settler, Warrior, Slinger from native `canStart(BUILD)`) | `confirmed` via poll (`BuildQueue.currentProductionTypeHash`); end-turn blocker went from `PRODUCTION` to none |
+| `end_turn` | `confirmed`; 2 s later seat = player 1, turn 13 |
+
+This is the first turn where every mandatory decision the game raised (research already set,
+units, production) was handled by the action catalog alone.
