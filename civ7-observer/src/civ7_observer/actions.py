@@ -15,7 +15,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -134,7 +134,7 @@ class ActionRegistry:
             self._offers[action_id] = {"kind": kind, "arg": o["arg"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
                                        "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
-            for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent"):
+            for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent", "unitTypeKey", "movesRemaining", "location"):
                 if k in o:
                     entry[k] = o[k]
             public.append(entry)
@@ -191,6 +191,8 @@ class ActionRegistry:
                 return True
         elif readback.get("matches") is True:
             return True
+        elif offer["kind"] == "SKIP_UNIT":
+            pass
         # poll the read-only read-back for a short, bounded time
         expr = render_payload("readback.js", bound_player_id=player)
         for _ in range(READBACK_ATTEMPTS):
@@ -202,6 +204,10 @@ class ActionRegistry:
             if offer["kind"] == "END_TURN":
                 if rb.get("hasSentTurnComplete") is True or rb.get("localPlayerId") != player or rb.get("turn") != offer["turn"]:
                     return True   # the turn moved on
+            elif offer["kind"] == "SKIP_UNIT":
+                ready = rb.get("unitsReadyToMove")
+                if isinstance(ready, list) and offer["arg"] not in ready:
+                    return True
             else:
                 key = "techResearching" if offer["kind"] == "SET_TECH_TREE_NODE" else "civicResearching"
                 if rb.get(key) == offer["arg"]:

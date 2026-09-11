@@ -159,3 +159,18 @@ def test_offers_persist_across_registry_instances_on_the_same_turn(tmp_path):
         res = reg2.perform(gs2, action_id=pottery["actionId"], request_id="r-persist", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
     assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_skip_offers_map_to_public_kind_and_perform_confirms_on_readback(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "SKIP_UNIT", "arg": 5, "unitTypeKey": "UNIT_SCOUT", "movesRemaining": 2, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SKIP_UNIT", "arg": 5, "isReadyToMove": False, "matches": True}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), ctx_reply(5)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        skip = next(o for o in out["offers"] if o["kind"] == "skip_unit")
+        assert skip["unitTypeKey"] == "UNIT_SCOUT" and skip["movesRemaining"] == 2 and "arg" not in skip
+        res = reg.perform(gs, action_id=skip["actionId"], request_id="skip-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"SKIP_UNIT"' in sent and "OP_ARG" not in sent

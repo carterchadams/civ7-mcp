@@ -9,6 +9,7 @@
     techResearching: player ? t(() => player.Techs.getResearching().type) : null,
     civicResearching: player ? t(() => player.Culture.getResearching().type) : null,
     hasSentTurnComplete: t(() => GameContext.hasSentTurnComplete()),
+    unitsReadyToMove: player ? t(() => player.Units.getUnits().filter((u) => u.isReadyToMove === true).map((u) => u.id.id)) : null,
     curtainDisplayed: t(() => typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null)
   });
 })()

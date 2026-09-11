@@ -33,7 +33,7 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
     Configuration: { getGame: () => SP },
     PlayerOperationTypes: { SET_TECH_TREE_NODE: 9001, SET_CULTURE_TREE_NODE: 9002, GRANT_TREE_NODE: 9999 },
     ProgressionTreeNodeState: STATE,
-    GameInfo: { ProgressionTreeNodes: table([{ $hash: 701, ProgressionTreeNodeType: "NODE_TECH_AQ_POTTERY", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_P" }, { $hash: 702, ProgressionTreeNodeType: "NODE_TECH_AQ_WRITING", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_W" }, { $hash: 801, ProgressionTreeNodeType: "NODE_CIVIC_AQ_MAIN_MYSTICISM", ProgressionTree: "TREE_CIVICS_AQ_MAIN", Name: "LOC_M" }]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]) },
+    GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }]), ProgressionTreeNodes: table([{ $hash: 701, ProgressionTreeNodeType: "NODE_TECH_AQ_POTTERY", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_P" }, { $hash: 702, ProgressionTreeNodeType: "NODE_TECH_AQ_WRITING", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_W" }, { $hash: 801, ProgressionTreeNodeType: "NODE_CIVIC_AQ_MAIN_MYSTICISM", ProgressionTree: "TREE_CIVICS_AQ_MAIN", Name: "LOC_M" }]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]) },
     Locale: { compose: (k) => ({ LOC_P: "Pottery", LOC_W: "Writing", LOC_M: "Mysticism" })[k] ?? k },
     document: { getElementById: (id) => (id === "hotseat-screen-curtain" && curtain ? {} : null) },
   };
@@ -122,4 +122,53 @@ test("perform reports a mismatched read-back as unknown, not success", () => {
   const r = runPerform(world({ researchAfter: 702 }), "SET_TECH_TREE_NODE", 701);
   assert.equal(r.outcome, "sent");
   assert.equal(r.readback.matches, false);
+});
+
+// ---- unit skip
+function withUnits(g, units, { skipOk = true } = {}) {
+  const me = g.Players.get(1);
+  me.Units = { getUnits: () => units };
+  g.UnitOperationTypes = { SKIP_TURN: 745019656, SLEEP: -41338758 };
+  g.UnitActivityTypes = { NONE: -1, AWAKE: 1797587246, OPERATION: 1225574625 };
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => { g._log.push(`ucanStart(${JSON.stringify(uid)},${op},${JSON.stringify(args)},${show})`); return { Success: skipOk && uid.owner === 1 }; },
+    sendRequest: (uid, op, args) => { g._log.push(`usendRequest(${JSON.stringify(uid)},${op},${JSON.stringify(args)})`); const u = units.find((x) => x.id.id === uid.id); if (u) { u.isReadyToMove = false; u.activityType = 1225574625; } },
+  };
+  return g;
+}
+const unit = (id, extra) => ({ id: { owner: 1, id, type: 26 }, type: 99, isReadyToMove: true, isReadyToSelect: true, activityType: 1797587246, Movement: { movementMovesRemaining: 2, maxMoves: 2 }, ...extra });
+
+test("offers include one skip offer per owned unit with canStart from the native query", () => {
+  const log = [];
+  const g = withUnits(world({ log }), [unit(5), unit(6, { isReadyToMove: false, Movement: { movementMovesRemaining: 0, maxMoves: 2 } })]);
+  g._log = log;
+  const r = runOffers(g);
+  const skips = r.offers.filter((o) => o.kind === "SKIP_UNIT");
+  assert.deepEqual(skips.map((o) => [o.arg, o.unitTypeKey, o.movesRemaining, o.canStart]), [[5, "UNIT_SCOUT", 2, true], [6, "UNIT_SCOUT", 0, true]]);
+  assert.ok(log.filter((e) => e.startsWith("ucanStart(")).every((e) => e.includes('"owner":1') && e.includes("745019656") && e.endsWith(",{},false)")));
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+test("perform SKIP_UNIT resolves the unit from the bound roster, checks canStart, sends, and reads back", () => {
+  const log = [];
+  const units = [unit(5), unit(6)];
+  const g = withUnits(world({ log }), units); g._log = log;
+  const r = runPerform(g, "SKIP_UNIT", 5);
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "SKIP_UNIT", arg: 5, isReadyToMove: false, matches: true });
+  const i = log.findIndex((e) => e.startsWith("ucanStart(") && e.includes('"id":5'));
+  const j = log.findIndex((e) => e.startsWith("usendRequest(") && e.includes('"id":5'));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+  assert.ok(!log.some((e) => e.startsWith("usendRequest(") && e.includes('"id":6')));
+});
+
+test("perform SKIP_UNIT refuses an id that is not in the bound roster and never touches Units.get", () => {
+  const log = [];
+  const g = withUnits(world({ log }), [unit(5)]); g._log = log;
+  g.Units = new Proxy({}, { get(_, k) { log.push(`Units.${String(k)}`); return () => ({}); } });
+  const r = runPerform(g, "SKIP_UNIT", 99);
+  assert.equal(r.refused.code, "UNKNOWN_ACTION");
+  assert.ok(!log.some((e) => e.startsWith("Units.")));
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
 });

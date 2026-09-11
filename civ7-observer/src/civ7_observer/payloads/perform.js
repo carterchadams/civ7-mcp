@@ -45,6 +45,21 @@
     result.readback = { kind: KIND, arg: 0, sentComplete: GameContext.hasSentTurnComplete() === true };
     return JSON.stringify(result);
   }
+  if (KIND === "SKIP_UNIT") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "unit id is not an integer");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.SKIP_TURN)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.SKIP_TURN unavailable");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const unitId = unit.id;
+    const ucheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false);
+    if (!ucheck || ucheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the skip");
+    Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.SKIP_TURN, {});
+    result.outcome = "sent";
+    const ready = unit.isReadyToMove === true;
+    result.readback = { kind: KIND, arg: ARG, isReadyToMove: ready, matches: !ready };
+    return JSON.stringify(result);
+  }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");
   if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
   if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");

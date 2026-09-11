@@ -56,6 +56,19 @@
         });
       }
     }
+    if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.SKIP_TURN)) {
+      const units = player.Units.getUnits();
+      if (!Array.isArray(units)) throw new Error("getUnits() is not an array");
+      for (const u of units) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const unitId = u.id;
+        const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false);
+        offers.push({ kind: "SKIP_UNIT", arg: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+          movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null,
+          location: u.location && isInt(u.location.x) && isInt(u.location.y) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+          canStart: !!(check && check.Success === true) });
+      }
+    }
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
     const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };

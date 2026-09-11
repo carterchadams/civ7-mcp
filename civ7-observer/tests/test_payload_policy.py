@@ -23,7 +23,7 @@ FORBIDDEN_PATTERNS = {
     "raw visibility dump": r"\bgetRevealedStates\s*\(",
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
-    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations|setResearch|purchasePlot|destroy)\b",
+    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
 }
@@ -34,9 +34,11 @@ MUTATION_ALLOWLIST = (
     "Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND]",
     "Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND]",
     "GameContext.sendTurnComplete()",
+    'Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false)',
+    'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.SKIP_TURN, {})',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperations|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
-ENGINE_CALL = re.compile(r"(Game\.PlayerOperations\.(?:canStart|sendRequest)\([^)]*|GameContext\.sendTurnComplete\(\))")
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
 
 
 def violations(source: str) -> list[str]:
