@@ -96,7 +96,7 @@ def route(decision_kinds: list[str], required: str | None = None) -> list[str]:
 
 
 def catalog() -> str:
-    """One line per available card, for the model to request another with load_skill."""
+    """One line per available card; each is a file the agent can read from its own session directory."""
     lines = [f"{skill_id} — {entry['title']}" for skill_id, entry in sorted(index()["skills"].items())]
     lines.append("friction — Report friction: a tool or fact you need is missing")
     return "\n".join(lines)

@@ -36,8 +36,8 @@ python -m civ7_observer probe    --out FILE [--player N] [--json]         # deve
 python -m civ7_observer snapshot --mode MODE [--player N] --out FILE [--json]
 python -m civ7_observer serve    --player N --mode MODE [--allow-actions] [--journal FILE]
 python -m civ7_observer act      {list|perform|result|reconcile|rebind} --player N --mode MODE [...]
-python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--workspace DIR]
-python -m civ7_observer friction --player N [--kind KIND] [--workspace DIR]
+python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--sessions DIR]
+python -m civ7_observer friction --player N [--kind KIND] [--sessions DIR]
 python -m civ7_observer curtain  {prune|raise} [--json]                      # hotseat UI tidy-up, sends no engine operation
 ```
 
@@ -54,8 +54,9 @@ catalog is added: `get_turn_brief` (start here each turn), `list_actions`, `get_
 and `get_city_options` (one unit's or one settlement's own choices, for when the brief's bounded
 options do not show them), `perform_action`
 (`action_id` + a caller-chosen `request_id` that makes it idempotent) and `get_action_result`, plus
-the runner's own tools, which never touch the game: `load_skill`, `get_plan`, `update_plan` and
-`report_friction` (the seat's plan and friction backlog live in the host workspace).
+nothing else: the server is a pure game interface. The agent's plan, notes and friction live in its
+own session directory, which the driver confines its file tools to and whose `PLAN.md` it injects
+into every prompt (see `docs/agent-runner.md`).
 A client only ever sees opaque action ids; engine operation names and arguments stay host-side.
 
 ## Host state (persistent, outside the repo)
@@ -69,7 +70,7 @@ A client only ever sees opaque action ids; engine operation names and arguments 
 | `inflight.json` | durable reservation written **before** any mutation is dispatched |
 | `unresolved.json` | game-wide barrier of uncertain outcomes |
 
-Plus `workspace/seat<N>/` (the agent's own plan, friction backlog and turn transcript) and a
+Plus `sessions/seat<N>/` (the agent's own `PLAN.md`, `FRICTION.md`, notes and a copy of the skill cards) and a
 per-seat journal wherever `--journal` points (default `runs/actions.jsonl`) with its
 `.offers.json` sidecar. Corrupt shared state raises `STATE_CORRUPT` and stops; it never reads as
 empty. A reservation with no recorded outcome makes every seat refuse `RECONCILIATION_REQUIRED`

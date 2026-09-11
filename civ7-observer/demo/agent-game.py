@@ -31,17 +31,19 @@ from civ7_observer.curtain import tidy
 from civ7_observer.runner import assemble_system_prompt
 from civ7_observer.server import default_journal
 from civ7_observer.service import open_game_session
-from civ7_observer.workspace import Workspace
+from civ7_observer.session import SeatSession
 
 PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs" / "agent-game"
 SERVER = "civ7"
 TOOLS = ("get_turn_brief", "list_actions", "get_unit_options", "get_city_options", "perform_action", "get_action_result",
-         "get_observation", "load_skill", "get_plan", "update_plan", "report_friction")
-# `--tools ""` empties the built-in set, but the harness still offers Read/Grep over a tool result it
-# spilled to disk (seen live on turn 34), which would let a seat read anything on this machine.
-DENIED = ("Read", "Grep", "Glob", "Bash", "Edit", "Write", "WebFetch", "WebSearch", "Task", "NotebookEdit", "TodoWrite")
+         "get_observation")
+# The seat gets the client's file tools, confined by path-scoped rules to its own session directory
+# (see SeatSession.permission_rules: reads and writes anywhere else are refused, verified live). No
+# shell, no network, no subagents: a seat that could run a command could read another seat's mind.
+FILE_TOOLS = ("Read", "Write", "Edit", "Glob", "Grep")
+DENIED = ("Bash", "WebFetch", "WebSearch", "Task", "NotebookEdit", "TodoWrite")
 
 INSTRUCTIONS = """You are playing one seat of a Civilization VII game through the civ7 MCP tools. You control \
 only that seat; nothing else is reachable, and every fact you have belongs to it.
@@ -59,19 +61,22 @@ combat, settlement placement, major spending and diplomacy. Read the brief again
 relevant to your next choice have changed.
 
 Choose only action ids the host has offered you in this turn. Never invent one, and never repeat an \
-action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \
-report_friction rather than guessing, then continue with the least committal legal option if you \
-can. get_observation is large: call it only when a specific decision needs map detail, and use \
-get_unit_options(unit_id) or get_city_options(city_id) rather than list_actions when you need one \
-unit's or one settlement's choices.
+action whose receipt was an error or unknown. If a tool or a fact you need is missing, append an \
+entry to FRICTION.md (the format is in its README) rather than guessing, then continue with the \
+least committal legal option if you can. get_observation is large: call it only when a specific \
+decision needs map detail, and use get_unit_options(unit_id) or get_city_options(city_id) rather \
+than list_actions when you need one unit's or one settlement's choices.
 
-Keep a short plan across turns with get_plan / update_plan (at most three commitments); update it \
-when its contents change. Report strategic changes, missing capabilities and exceptions, and do not \
-narrate routine moves. Finish with at most three short bullets. The skill cards below are your \
-procedures; the rest of the catalog can be loaded on demand.
+Your working directory is your own session directory, and it is the only place on this machine you \
+can read or write. PLAN.md there is your canonical plan: keep it short (the commitments you are \
+pursuing, what each needs next, what would make you drop it) and keep it current, because its \
+contents are placed in these instructions at the start of every turn and nothing else carries over. \
+Update it when its contents change, not every turn. The skill cards below are your procedures; every \
+other card is a file under skills/ that you can read when a decision is outside them.
 
-These instructions are your whole brief. You have no filesystem, no shell and no network: the civ7 \
-tools are everything you can reach, and nothing outside this turn is yours to change."""
+Report strategic changes, missing capabilities and exceptions, and do not narrate routine moves. \
+Finish with at most three short bullets. You have no shell and no network: the civ7 tools reach the \
+game, your session directory holds your memory, and nothing else is yours to touch."""
 
 
 def context(attempts: int = 40):
@@ -145,19 +150,21 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
         summary["tag"] = tag
     if brief.get("pause"):
         return {**summary, "status": "paused", "pause": brief["pause"], "brief": brief}
-    workspace = Workspace(root=state_dir() / "workspace", seat=seat)
-    friction_before = len(workspace.friction())
+    session = SeatSession(root=state_dir() / "sessions", seat=seat)
+    session.prepare()
+    friction_before = len(session.friction_entries())
     journal_before = len(journal_rows(seat))
-    system = assemble_system_prompt(brief, workspace, instructions=INSTRUCTIONS)
+    system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir))
     system_path = RUNS / f"{tag}.system.md"
     system_path.write_text(system, encoding="utf-8")
     transcript = RUNS / f"{tag}.transcript.jsonl"
     prompt = f"Play this turn for seat {seat}. Current brief:\n\n{json.dumps(brief, ensure_ascii=False)}"
 
-    cmd = ["claude", "-p", prompt, "--model", model, "--tools", "",
+    cmd = ["claude", "-p", prompt, "--model", model, "--tools", ",".join(FILE_TOOLS),
            "--mcp-config", str(mcp_config(seat, mode)), "--strict-mcp-config",
-           "--allowedTools", *[f"mcp__{SERVER}__{t}" for t in TOOLS],
+           "--allowedTools", *[f"mcp__{SERVER}__{t}" for t in TOOLS], *session.permission_rules(),
            "--disallowedTools", *DENIED,
+           "--add-dir", str(session.dir),
            # Replaces the default coding prompt instead of appending to it. Appending left the seat
            # being Claude Code first and a player second: asked to follow an appended instruction it
            # conflicted with, the model said so and ignored it (verified against this client).
@@ -168,7 +175,7 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     t0 = time.monotonic()
     with open(transcript, "w", encoding="utf-8") as out:
         try:
-            proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=clean_env(), timeout=timeout, cwd=ROOT)
+            proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=clean_env(), timeout=timeout, cwd=session.dir)
             exit_code, stderr = proc.returncode, proc.stderr[-2000:]
         except subprocess.TimeoutExpired as exc:
             exit_code, stderr = -1, f"timeout after {timeout}s: {str(exc.stderr or '')[-1000:]}"
@@ -195,7 +202,7 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     receipts = [{"kind": r.get("kind"), "status": r.get("status"), "requestId": r.get("requestId")} for r in rows if r.get("status") != "pending"]
     ended = any(r.get("kind") == "END_TURN" and r.get("status") == "confirmed" and r.get("turn") == turn for r in rows)
     unknown = [r["requestId"] for r in rows if r.get("status") == "unknown"]
-    friction = workspace.friction()[friction_before:]
+    friction = session.friction_entries()[friction_before:]
     after = context()
     counts: dict[str, int] = {}
     for name in tool_calls:

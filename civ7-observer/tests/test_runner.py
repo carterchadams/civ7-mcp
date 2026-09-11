@@ -43,7 +43,7 @@ def make(tmp_path, scripts, provider, **kw):
     f = Factory(scripts)
     r = runner.Runner(
         port=9444, timeout=1, player=1, mode="singleplayer", provider=provider,
-        journal_path=tmp_path / "journal.jsonl", workspace_root=tmp_path / "ws",
+        journal_path=tmp_path / "journal.jsonl", sessions_root=tmp_path / "ws",
         discover=lambda p, t: [target("a")], session_factory=f, **kw)
     return r, f
 
@@ -114,24 +114,6 @@ def test_a_pause_stops_the_turn_without_acting(tmp_path):
     assert not any("sendRequest" in m for sock in f.all_sockets for m in sock.sent)
 
 
-def test_friction_is_recorded_and_the_turn_continues(tmp_path):
-    scripts = session_scripts(offers_payload(RESEARCH + UNITS))
-    provider = FakeProvider([
-        ProviderResponse(text="", tool_calls=[ToolCall("1", "get_turn_brief", {})]),
-        ProviderResponse(text="", tool_calls=[ToolCall("2", "report_friction", {
-            "kind": "missing_information", "goal": "choose what to produce",
-            "needed": "the cost and completion time of each unit", "note": "picked nothing"})]),
-        ProviderResponse(text="Reported friction and stopped.", tool_calls=[]),
-    ])
-    r, _ = make(tmp_path, scripts, provider)
-    result = r.play_turn()
-    assert result.status == "stopped"
-    assert len(result.friction) == 1 and result.friction[0]["kind"] == "missing_information"
-    rows = r.workspace.friction()
-    assert rows[0]["needed"] == "the cost and completion time of each unit"
-    assert rows[0]["turn"] == 12 and rows[0]["seat"] == 1
-
-
 def test_an_invented_action_id_is_refused_without_reaching_the_game(tmp_path):
     scripts = session_scripts(offers_payload(RESEARCH))
     provider = FakeProvider([
@@ -167,21 +149,21 @@ def test_the_tool_call_budget_stops_the_turn(tmp_path):
     assert result.status == "budget_exhausted" and result.tool_calls == 3
 
 
-def test_the_model_can_load_another_skill_and_update_its_plan(tmp_path):
+def test_the_runner_has_no_tool_for_plans_skills_or_friction(tmp_path):
+    """Those live in the agent's own session directory; a model that asks for them is told so."""
+    from civ7_observer.runner import TOOLS
+    assert {t["name"] for t in TOOLS} == {"get_turn_brief", "list_actions", "perform_action"} | {t["name"] for t in TOOLS if t["name"].startswith("get_")}
+    assert not any(t["name"] in ("load_skill", "update_plan", "report_friction") for t in TOOLS)
     scripts = session_scripts(offers_payload(RESEARCH))
     provider = FakeProvider([
         ProviderResponse(text="", tool_calls=[ToolCall("1", "get_turn_brief", {})]),
-        ProviderResponse(text="", tool_calls=[ToolCall("2", "load_skill", {"skill_id": "civ7-settlement-sites"})]),
-        ProviderResponse(text="", tool_calls=[ToolCall("3", "update_plan", {"expected_revision": 0, "operations": [
-            {"op": "add_commitment", "id": "c1", "objective": "Settle the river site", "next_intent": "move the settler"}]})]),
-        ProviderResponse(text="done", tool_calls=[]),
+        ProviderResponse(text="", tool_calls=[ToolCall("2", "update_plan", {"expected_revision": 0, "operations": []})]),
+        ProviderResponse(text="stop", tool_calls=[]),
     ])
     r, _ = make(tmp_path, scripts, provider)
-    result = r.play_turn()
-    assert result.plan_revision == 1
-    assert "Settle the river site" in (r.workspace.dir / "PLAN.md").read_text()
-    skill_result = json.loads(provider.calls[2]["messages"][-1]["content"][0]["content"])
-    assert skill_result["card"].startswith("# Settlement-site selection")
+    r.play_turn()
+    refusal = json.loads(provider.calls[2]["messages"][-1]["content"][0]["content"])
+    assert refusal["error"]["code"] == "UNKNOWN_TOOL"
 
 
 def test_the_prompt_carries_the_contract_the_routed_card_and_the_plan(tmp_path):
@@ -191,13 +173,12 @@ def test_the_prompt_carries_the_contract_the_routed_card_and_the_plan(tmp_path):
         ProviderResponse(text="stop", tool_calls=[]),
     ])
     r, _ = make(tmp_path, scripts, provider)
-    r.workspace.apply({"match": "ABCDEF0123456789", "generation": 1, "seat": 1, "turn": 12, "age": 4242},
-                      expected_revision=0, operations=[{"op": "add_commitment", "id": "c1", "objective": "Reach Writing"}])
+    r.session.plan_path.write_text("# Plan\n\n- Reach Writing\n", encoding="utf-8")
     r.play_turn()
     system = provider.calls[-1]["system"]
     assert "## The turn loop" in system                      # operating contract
     assert "Technology, civics, masteries" in system         # the card routed for the required decision
-    assert "Reach Writing" in system                         # the agent's own plan
+    assert "Reach Writing" in system                         # the agent's own PLAN.md, injected verbatim
     assert "friction — Report friction" in system            # the catalog it can load from
     assert "civ7-naval-and-overseas" in system, "the rest of the catalog is listed by id"
     assert "amphibious attack" not in system, "a card that was not routed is listed, not loaded"

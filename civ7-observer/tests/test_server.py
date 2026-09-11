@@ -158,7 +158,8 @@ def test_read_only_server_exposes_no_action_tools():
 def test_acting_server_exposes_the_action_tools_with_honest_annotations(tmp_path):
     s, _ = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
     names = sorted(t.name for t in s._tool_manager.list_tools())
-    assert names == ["get_action_result", "get_city_options", "get_observation", "get_plan", "get_status", "get_turn_brief", "get_unit_options", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
+    # a pure game interface: nothing about the agent playing the seat is a tool here
+    assert names == ["get_action_result", "get_city_options", "get_observation", "get_status", "get_turn_brief", "get_unit_options", "list_actions", "perform_action"]
     perform = tool(s, "perform_action")
     assert perform.annotations.readOnlyHint is False and perform.annotations.idempotentHint is True
     assert perform.annotations.openWorldHint is False
@@ -217,35 +218,15 @@ def test_seat_journals_default_to_the_host_state_directory(tmp_path):
     assert str(srv.default_journal(1)) == str(tmp_path / "host-state" / "journals" / "seat1.jsonl")
 
 
-def test_runner_tools_over_mcp_read_cards_and_write_only_the_seat_workspace(tmp_path):
-    from test_brief import RESEARCH, offers_with
-    ctx = json.dumps(GAME)
-    payload = json.dumps(offers_with(RESEARCH, end_can_start=False, blocking="RESEARCH"))
-    s, f = srv.build_server(port=9444, timeout=1, player=1, mode="singleplayer", allow_actions=True, journal_path=tmp_path / "j.jsonl",
-                            workspace_root=tmp_path / "ws", discover=lambda p, t: [target("a")],
-                            session_factory=Factory({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)]})), None
-    for name in ("load_skill", "get_plan"):
-        assert tool(s, name).annotations.readOnlyHint is True
-    for name in ("update_plan", "report_friction"):
-        assert tool(s, name).annotations.readOnlyHint is False and tool(s, name).annotations.destructiveHint is False
-    assert "Report friction" in tool(s, "load_skill").fn(skill_id="friction")["card"]
-    assert tool(s, "load_skill").fn(skill_id="civ7-settlement-sites")["skillId"] == "civ7-settlement-sites"
-    assert tool(s, "load_skill").fn(skill_id="nope")["error"]["code"] == "UNKNOWN_SKILL"
-    # plan and friction need the attachment a brief establishes
-    assert tool(s, "update_plan").fn(expected_revision=0, operations=[{"op": "add_commitment", "id": "c1", "objective": "x"}])["error"]["code"] == "NO_ATTACHMENT"
-    b = tool(s, "get_turn_brief").fn()
-    assert b["attachment"]["seat"] == 1
-    plan = tool(s, "update_plan").fn(expected_revision=0, operations=[{"op": "add_commitment", "id": "c1", "objective": "Settle the river site", "next_intent": "found on turn 1"}])
-    assert plan["revision"] == 1 and plan["commitments"][0]["id"] == "c1"
-    assert tool(s, "update_plan").fn(expected_revision=0, operations=[{"op": "set_next_intent", "id": "c1", "next_intent": "y"}])["error"]["code"] == "INVALID_ARGUMENT"
-    got = tool(s, "get_plan").fn()
-    assert got["revision"] == 1 and "Settle the river site" in got["excerpt"] and got["attachment"]["match"] == "ABCDEF0123456789"
-    rec = tool(s, "report_friction").fn(kind="missing_action", goal="fortify the warrior", needed="a fortify action")
-    assert rec == {"recorded": True, "kind": "missing_action", "turn": GAME["turn"]}
-    assert tool(s, "report_friction").fn(kind="bogus", goal="g", needed="n")["error"]["code"] == "INVALID_ARGUMENT"
-    rows = [json.loads(l) for l in (tmp_path / "ws" / "seat1" / "friction.jsonl").read_text().splitlines()]
-    assert rows[0]["blocking"] == "RESEARCH" and rows[0]["decision"] == "research" and rows[0]["seat"] == 1 and rows[0]["match"] == "ABCDEF0123456789"
-    assert not (tmp_path / "ws" / "seat0").exists()
+def test_the_server_keeps_no_agent_state_and_takes_no_workspace(tmp_path):
+    """The plan, notes and friction of whoever plays the seat live in that agent's own session
+    directory, outside this process; the server has no tool and no argument for them."""
+    import inspect
+    assert "workspace_root" not in inspect.signature(srv.build_server).parameters
+    assert "workspace_root" not in inspect.signature(srv.serve).parameters
+    src = open(srv.__file__, encoding="utf-8").read()
+    for word in ("Workspace", "load_skill", "get_plan", "update_plan", "report_friction"):
+        assert word not in src, f"{word} is back in the game server"
 
 
 def test_get_unit_options_returns_only_that_units_offers(tmp_path):

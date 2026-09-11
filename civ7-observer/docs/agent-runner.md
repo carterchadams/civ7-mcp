@@ -6,8 +6,8 @@ goes through the action registry with the same lock, reservation, `canStart` che
 confirmation as `act perform`.
 
 ```
-python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--workspace DIR]
-python -m civ7_observer friction --player N [--kind KIND] [--workspace DIR]
+python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--sessions DIR]
+python -m civ7_observer friction --player N [--kind KIND] [--sessions DIR]
 ```
 
 `play` runs exactly one turn and exits: 0 if the turn was ended, 1 otherwise (paused, stopped,
@@ -34,9 +34,6 @@ The brief is cached within a turn and invalidated by every performed action, so 
 | `list_actions` | the full offer listing, when the bounded options are not enough |
 | `get_unit_options` | one unit's own legal actions, by the unitId a brief shows; far smaller than the full listing |
 | `perform_action` | one offered action id plus a caller-chosen `request_id` (idempotent) |
-| `load_skill` | another skill card by id |
-| `update_plan` | bounded edits to this seat's own multi-turn plan |
-| `report_friction` | record that a tool or a fact it needed is missing |
 
 The model can only ever name an action id the host offered it this turn. An invented id is refused
 by shape before any session is opened, and an id from another match or generation is refused by the
@@ -110,3 +107,14 @@ Production offers are enqueue requests: the game's BUILD operation appends to th
 
 Nothing inside the game watches for a seat's turn or drives the hotseat curtain: agent seats play
 under it, and the driver above sequences seats from outside by reading the seat context.
+
+## The seat's session directory
+
+The game server is a pure game interface: it observes and acts, and keeps no notion of what the
+agent intends. Everything an agent wants to remember across turns lives in its own session
+directory, `<state>/sessions/seat<N>/`, which the agent-game driver grants the client's file tools
+over and nothing else on the machine (path-scoped rules in the client's absolute form,
+`Read(//dir/**)`; reads and writes outside it are refused, verified live). The agent keeps its
+canonical `PLAN.md` there, and the driver injects that file into every prompt. Friction goes into
+`FRICTION.md` as Markdown entries, which the driver collects after each turn. Every skill card is
+copied into `skills/` so the agent can read one without leaving the directory.

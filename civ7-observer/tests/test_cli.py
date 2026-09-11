@@ -197,7 +197,7 @@ def _turn_result(**kw):
     from civ7_observer.runner import TurnResult
     base = {"status": "turn_ended", "report": "Chose Pottery, then ended.",
             "actions": [{"kind": "SET_TECH_TREE_NODE", "status": "confirmed", "requestId": "r1"}],
-            "friction": [], "tool_calls": 3, "plan_revision": 2}
+            "tool_calls": 3}
     return TurnResult(**{**base, **kw})
 
 
@@ -213,7 +213,7 @@ def test_play_runs_one_turn_for_the_bound_seat_and_reports_it(monkeypatch, capsy
 
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     monkeypatch.setattr(cli, "Runner", FakeRunner)
-    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--workspace", str(tmp_path),
+    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--sessions", str(tmp_path),
                      "--model", "test-model", "--json"])
     out, _ = capsys.readouterr()
     payload = json.loads(out)
@@ -227,7 +227,7 @@ def test_play_exits_nonzero_when_the_turn_did_not_end(monkeypatch, capsys, tmp_p
     monkeypatch.setenv("ANTHROPIC_API_KEY", "k")
     monkeypatch.setattr(cli, "Runner", lambda **kw: type("R", (), {
         "play_turn": lambda self: _turn_result(status="paused", pause={"reason": "UNSUPPORTED_DECISION"})})())
-    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--workspace", str(tmp_path), "--json"])
+    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--sessions", str(tmp_path), "--json"])
     out, _ = capsys.readouterr()
     assert code == 1
     assert json.loads(out)["pause"]["reason"] == "UNSUPPORTED_DECISION"
@@ -236,17 +236,17 @@ def test_play_exits_nonzero_when_the_turn_did_not_end(monkeypatch, capsys, tmp_p
 def test_play_without_an_api_key_fails_before_touching_the_game(monkeypatch, capsys, tmp_path):
     monkeypatch.delenv("ANTHROPIC_API_KEY", raising=False)
     monkeypatch.setattr(cli, "Runner", lambda **kw: pytest.fail("the game must not be touched"))
-    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--workspace", str(tmp_path), "--json"])
+    code = cli.main(["play", "--player", "1", "--mode", "local-hotseat", "--sessions", str(tmp_path), "--json"])
     out, _ = capsys.readouterr()
     assert code == 2 and "API key" in json.loads(out)["error"]["message"]
 
 
 def test_friction_lists_the_backlog_a_seat_reported(capsys, tmp_path):
-    from civ7_observer.workspace import Workspace
-    ws = Workspace(root=tmp_path, seat=2)
-    ws.record_friction({"match": "M", "generation": 1, "turn": 5, "age": 1},
-                       kind="missing_action", goal="attack the scout", needed="an attack action")
-    code = cli.main(["friction", "--player", "2", "--workspace", str(tmp_path), "--json"])
+    from civ7_observer.session import SeatSession
+    session = SeatSession(root=tmp_path, seat=2)
+    session.dir.mkdir(parents=True)
+    session.friction_path.write_text("## missing_action: attack the scout\nneeded: an attack action\n", encoding="utf-8")
+    code = cli.main(["friction", "--player", "2", "--sessions", str(tmp_path), "--json"])
     out, _ = capsys.readouterr()
     payload = json.loads(out)
     assert code == 0

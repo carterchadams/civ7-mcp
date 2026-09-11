@@ -24,7 +24,7 @@ def test_operating_contract_and_rules_load():
 
 def test_local_friction_card_is_available_and_not_generated():
     card = skills.card("friction")
-    assert card.startswith("# Report friction") and "report_friction" in card
+    assert card.startswith("# Report friction") and "FRICTION.md" in card and "report_friction" not in card
     assert "friction" not in skills.index()["skills"], "the local card must not pretend to come from the guide"
 
 

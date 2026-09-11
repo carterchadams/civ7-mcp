@@ -20,13 +20,14 @@ what to build next.
 
 ## How to report
 
-Call `report_friction` once per distinct problem, with:
+Append one entry per distinct problem to `FRICTION.md` in your session directory, in this shape:
 
-- `kind`: one of the four above.
-- `goal`: what you were trying to achieve, in one line.
-- `needed`: the specific tool, field or fact that would have let you decide. Be concrete: name the
-  missing field or the action you wanted, not "more information".
-- `note`: optional detail, including what you did instead.
+    ## <kind>: <what you were trying to achieve, in one line>
+    needed: <the specific action, field or fact that would have let you decide>
+    <optional detail, including what you did instead>
+
+`kind` is one of the four above. Be concrete in `needed`: name the missing field or the action you
+wanted, not "more information". Append; never rewrite earlier entries, which have already been read.
 
 Then continue if you can, choosing the least committal legal option, and say in your report that
 you did so. If you cannot continue, stop and say so.

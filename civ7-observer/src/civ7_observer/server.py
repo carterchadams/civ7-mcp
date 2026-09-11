@@ -17,20 +17,18 @@ from typing import Any, Callable
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from civ7_observer import __version__, cdp, schema, skills
+from civ7_observer import __version__, cdp, schema
 from civ7_observer.actions import ACTION_ID, REQUEST_ID, ActionRegistry
 from civ7_observer.attachment import state_dir
 from civ7_observer.brief import build_brief
 from civ7_observer.service import ObserverError, open_game_session
 from civ7_observer.payloads import render_payload
 from civ7_observer.snapshot import capture, session_id
-from civ7_observer.workspace import PlanConflict, Workspace
 
 log = logging.getLogger(__name__)
 
 READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False, idempotentHint=True, openWorldHint=False)
 MUTATING = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=True, openWorldHint=False)
-HOST_STATE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)   # writes the seat workspace, never the game
 
 
 MAX_ENTITY_OPTIONS = 40
@@ -119,34 +117,11 @@ RESULT_DESCRIPTION = (
     "Read-only. The recorded outcome of one of this seat's earlier actions by `request_id`: confirmed, "
     "rejected, unknown, or no_such_request. Use it after a transport failure rather than repeating the action."
 )
-SKILL_DESCRIPTION = (
-    "Read-only. Loads one skill card by id (a procedure from the strategy guide, or this project's `friction` "
-    "card) when the current decision is outside the cards already in your instructions. Ids are listed in the "
-    "operating contract. Never touches the game."
-)
-PLAN_DESCRIPTION = (
-    "Read-only. This seat's own multi-turn plan: revision, open commitments (at most three) and a short excerpt. "
-    "Written only by update_plan; carried across turns. Never touches the game."
-)
-UPDATE_PLAN_DESCRIPTION = (
-    "Edits this seat's own multi-turn plan atomically. `expected_revision` must equal the revision you were last "
-    "shown (get_plan or a previous update), otherwise the edit is refused. `operations` is a list of objects with "
-    "`op` one of add_commitment {id, objective, entities?, next_intent?, review?, reservation?, assumptions?}, "
-    "revise_commitment {id, ...fields}, set_next_intent {id, next_intent}, cancel_commitment {id, reason}. "
-    "Call get_turn_brief first in this session. Never touches the game."
-)
-FRICTION_DESCRIPTION = (
-    "Records that a tool or a fact you needed is missing, instead of guessing. `kind` is one of missing_action, "
-    "missing_information, unclear_option, blocked; `goal` is what you were trying to achieve; `needed` names the "
-    "specific action, field or fact that would have let you decide; `note` is optional detail including what you "
-    "did instead. One report per distinct problem per turn. This backlog drives what gets built next. Never "
-    "touches the game."
-)
 
 
 def build_server(
     *, port: int, timeout: float, player: int | None, mode: str, target_id: str | None = None,
-    allow_actions: bool = False, journal_path: Path | None = None, workspace_root: Path | None = None,
+    allow_actions: bool = False, journal_path: Path | None = None,
     discover: Callable[[int, float], list[cdp.CdpTarget]] = cdp.discover_targets,
     session_factory: Callable[..., cdp.CdpSession] = cdp.CdpSession,
 ) -> FastMCP:
@@ -238,24 +213,13 @@ def build_server(
             except ValueError as exc:
                 return {"error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}
 
-    workspace = Workspace(root=workspace_root or state_dir() / "workspace", seat=bound)
-    last: dict[str, Any] = {"attachment": None, "brief": None}   # what this seat was last shown, for plan and friction identity
-
     @mcp.tool(name="get_turn_brief", description=BRIEF_DESCRIPTION, annotations=READ_ONLY)
     def get_turn_brief() -> dict[str, Any]:
-        brief = _with_session(lambda gs: build_brief(gs, registry, player=bound, mode=mode))
-        if "error" not in brief and isinstance(brief.get("attachment"), dict):
-            last["brief"], last["attachment"] = brief, brief["attachment"]
-            if workspace.needs_reattachment(brief["attachment"]):
-                workspace.reattach(brief["attachment"], note="the game's attachment generation changed")
-        return brief
+        return _with_session(lambda gs: build_brief(gs, registry, player=bound, mode=mode))
 
     @mcp.tool(name="list_actions", description=LIST_DESCRIPTION, annotations=READ_ONLY)
     def list_actions() -> dict[str, Any]:
-        listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
-        if "error" not in listing and isinstance(listing.get("attachment"), dict):
-            last["attachment"] = listing["attachment"]
-        return listing
+        return _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
 
     @mcp.tool(name="get_unit_options", description=UNIT_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
     def get_unit_options(unit_id: int) -> dict[str, Any]:
@@ -264,8 +228,6 @@ def build_server(
         listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
         if "error" in listing:
             return listing
-        if isinstance(listing.get("attachment"), dict):
-            last["attachment"] = listing["attachment"]
         options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
         roster = listing.get("unitIds")
         # A unit can leave the roster between turns (destroyed, disbanded, converted). Say so, rather
@@ -288,8 +250,6 @@ def build_server(
         listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
         if "error" in listing:
             return listing
-        if isinstance(listing.get("attachment"), dict):
-            last["attachment"] = listing["attachment"]
         options = [o for o in listing["offers"] if o.get("cityId") == city_id]
         shown, omitted = _bounded(options)
         return {"cityId": city_id, "attachment": listing["attachment"], "count": len(options), "shown": len(shown),
@@ -319,51 +279,17 @@ def build_server(
             return {"error": exc.to_dict()}
         return result if result is not None else {"requestId": request_id, "status": "no_such_request"}
 
-    # ---- the runner's own tools: skill cards, the seat's plan, and the friction backlog.
-    # None of these touch the game; they read packaged cards or write this seat's workspace.
-    @mcp.tool(name="load_skill", description=SKILL_DESCRIPTION, annotations=READ_ONLY)
-    def load_skill(skill_id: str) -> dict[str, Any]:
-        try:
-            return {"skillId": skill_id, "card": skills.card(skill_id)}
-        except (KeyError, TypeError):
-            return {"error": {"code": "UNKNOWN_SKILL", "message": f"no such skill card: {skill_id!r}; ids are listed in the operating contract"}}
-
-    @mcp.tool(name="get_plan", description=PLAN_DESCRIPTION, annotations=READ_ONLY)
-    def get_plan() -> dict[str, Any]:
-        plan = workspace.plan()
-        return {"revision": plan["revision"], "commitments": plan["commitments"], "attachment": plan.get("attachment"),
-                "reattachedNote": plan.get("reattachedNote"), "excerpt": workspace.excerpt()}
-
-    @mcp.tool(name="update_plan", description=UPDATE_PLAN_DESCRIPTION, annotations=HOST_STATE)
-    def update_plan(expected_revision: int, operations: list[dict[str, Any]]) -> dict[str, Any]:
-        if last["attachment"] is None:
-            return {"error": {"code": "NO_ATTACHMENT", "message": "call get_turn_brief first so the plan can be bound to this match and turn"}}
-        try:
-            plan = workspace.apply(last["attachment"], expected_revision=expected_revision, operations=operations)
-        except (PlanConflict, ValueError, TypeError) as exc:
-            return {"error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}
-        return {"revision": plan["revision"], "commitments": plan["commitments"]}
-
-    @mcp.tool(name="report_friction", description=FRICTION_DESCRIPTION, annotations=HOST_STATE)
-    def report_friction(kind: str, goal: str, needed: str, note: str = "") -> dict[str, Any]:
-        brief = last["brief"] or {}
-        try:
-            entry = workspace.record_friction(
-                last["attachment"] or {}, kind=kind, goal=goal, needed=needed, note=note or "",
-                blocking=(brief.get("endTurn") or {}).get("blocking"),
-                decision=next((d["kind"] for d in brief.get("decisions", []) if d.get("required")), None))
-        except (ValueError, TypeError) as exc:
-            return {"error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}
-        log.info("friction (%s) seat %s turn %s: %s", entry["kind"], bound, entry.get("turn"), entry["needed"])
-        return {"recorded": True, "kind": entry["kind"], "turn": entry.get("turn")}
+    # Nothing else. The server is a pure game interface: what the agent playing this seat intends,
+    # remembers or could not do lives in its own session directory, outside the game and outside
+    # this process (see civ7_observer.session).
 
     return mcp
 
 
 def serve(*, port: int, timeout: float, player: int, mode: str, target_id: str | None = None,
-          allow_actions: bool = False, journal_path: Path | None = None, workspace_root: Path | None = None) -> int:
+          allow_actions: bool = False, journal_path: Path | None = None) -> int:
     server = build_server(port=port, timeout=timeout, player=player, mode=mode, target_id=target_id,
-                          allow_actions=allow_actions, journal_path=journal_path, workspace_root=workspace_root)
+                          allow_actions=allow_actions, journal_path=journal_path)
     log.info("civ7-observer serve: player %s, mode %s, port %s, actions %s", player, mode, port,
              "ENABLED" if allow_actions else "disabled")
     server.run(transport="stdio")

@@ -23,7 +23,7 @@ from civ7_observer.actions import ACTION_ID, REQUEST_ID, ActionRegistry
 from civ7_observer.attachment import state_dir
 from civ7_observer.brief import build_brief
 from civ7_observer.service import ObserverError, open_game_session
-from civ7_observer.workspace import PlanConflict, Workspace
+from civ7_observer.session import SeatSession
 
 log = logging.getLogger(__name__)
 
@@ -53,9 +53,7 @@ class TurnResult:
     status: str                      # turn_ended | paused | stopped | budget_exhausted | error
     report: str = ""
     actions: list[dict[str, Any]] = field(default_factory=list)
-    friction: list[dict[str, Any]] = field(default_factory=list)
     pause: dict[str, Any] | None = None
-    plan_revision: int = 0
     tool_calls: int = 0
     error: str = ""
     transcript_path: Path | None = None
@@ -95,32 +93,6 @@ TOOLS = [
             "request_id": {"type": "string", "description": "your own short id, 1-64 chars of A-Za-z0-9._-"},
         }, "required": ["action_id", "request_id"]},
     },
-    {
-        "name": "load_skill",
-        "description": "Load another skill card by id when the current decision is outside the cards already loaded. "
-                       "Ids are listed in the operating contract.",
-        "input_schema": {"type": "object", "properties": {"skill_id": {"type": "string"}}, "required": ["skill_id"]},
-    },
-    {
-        "name": "update_plan",
-        "description": "Edit your own multi-turn plan. Operations: add_commitment, revise_commitment, set_next_intent, "
-                       "cancel_commitment. expected_revision must match the revision you were shown.",
-        "input_schema": {"type": "object", "properties": {
-            "expected_revision": {"type": "integer"},
-            "operations": {"type": "array", "items": {"type": "object"}},
-        }, "required": ["expected_revision", "operations"]},
-    },
-    {
-        "name": "report_friction",
-        "description": "Report that a tool or a fact you needed is missing, instead of guessing. See the friction "
-                       "skill card for when and how.",
-        "input_schema": {"type": "object", "properties": {
-            "kind": {"type": "string", "enum": ["missing_action", "missing_information", "unclear_option", "blocked"]},
-            "goal": {"type": "string", "description": "what you were trying to achieve"},
-            "needed": {"type": "string", "description": "the specific tool, field or fact that would have let you decide"},
-            "note": {"type": "string", "description": "optional detail, including what you did instead"},
-        }, "required": ["kind", "goal", "needed"]},
-    },
 ]
 
 INSTRUCTIONS = """You are playing one seat of a Civilization VII game. You control only that seat; \
@@ -132,18 +104,20 @@ and due plan commitments. Take worthwhile supported optional actions; do not chu
 queries without new information. Then end the turn. Stop immediately if the brief sets `pause`.
 
 Choose only action ids the host has offered you in this turn. Never invent one, and never repeat an \
-action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \
-report_friction rather than guessing.
+action whose receipt was an error or unknown. If a tool or a fact you need is missing, say so \
+rather than guessing.
 
 Keep your visible output short: a line per decision saying what you chose and why, and a closing \
-summary. The skill cards below are your procedures; the rest of the catalog can be loaded on demand."""
+summary. The skill cards below are your procedures."""
 
 
-def assemble_system_prompt(brief: dict[str, Any], workspace: Workspace, *, instructions: str = INSTRUCTIONS) -> str:
+def assemble_system_prompt(brief: dict[str, Any], plan_text: str, *, instructions: str = INSTRUCTIONS,
+                           skills_location: str | None = None) -> str:
     """The per-turn system prompt: operating instructions, the operating contract, the skill cards
     routed for this brief's decisions (required first), the friction card, the rules those cards
-    cite, the seat's own plan, and the catalog of every other card. Shared by the in-process runner
-    and any external client that plays a seat through the MCP server."""
+    cite, the seat's own plan as the seat last wrote it, and the catalog of every other card.
+    `plan_text` is whatever the agent keeps in its PLAN.md; the harness only carries it forward.
+    Shared by the in-process runner and the agent-game driver."""
     decisions = [d["kind"] for d in brief.get("decisions", [])]
     required = next((d["kind"] for d in brief.get("decisions", []) if d.get("required")), None)
     routed = skills.route(decisions, required=required)
@@ -158,14 +132,15 @@ def assemble_system_prompt(brief: dict[str, Any], workspace: Workspace, *, instr
     parts.append(skills.card("friction"))
     if rule_ids:
         parts.append("# Rules referenced by these skills\n\n" + skills.rules(rule_ids))
-    parts.append("# Your plan\n\n" + workspace.excerpt())
-    parts.append("# Other skill cards you can load\n\n" + skills.catalog())
+    parts.append("# Your plan\n\n" + plan_text)
+    where = f" (files in {skills_location})" if skills_location else ""
+    parts.append("# Other skill cards" + where + "\n\n" + skills.catalog())
     return "\n\n".join(parts)
 
 
 class Runner:
     def __init__(self, *, port: int, timeout: float, player: int, mode: str, provider: Provider,
-                 journal_path: Path | None = None, workspace_root: Path | None = None,
+                 journal_path: Path | None = None, sessions_root: Path | None = None,
                  target_id: str | None = None, max_tool_calls: int = DEFAULT_MAX_TOOL_CALLS,
                  discover: Callable[[int, float], list[cdp.CdpTarget]] = cdp.discover_targets,
                  session_factory: Callable[..., cdp.CdpSession] = cdp.CdpSession) -> None:
@@ -175,8 +150,9 @@ class Runner:
         self.max_tool_calls = max_tool_calls
         self.discover, self.session_factory = discover, session_factory
         self.registry = ActionRegistry(journal_path=journal_path or state_dir() / "journals" / f"seat{player}.jsonl")
-        self.workspace = Workspace(root=workspace_root or state_dir() / "workspace", seat=player)
-        self.transcript_path = self.workspace.dir / "transcript.jsonl"
+        self.session = SeatSession(root=sessions_root or state_dir() / "sessions", seat=player)
+        self.session.dir.mkdir(parents=True, exist_ok=True)
+        self.transcript_path = self.session.dir / "transcript.jsonl"
 
     # ---- host-side helpers
     def _session(self, fn):
@@ -236,38 +212,19 @@ class Runner:
                 if receipt.get("kind") == "END_TURN" and receipt.get("status") == "confirmed":
                     state["turn_ended"] = True
                 return receipt
-            if name == "load_skill":
-                skill_id = args.get("skill_id")
-                try:
-                    return {"skillId": skill_id, "card": skills.card(skill_id)}
-                except KeyError:
-                    return {"error": {"code": "UNKNOWN_SKILL", "message": f"no such skill card: {skill_id}"}}
-            if name == "update_plan":
-                plan = self.workspace.apply(state.get("attachment") or {}, expected_revision=args.get("expected_revision"),
-                                            operations=args.get("operations") or [])
-                return {"revision": plan["revision"], "commitments": plan["commitments"]}
-            if name == "report_friction":
-                brief = state.get("brief") or {}
-                entry = self.workspace.record_friction(
-                    state.get("attachment") or {}, kind=args.get("kind"), goal=args.get("goal"),
-                    needed=args.get("needed"), note=args.get("note") or "",
-                    blocking=(brief.get("endTurn") or {}).get("blocking"),
-                    decision=next((d["kind"] for d in brief.get("decisions", []) if d.get("required")), None))
-                state["friction"].append(entry)
-                return {"recorded": True, "kind": entry["kind"]}
         except (ObserverError, cdp.CdpError) as exc:
             return {"error": exc.to_dict()}
-        except (PlanConflict, ValueError, TypeError) as exc:
+        except (ValueError, TypeError) as exc:
             return {"error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}
         return {"error": {"code": "UNKNOWN_TOOL", "message": f"{name} is not a tool you have"}}
 
     # ---- prompt
     def _system_prompt(self, brief: dict[str, Any]) -> str:
-        return assemble_system_prompt(brief, self.workspace)
+        return assemble_system_prompt(brief, self.session.plan_text())
 
     # ---- the loop
     def play_turn(self) -> TurnResult:
-        state: dict[str, Any] = {"actions": [], "friction": [], "turn_ended": False, "brief": None,
+        state: dict[str, Any] = {"actions": [], "turn_ended": False, "brief": None,
                                  "brief_fresh": False, "attachment": None}
         try:
             brief = self._brief()
@@ -276,9 +233,6 @@ class Runner:
         state["brief"], state["brief_fresh"] = brief, True
         state["attachment"] = brief.get("attachment")
         self._record({"type": "turn_start", "brief": brief})
-
-        if self.workspace.needs_reattachment(state["attachment"] or {}):
-            self.workspace.reattach(state["attachment"] or {}, note="the game's attachment generation changed")
 
         system = self._system_prompt(brief)
         messages: list[dict[str, Any]] = [{"role": "user", "content": [
@@ -345,8 +299,7 @@ class Runner:
 
     def _finish(self, state: dict[str, Any], status: str, report: str, calls: int,
                 pause: dict[str, Any] | None = None, error: str = "") -> TurnResult:
-        self._record({"type": "turn_end", "status": status, "actions": len(state["actions"]),
-                      "friction": len(state["friction"]), "toolCalls": calls})
-        return TurnResult(status=status, report=report.strip(), actions=state["actions"], friction=state["friction"],
-                          pause=pause, plan_revision=self.workspace.plan()["revision"], tool_calls=calls,
+        self._record({"type": "turn_end", "status": status, "actions": len(state["actions"]), "toolCalls": calls})
+        return TurnResult(status=status, report=report.strip(), actions=state["actions"],
+                          pause=pause, tool_calls=calls,
                           error=error, transcript_path=self.transcript_path)
