@@ -86,7 +86,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -104,7 +104,8 @@ PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`q
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "
-                        "appears; call get_unit_options with its unitId to see where it can go.")
+                        "appears; call get_unit_options with its unitId to see where it can go. Each move option carries "
+                        "tooCloseToSettle: head for plots where it is false.")
 
 
 def _option(offer: dict[str, Any]) -> dict[str, Any]:
@@ -184,7 +185,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
                 group = group_for("settle")
                 if offer["unitId"] not in group["_seen"]:
                     group["_seen"].add(offer["unitId"])
-                    group["entities"].append({**_entity(offer), "canFoundHere": False, "terrainKey": offer.get("terrainKey")})
+                    group["entities"].append({**_entity(offer), "canFoundHere": False, "terrainKey": offer.get("terrainKey"),
+                                              "tooCloseToSettle": offer.get("tooCloseToSettle")})
                     group["note"] = BLOCKED_SETTLER_NOTE
             continue
         decision = DECISION_OF_KIND.get(offer["kind"])

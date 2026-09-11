@@ -16,6 +16,9 @@
   const plotYields = (x, y) => { const out = {}; try { for (const row of yieldRows) { const v = GameplayMap.getYield(x, y, row.$hash, BOUND_PLAYER_ID); if (typeof v === "number") out[row.YieldType.replace("YIELD_", "").toLowerCase()] = v; } } catch (e) { /* decorative: a realm without yields still gets offers */ } return out; };
   const plotYieldsNonZero = (x, y) => { const all = plotYields(x, y); const out = {}; for (const k of Object.keys(all)) { if (all[k] !== 0) out[k] = all[k]; } return out; };
   const plotIsRiver = (x, y) => { try { return GameplayMap.isRiver(x, y) === true; } catch (e) { return null; } };
+  // The game's own minimum-settlement-distance rule for a plot. A plain boolean with no identity,
+  // owner or position attached: it says only what the game would say if this seat tried to found here.
+  const tooCloseToSettlement = (x, y) => { try { const v = GameplayMap.isCityWithinMinimumDistance(x, y); return typeof v === "boolean" ? v : null; } catch (e) { return null; } };
   // True when a visible plot holds a unit belonging to someone else. Used only to withhold a move that
   // the engine would silently drop; the defender's identity is never read out of this function.
   const occupiedByOther = (unitId, x, y) => {
@@ -125,6 +128,7 @@
           offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1],
             featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: plotIsRiver(loc.x, loc.y), yields: plotYieldsNonZero(loc.x, loc.y),
+            tooCloseToSettle: tooCloseToSettlement(loc.x, loc.y),
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
         }
       }
@@ -174,11 +178,15 @@
         if (!exists || exists.Success !== true) continue;
         const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false);
         const ok = !!(check && check.Success === true);
+        const close = tooCloseToSettlement(u.location.x, u.location.y);
         offers.push({ kind: "FOUND_CITY", arg: u.id.id, x: u.location.x, y: u.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y },
           unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(u.location.x, u.location.y), "TerrainType"),
           featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(u.location.x, u.location.y), "FeatureType"), river: plotIsRiver(u.location.x, u.location.y), yields: plotYieldsNonZero(u.location.x, u.location.y),
           movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null, canStart: ok,
-          reason: ok ? null : "the game refuses founding on this unit's current plot (the engine gives no detail; typical causes are water or navigable-river tiles, and plots too close to another settlement); move the unit first" });
+          tooCloseToSettle: close,
+          reason: ok ? null : (close === true
+            ? "this plot is inside the game's minimum distance from an existing settlement; the move options carry tooCloseToSettle, so walk to a plot where it is false"
+            : "the game refuses founding here and it is not the minimum-settlement-distance rule (typical remaining causes are water or navigable-river tiles); move the unit first") });
       }
     }
     if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.CHANGE_GROWTH_MODE) && typeof GrowthTypes !== "undefined" && isInt(GrowthTypes.PROJECT) && GameInfo.Projects) {

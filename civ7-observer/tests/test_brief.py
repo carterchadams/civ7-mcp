@@ -123,7 +123,7 @@ def test_a_settler_that_cannot_found_here_is_shown_as_an_entity_with_a_note_not_
     b, _, _ = build(tmp_path, offers_with(UNITS + blocked, end_can_start=False, blocking="UNITS"))
     settle = next(d for d in b["decisions"] if d["kind"] == "settle")
     assert settle["options"] == [] and settle["optionCount"] == 0 and settle["required"] is False
-    assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 49, "y": 5}, "movesRemaining": 2, "canFoundHere": False, "terrainKey": "TERRAIN_NAVIGABLE_RIVER"}]
+    assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 49, "y": 5}, "movesRemaining": 2, "canFoundHere": False, "terrainKey": "TERRAIN_NAVIGABLE_RIVER", "tooCloseToSettle": None}]
     assert "refused" in settle["note"] and "Move it" in settle["note"]
 
 

@@ -1110,3 +1110,31 @@ test("perform CHOOSE_TOWN_PROJECT re-checks the town, its current project and ca
     assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
   }
 });
+
+test("move and found offers carry the game's own minimum-settlement-distance rule, with no identity attached", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  g.GameplayMap.isCityWithinMinimumDistance = (x, y) => x <= 11;
+  const moves = runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT");
+  assert.ok(moves.length > 0);
+  assert.ok(moves.every((o) => o.tooCloseToSettle === (o.x <= 11)), "every destination reports the rule");
+  const far = moves.find((o) => o.x > 11);
+  assert.ok(!far || far.tooCloseToSettle === false);
+  assert.ok(!JSON.stringify(moves).includes('"owner"'));
+});
+
+test("a settler blocked by the minimum distance is told so, and one blocked for another reason is not", () => {
+  const log = [];
+  const g = withFounder(world({ log }), [founder(5)], { foundOk: false }); g._log = log;
+  g.Game.UnitOperations.canStart = ((inner) => (uid, op, args, show) => op === 1463004268 && show === true ? { Success: uid.id === 5 } : inner(uid, op, args, show))(g.Game.UnitOperations.canStart);
+  g.GameplayMap.isCityWithinMinimumDistance = () => true;
+  const close = runOffers(g).offers.find((o) => o.kind === "FOUND_CITY");
+  assert.equal(close.tooCloseToSettle, true);
+  assert.match(close.reason, /minimum distance/);
+  const h = withFounder(world({ log: [] }), [founder(5)], { foundOk: false }); h._log = [];
+  h.Game.UnitOperations.canStart = ((inner) => (uid, op, args, show) => op === 1463004268 && show === true ? { Success: uid.id === 5 } : inner(uid, op, args, show))(h.Game.UnitOperations.canStart);
+  h.GameplayMap.isCityWithinMinimumDistance = () => false;
+  const other = runOffers(h).offers.find((o) => o.kind === "FOUND_CITY");
+  assert.equal(other.tooCloseToSettle, false);
+  assert.match(other.reason, /not the minimum-settlement-distance rule/);
+});
