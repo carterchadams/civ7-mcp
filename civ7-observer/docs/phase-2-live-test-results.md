@@ -114,3 +114,11 @@ units, production) was handled by the action catalog alone.
 | offers | skip and move offers carry `unitId` and `from`; end turn blocked by `UNITS` |
 | `skip_unit` perform | `confirmed` with `confirmedBy: {source: poll, gameGuid: 83853C0C…, turn: 13, localPlayerId: 1}` |
 | files | `actions.jsonl`, `actions.offers.json`, `actions.lock` |
+
+## Action-layer fix review verified live (game 2, player 1, turn 13, curtain up)
+
+| check | result |
+|---|---|
+| offers | `generation 1`, `reattached true` on first sight of match `83853C0C…`; `~/.local/state/civ7-observer/generations.json` = `{"83853C0C…": {"generation": 1, "maxTurn": 13}}` |
+| `skip_unit` 196609 | `confirmed`, `confirmedBy.effect = {"unitNoLongerReady": 196609}` with match/turn/age/player/observer |
+| reload of an earlier save of the same campaign | pending human action: expected `reattached true`, generation 2, pre-reload offers refused |
