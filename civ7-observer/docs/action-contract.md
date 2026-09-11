@@ -426,3 +426,6 @@ positive signal when it comes.
 The same settler then failed to step at all (one move left for a plot costing two, though the engine's
 path had said one turn): the queued operation it did not have when offered (`unitPendingOps`) is the
 proof the order was accepted, reported as `queued: true`.
+
+A unit already carrying a queued operation is not offered fresh moves at all (its cancel stays):
+a third order on the same settler left no signal to confirm by.

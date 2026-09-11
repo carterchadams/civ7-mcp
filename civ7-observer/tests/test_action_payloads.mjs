@@ -212,6 +212,8 @@ test("move offers cover everywhere reachable this turn, visible and with a nativ
   assert.equal(moves.length, 16);
   assert.ok(moves.every((o) => o.steps >= 1 && o.steps <= 2), "nothing beyond the unit's movement is offered");
   assert.ok(moves.some((o) => o.steps === 2), "a two-tile destination is reachable in one action");
+  const busy = withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 }, hasPendingOperations: () => true })]), {}); busy._log = [];
+  assert.equal(runOffers(busy).offers.filter((o) => o.kind === "MOVE_UNIT").length, 0, "a unit with a queued operation is travelling and gets no fresh move");
   assert.ok(!moves.some((o) => o.x === 10 && o.y === 11), "plot with an empty native path must not be offered");
   assert.ok(moves.every((o) => o.pathTurns === 1));
   assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.terrainKey === "TERRAIN_FLAT"));

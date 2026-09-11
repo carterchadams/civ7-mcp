@@ -158,6 +158,9 @@
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
         if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || u.location.x < 0) continue;
+        // A unit already carrying a queued operation is travelling: a fresh move on top of it leaves no
+        // signal to confirm by (live, turn 66, three unknowns on one settler). It keeps its cancel.
+        if ((typeof u.hasPendingOperations === "function" ? u.hasPendingOperations() : u.hasPendingOperations) === true) continue;
         if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
         const unitId = u.id;
         // Everywhere the unit can actually reach this turn, not just its six neighbours: a scout with
