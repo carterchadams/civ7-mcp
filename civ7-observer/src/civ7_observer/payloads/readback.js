@@ -25,6 +25,9 @@
     activeTraditions: player ? t(() => { const out = []; for (const k of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) { const st = CultureSlotTypes[k]; if (Number.isInteger(st)) for (const h of player.Culture.getActiveTraditions(st)) out.push(h); } return out; }) : null,
     tradeRoutes: player ? t(() => player.Trade.countPlayerTradeRoutes()) : null,
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
+    // BEGIN VETTED MET-PLAYER SCOPE
+    diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true }; } return m; }) : null,
+    // END VETTED MET-PLAYER SCOPE
     influenceBalance: player ? t(() => Math.floor(player.DiplomacyTreasury.diplomacyBalance)) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
     // Neither getNumPromotions nor getTotalPromotionsEarned moves when a promotion is taken (both were
@@ -32,6 +35,7 @@
     // discipline and promotion TYPE STRINGS, not hashes: a hash argument silently answers false.
     unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (!u || !u.id || !u.Experience || typeof u.Experience.hasPromotion !== "function") continue; const held = []; for (const det of GameInfo.UnitPromotionDisciplineDetails) { if (!det || typeof det.UnitPromotionDisciplineType !== "string" || typeof det.UnitPromotionType !== "string") continue; try { if (u.Experience.hasPromotion(det.UnitPromotionDisciplineType, det.UnitPromotionType) === true) { const h = Database.makeHash(det.UnitPromotionType); if (held.indexOf(h) === -1) held.push(h); } } catch (e) {} } m[String(u.id.id)] = held; } return m; }) : null,
     unitsReadyToMove: player ? t(() => player.Units.getUnits().filter((u) => u.isReadyToMove === true).map((u) => u.id.id)) : null,
+    specialistPlots: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (!c || !c.Workers) continue; const info = c.Workers.GetAllPlacementInfo(); if (!Array.isArray(info)) continue; for (const q of info) { if (q && Number.isInteger(q.PlotIndex) && Number.isInteger(q.NumWorkers)) m[String(q.PlotIndex)] = q.NumWorkers; } } return m; }) : null,
     cityQueues: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.getQueue().map((it) => it.type); } return m; }) : null,
     cityProduction: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.currentProductionTypeHash; } return m; }) : null,
     townProjects: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Growth) m[String(c.id.id)] = Number.isInteger(c.Growth.projectType) ? c.Growth.projectType : -1; } return m; }) : null,

@@ -1064,6 +1064,87 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_a_war_declaration_needs_a_confirmation_and_proves_itself_by_the_relationship(tmp_path):
+    war = {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9003, "pre": 500, "expect": "war",
+           "typeKey": "DIPLOMACY_ACTION_DECLARE_WAR", "displayName": "Declare War", "targetPlayerId": 0,
+           "targetName": "Abbasid", "targetIsMajor": True, "group": "UNIQUE", "cost": 0, "costYield": "influence",
+           "influenceBalance": 500, "affordable": True, "destructive": True, "requiresConfirmation": True, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [war]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent",
+                 "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9003, "influenceBefore": 500,
+                              "influence": 500, "wasAtWar": False, "atWar": False, "wasAllied": False, "allied": False, "matches": False}}
+    rb = {**RB, "influenceBalance": 500, "diplomaticRelations": {"0": {"atWar": True, "allied": False}}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), ctx_reply(3),
+                                reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        w = next(o for o in out["offers"] if o.get("typeKey") == "DIPLOMACY_ACTION_DECLARE_WAR")
+        assert w["requiresConfirmation"] is True and "cannot be taken back" in w["guidance"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=w["actionId"], request_id="war-0", player=1, mode="singleplayer")
+        assert info.value.code == "CONFIRMATION_REQUIRED"
+        res = reg.perform(gs, action_id=w["actionId"], request_id="war-1", player=1, mode="singleplayer", confirm=True)
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"warDeclared": {"targetPlayerId": 0, "actionType": 9003}}
+
+
+def test_a_priced_diplomatic_action_still_needs_no_confirmation(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9001, "pre": 1256,
+                                                       "expect": "influence", "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS",
+                                                       "cost": 33, "costYield": "influence", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent",
+                 "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9001, "influenceBefore": 1256, "influence": 1256, "matches": False}}
+    rb = {**RB, "influenceBalance": 1223}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "start_diplomatic_action")
+        assert "requiresConfirmation" not in d and "guidance" not in d
+        res = reg.perform(gs, action_id=d["actionId"], request_id="ob-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"]["diplomaticActionStarted"]["influenceSpent"] == 33
+
+
+def test_ending_an_alliance_confirms_on_the_alliance_being_gone(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CANCEL_ALLIANCE", "arg": 0, "pre": 1, "targetPlayerId": 0,
+                                                       "targetName": "Abbasid", "targetIsMajor": True, "displayName": "End alliance", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent",
+                 "readback": {"kind": "CANCEL_ALLIANCE", "arg": 0, "wasAllied": True, "allied": True, "matches": False}}
+    rb = {**RB, "diplomaticRelations": {"0": {"atWar": False, "allied": False}}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        c = next(o for o in out["offers"] if o["kind"] == "cancel_alliance")
+        assert c["targetName"] == "Abbasid"
+        res = reg.perform(gs, action_id=c["actionId"], request_id="ca-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"allianceEnded": {"targetPlayerId": 0}}
+
+
+def test_a_specialist_assignment_confirms_on_the_plot_gaining_a_worker(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "ASSIGN_WORKER", "arg": 65536, "arg2": 489, "pre": 0,
+                                                       "cityId": 65536, "cityName": "al-Fustāt", "plotIndex": 489, "x": 9, "y": 8,
+                                                       "workers": 0, "maxWorkers": 1, "cityWorkers": 0, "cityWorkerCap": 1,
+                                                       "yields": {}, "yieldsNext": {"science": 2}, "upkeep": {},
+                                                       "upkeepNext": {"food": 1, "happiness": 1}, "terrainKey": "TERRAIN_COAST", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent",
+                 "readback": {"kind": "ASSIGN_WORKER", "arg": 65536, "plotIndex": 489, "workersBefore": 0, "workers": 0, "matches": False}}
+    rb = {**RB, "specialistPlots": {"489": 1}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        sp = next(o for o in out["offers"] if o["kind"] == "assign_specialist")
+        assert sp["yieldsNext"] == {"science": 2} and sp["upkeepNext"] == {"food": 1, "happiness": 1}
+        assert sp["cityWorkerCap"] == 1 and "arg" not in sp
+        res = reg.perform(gs, action_id=sp["actionId"], request_id="sp-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"specialistAssigned": {"cityId": 65536, "plotIndex": 489, "workers": 1}}
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

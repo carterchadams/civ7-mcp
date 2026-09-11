@@ -1214,6 +1214,130 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   assert.equal(rr.readback.matches, false);
 });
 
+test("perform of a war declaration reads the relationship back, since the treasury never moves for it", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), []), { spend: 0, warAfter: [0] }); g._log = log;
+  const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9003, 0, { pre: 500 });
+  assert.equal(r.refused, null);
+  assert.equal(r.readback.wasAtWar, false);
+  assert.equal(r.readback.atWar, true);
+  assert.equal(r.readback.matches, true, "a war costs no influence; the relationship is the whole signal");
+  assert.ok(log.find((e) => e.startsWith("dsendRequest(") && e.includes(",557,")), "the listing's own operation for that project");
+});
+
+test("an alliance that is never formed leaves the action unmatched even though the call went through", () => {
+  const g = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0 }); g._log = [];
+  const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9003, 0, { pre: 500 });
+  assert.equal(r.outcome, "sent");
+  assert.equal(r.readback.matches, false);
+});
+
+test("ending an alliance is offered only while one exists, and confirms on the alliance being gone", () => {
+  const log = [];
+  const none = withDiplomacy(withUnits(world({ log }), [])); none._log = log;
+  assert.deepEqual(runOffers(none).offers.filter((o) => o.kind === "CANCEL_ALLIANCE"), [],
+    "nothing to end when the seat is allied with no one");
+  const g = withDiplomacy(withUnits(world({ log: [] }), []), { allied: [0], alliedAfter: [] }); g._log = [];
+  const offers = runOffers(g).offers.filter((o) => o.kind === "CANCEL_ALLIANCE");
+  assert.deepEqual(offers.map((o) => [o.arg, o.targetName, o.targetIsMajor]), [[0, "LOC_ABBASID", true]]);
+  const h = withDiplomacy(withUnits(world({ log: [] }), []), { allied: [0], alliedAfter: [] }); h._log = [];
+  const r = runPerformArgs(h, "CANCEL_ALLIANCE", 0, 0, 0, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CANCEL_ALLIANCE", arg: 0, wasAllied: true, allied: false, matches: true });
+  assert.ok(h._log.find((e) => e.startsWith("csendRequest(") && e.includes('"Type":769311562')), "the cancel carries the alliance action type");
+});
+
+test("perform CANCEL_ALLIANCE refuses an unmet target, itself, a seat with no alliance and a refused check", () => {
+  for (const [label, mk, target] of [
+    ["unmet", () => withDiplomacy(withUnits(world({ log: [] }), []), { met: [], allied: [0] }), 0],
+    ["itself", () => withDiplomacy(withUnits(world({ log: [] }), []), { allied: [1] }), 1],
+    ["not allied", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0],
+    ["canStart false", () => withDiplomacy(withUnits(world({ log: [] }), []), { allied: [0], cancelOk: false }), 0],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "CANCEL_ALLIANCE", target, 0, 0, { pre: 1 });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("csendRequest")), `${label}: must not send`);
+  }
+});
+
+// ---- specialists (a PLAYER operation taking a plot INDEX, not a city one taking x/y)
+function withSpecialists(g, { slots = null, assignable = [489], applied = true } = {}) {
+  withCity(g, {});
+  g.GameInfo.Yields = [{ $hash: 1, YieldType: "YIELD_FOOD" }, { $hash: 2, YieldType: "YIELD_SCIENCE" }];
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_HILL" }]);
+  g.GameplayMap = { ...(g.GameplayMap || {}), getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getTerrainType: () => 1, getFeatureType: () => -1, isRiver: () => false, getYield: () => 0 };
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, ASSIGN_WORKER: 9201 };
+  const rows = slots ?? [
+    { PlotIndex: 489, CityID: 65536, NumWorkers: 0, MaxWorkers: 1, IsBlocked: false, CurrentYields: [0, 0], NextYields: [0, 2], CurrentMaintenance: [0, 0], NextMaintenance: [1, 0] },
+    { PlotIndex: 490, CityID: 65536, NumWorkers: 0, MaxWorkers: 1, IsBlocked: true, CurrentYields: [0, 0], NextYields: [0, 3], CurrentMaintenance: [0, 0], NextMaintenance: [1, 0] },
+  ];
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.Workers = { GetAllPlacementInfo: () => rows, getCityWorkerCap: () => 2, getNumWorkers: () => 0 };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op !== 9201) return inner.canStart(pid, op, args, show);
+      g._log.push(`wcanStart(${pid},${op},${JSON.stringify(args)},${show})`);
+      return { Success: pid === 1 && assignable.includes(args.Location) };
+    },
+    sendRequest: (pid, op, args) => {
+      if (op !== 9201) return inner.sendRequest(pid, op, args);
+      g._log.push(`wsendRequest(${pid},${op},${JSON.stringify(args)})`);
+      if (applied) { const r = rows.find((q) => q.PlotIndex === args.Location); if (r) r.NumWorkers += 1; }
+    },
+  };
+  return g;
+}
+
+test("specialist offers name the plot index, the yields it would add and the upkeep it would cost", () => {
+  const log = [];
+  const g = withSpecialists(withUnits(world({ log }), [])); g._log = log;
+  const sp = runOffers(g).offers.filter((o) => o.kind === "ASSIGN_WORKER");
+  assert.deepEqual(sp.map((o) => [o.arg, o.arg2, o.pre, o.plotIndex, o.x, o.y, o.maxWorkers, o.cityWorkerCap, o.terrainKey]),
+    [[65536, 489, 0, 489, 89, 4, 1, 2, "TERRAIN_HILL"]]);
+  assert.deepEqual(sp[0].yields, {});
+  assert.deepEqual(sp[0].yieldsNext, { science: 2 });
+  assert.deepEqual(sp[0].upkeepNext, { food: 1 });
+  assert.ok(!log.some((e) => e.startsWith("wsendRequest")));
+});
+
+test("a blocked plot and a plot the engine refuses are both withheld", () => {
+  const log = [];
+  const g = withSpecialists(withUnits(world({ log }), [])); g._log = log;
+  assert.ok(!runOffers(g).offers.some((o) => o.kind === "ASSIGN_WORKER" && o.arg2 === 490), "blocked plot offered");
+  const none = withSpecialists(withUnits(world({ log: [] }), []), { assignable: [] }); none._log = [];
+  assert.deepEqual(runOffers(none).offers.filter((o) => o.kind === "ASSIGN_WORKER"), []);
+});
+
+test("perform ASSIGN_WORKER sends the plot index as a player operation and reads the plot's workers back", () => {
+  const log = [];
+  const g = withSpecialists(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "ASSIGN_WORKER", 65536, 489, 0, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "ASSIGN_WORKER", arg: 65536, plotIndex: 489, workersBefore: 0, workers: 1, matches: true });
+  assert.ok(log.find((e) => e.startsWith("wsendRequest(") && e.includes('"Location":489,"Amount":1')));
+});
+
+test("perform ASSIGN_WORKER refuses an unknown settlement, a foreign plot, a blocked plot, a changed count and a refused check", () => {
+  for (const [label, mk, cid, plot, pre] of [
+    ["unknown settlement", () => withSpecialists(withUnits(world({ log: [] }), [])), 7, 489, 0],
+    ["plot this city cannot work", () => withSpecialists(withUnits(world({ log: [] }), [])), 65536, 4242, 0],
+    ["blocked plot", () => withSpecialists(withUnits(world({ log: [] }), []), { assignable: [489, 490] }), 65536, 490, 0],
+    ["count changed", () => withSpecialists(withUnits(world({ log: [] }), [])), 65536, 489, 3],
+    ["canStart false", () => withSpecialists(withUnits(world({ log: [] }), []), { assignable: [] }), 65536, 489, 0],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "ASSIGN_WORKER", cid, plot, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("wsendRequest")), `${label}: must not send`);
+  }
+  const none = withSpecialists(withUnits(world({ log: [] }), []), { applied: false }); none._log = [];
+  const rr = runPerformArgs(none, "ASSIGN_WORKER", 65536, 489, 0, { pre: 0 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- disbanding a unit (destructive; the engine raises its own confirmation flag)
 function withDisband(g, { deletable = [5], gone = true } = {}) {
   g.UnitCommandTypes = { ...(g.UnitCommandTypes || {}), DELETE: 6660 };
@@ -1402,13 +1526,15 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
 });
 
 // ---- diplomacy (the only place the payload looks past the bound seat, and only at met players)
-function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2" } = {}) {
+function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2", atWar = [], allied = [], warAfter = [], cancelOk = true, alliedAfter = null } = {}) {
   const me = g.Players.get(1);
   me.DiplomacyTreasury = { diplomacyBalance: influence };
-  me.Diplomacy = { hasMet: (id) => met.some((m) => m.id === id) };
+  me.Diplomacy = { hasMet: (id) => met.some((m) => m.id === id), isAtWarWith: (id) => atWar.includes(id), hasAllied: (id) => allied.includes(id) };
   me.Units = me.Units || { getUnits: () => [] };
   g.DiplomacyProjectStatus = { PROJECT_AVAILABLE: 1, PROJECT_BLOCKED: 2, PROJECT_NO_VIABLE_TARGETS: 3, PROJECT_NOT_UNLOCKED: 4, PROJECT_ACTIVE: 5 };
   g.DiplomacyActionTargetTypes = { NO_DIPLOMACY_TARGET: -1 };
+  g.DiplomacyActionTypes = { DIPLOMACY_ACTION_FORM_ALLIANCE: 769311562, DIPLOMACY_ACTION_DECLARE_WAR: -434781988 };
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, CANCEL_ALLIANCE: 9301 };
   g.DiplomacyActionGroups = { NO_DIPLOMACY_ACTION_GROUP: -1, DIPLOMACY_ACTION_GROUP_TREATY: 4, DIPLOMACY_ACTION_GROUP_SANCTION: 5 };
   const rows = projects ?? [
     { actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", actionDisplayName: "LOC_OPEN_BORDERS", operationType: 555, actionGroup: 4, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 33 }] },
@@ -1422,6 +1548,7 @@ function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: 
   const inner = g.Game.PlayerOperations;
   g.Game.PlayerOperations = {
     canStart: (pid, op, args, show) => {
+      if (op === 9301) { g._log.push(`ccanStart(${pid},${op},${JSON.stringify(args)},${show})`); return { Success: cancelOk && pid === 1 }; }
       if (args && args.Type !== undefined && args.Amount === 1) {
         g._log.push(`dcanStart(${pid},${op},${JSON.stringify(args)},${show})`);
         return { Success: pid === 1 && args[acceptShape] !== undefined };
@@ -1429,7 +1556,13 @@ function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: 
       return inner.canStart(pid, op, args, show);
     },
     sendRequest: (pid, op, args) => {
-      if (args && args.Type !== undefined && args.Amount === 1) { g._log.push(`dsendRequest(${pid},${op},${JSON.stringify(args)})`); me.DiplomacyTreasury = { diplomacyBalance: influence - spend }; return; }
+      if (op === 9301) { g._log.push(`csendRequest(${pid},${op},${JSON.stringify(args)})`); if (alliedAfter !== null) { me.Diplomacy.hasAllied = (id) => alliedAfter.includes(id); } return; }
+      if (args && args.Type !== undefined && args.Amount === 1) {
+        g._log.push(`dsendRequest(${pid},${op},${JSON.stringify(args)})`);
+        me.DiplomacyTreasury = { diplomacyBalance: influence - spend };
+        if (warAfter.length) me.Diplomacy.isAtWarWith = (id) => warAfter.includes(id);
+        return;
+      }
       return inner.sendRequest(pid, op, args);
     },
   };
@@ -1442,18 +1575,24 @@ test("diplomacy offers name each met civilization and the influence each availab
   const log = [];
   const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
   const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
-  assert.deepEqual(dips.map((o) => [o.arg, o.arg2, o.typeKey, o.targetName, o.targetIsMajor, o.cost, o.pre, o.affordable, o.group]),
-    [[0, 9001, "DIPLOMACY_ACTION_OPEN_BORDERS", "LOC_ABBASID", true, 33, 500, true, "TREATY"],
-     [0, 9002, "DIPLOMACY_ACTION_DENOUNCE", "LOC_ABBASID", true, 80, 500, true, "SANCTION"]]);
+  assert.deepEqual(dips.map((o) => [o.arg, o.arg2, o.typeKey, o.targetName, o.cost, o.expect]),
+    [[0, 9001, "DIPLOMACY_ACTION_OPEN_BORDERS", "LOC_ABBASID", 33, "influence"],
+     [0, 9002, "DIPLOMACY_ACTION_DENOUNCE", "LOC_ABBASID", 80, "influence"],
+     [0, 9003, "DIPLOMACY_ACTION_DECLARE_WAR", "LOC_ABBASID", 0, "war"]]);
+  assert.deepEqual(dips.filter((o) => o.expect === "war").map((o) => [o.destructive, o.requiresConfirmation]), [[true, true]]);
+  assert.ok(dips.filter((o) => o.expect === "influence").every((o) => o.destructive === undefined));
   assert.ok(dips.every((o) => o.costYield === "influence" && o.influenceBalance === 500));
   assert.ok(!log.some((e) => e.startsWith("dsendRequest")), "enumeration must never start an action");
 });
 
-test("a free action, a blocked one and an unmet civilization are all withheld", () => {
+test("a free action with no relationship to change, a blocked one and an unmet civilization are all withheld", () => {
   const log = [];
-  const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
-  const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
-  assert.ok(!dips.some((o) => o.arg2 === 9003), "a zero-cost action has no signal to confirm it and is not offered");
+  const free = [{ actionType: 9005, actionTypeName: "DIPLOMACY_ACTION_SOMETHING_FREE", actionDisplayName: "LOC_FREE", operationType: 559, actionGroup: 5, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 0 }] }];
+  const g = withDiplomacy(withUnits(world({ log }), []), { projects: free }); g._log = log;
+  assert.deepEqual(runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION"), [],
+    "a free action that changes no relationship leaves no signal and is not offered");
+  const h = withDiplomacy(withUnits(world({ log: [] }), [])); h._log = [];
+  const dips = runOffers(h).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
   assert.ok(!dips.some((o) => o.arg2 === 9004), "a blocked project is not offered");
   const unmet = withDiplomacy(withUnits(world({ log: [] }), []), { met: [] }); unmet._log = [];
   assert.deepEqual(runOffers(unmet).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION"), []);
@@ -1476,7 +1615,8 @@ test("perform START_DIPLOMATIC_ACTION takes the operation from the engine's own 
   const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, influenceBefore: 500, influence: 467, matches: true });
+  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, influenceBefore: 500, influence: 467,
+    wasAtWar: false, atWar: false, wasAllied: false, allied: false, matches: true });
   const send = log.find((e) => e.startsWith("dsendRequest("));
   assert.ok(send.includes(",555,"), "the operation must be the one the listing gave for that project");
   assert.ok(send.includes('"Type":9001') && send.includes('"Player2":0'));
@@ -1497,7 +1637,6 @@ test("perform START_DIPLOMATIC_ACTION refuses an unmet target, itself, a stale i
     ["influence moved", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9001, 400],
     ["project withdrawn", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9004, 500],
     ["unknown action type", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 4242, 500],
-    ["free action", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9003, 500],
     ["canStart false", () => withDiplomacy(withUnits(world({ log: [] }), []), { acceptShape: "nothing" }), 0, 9001, 500],
   ]) {
     const h = mk(); const l = []; h._log = l;

@@ -16,6 +16,9 @@
   const compose = (key) => { if (typeof key !== "string") return null; try { const s = Locale.compose(key); return typeof s === "string" ? s : key; } catch (e) { return key; } };
   const yieldRows = []; try { for (const y of (GameInfo.Yields || [])) { if (y && isInt(y.$hash) && typeof y.YieldType === "string") yieldRows.push(y); } } catch (e) { /* no yield table in this realm */ }
   const plotYields = (x, y) => { const out = {}; try { for (const row of yieldRows) { const v = GameplayMap.getYield(x, y, row.$hash, BOUND_PLAYER_ID); if (typeof v === "number") out[row.YieldType.replace("YIELD_", "").toLowerCase()] = v; } } catch (e) { /* decorative: a realm without yields still gets offers */ } return out; };
+  // Worker placement yields arrive as a bare array positional over the yield table; without names a
+  // seat cannot tell food from production in it.
+  const namedYields = (arr) => { const out = {}; if (!Array.isArray(arr)) return out; for (let i = 0; i < yieldRows.length && i < arr.length; i++) { const v = arr[i]; if (typeof v === "number" && v !== 0) out[yieldRows[i].YieldType.replace("YIELD_", "").toLowerCase()] = v; } return out; };
   const plotYieldsNonZero = (x, y) => { const all = plotYields(x, y); const out = {}; for (const k of Object.keys(all)) { if (all[k] !== 0) out[k] = all[k]; } return out; };
   const plotIsRiver = (x, y) => { try { return GameplayMap.isRiver(x, y) === true; } catch (e) { return null; } };
   // The game's own minimum-settlement-distance rule for a plot. A plain boolean with no identity,
@@ -374,6 +377,37 @@
           destructive: true, requiresConfirmation: check.RequiresConfirmation === true, warning: warning, canStart: true });
       }
     }
+    // Specialists: a settlement's population worked onto a specific tile. The shipped tile-picker
+    // reads the city's own placement info, skips the blocked plots and sends ASSIGN_WORKER for the
+    // PLOT INDEX (not x/y) as a PLAYER operation, not a city one.
+    if (isInt(PlayerOperationTypes.ASSIGN_WORKER)) {
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || !c.Workers) continue;
+        let info = null; try { info = c.Workers.GetAllPlacementInfo(); } catch (e) { info = null; }
+        if (!Array.isArray(info)) continue;
+        let cityCap = null, cityWorkers = null;
+        try { const v = c.Workers.getCityWorkerCap(); cityCap = isInt(v) ? v : null; } catch (e) { cityCap = null; }
+        try { const v = c.Workers.getNumWorkers(false); cityWorkers = isInt(v) ? v : null; } catch (e) { cityWorkers = null; }
+        for (const slot of info) {
+          if (!slot || slot.IsBlocked === true || !isInt(slot.PlotIndex) || !isInt(slot.NumWorkers)) continue;
+          const workerArgs = { Location: slot.PlotIndex, Amount: 1 };
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ASSIGN_WORKER, workerArgs, false);
+          if (!check || check.Success !== true) continue;
+          const loc = GameplayMap.getLocationFromIndex(slot.PlotIndex);
+          offers.push({ kind: "ASSIGN_WORKER", arg: c.id.id, arg2: slot.PlotIndex, pre: slot.NumWorkers,
+            cityId: c.id.id, cityName: compose(c.name), plotIndex: slot.PlotIndex,
+            x: loc && isInt(loc.x) ? loc.x : null, y: loc && isInt(loc.y) ? loc.y : null,
+            workers: slot.NumWorkers, maxWorkers: isInt(slot.MaxWorkers) ? slot.MaxWorkers : null,
+            cityWorkers: cityWorkers, cityWorkerCap: cityCap,
+            // The engine gives the yields this plot makes now and what it would make with one more
+            // specialist on it, plus the upkeep each way: that difference is the whole decision.
+            yields: namedYields(slot.CurrentYields), yieldsNext: namedYields(slot.NextYields),
+            upkeep: namedYields(slot.CurrentMaintenance), upkeepNext: namedYields(slot.NextMaintenance),
+            terrainKey: loc ? lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") : null,
+            canStart: true });
+        }
+      }
+    }
     // ---- diplomacy
     // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
     // this is the one place the payload looks past the bound player. The scope is exactly the shipped
@@ -406,16 +440,24 @@
           for (const d of data) {
             if (!d || !isInt(d.actionType) || d.projectStatus !== DiplomacyProjectStatus.PROJECT_AVAILABLE) continue;
             const t1 = Array.isArray(d.targetList1) ? d.targetList1.find((t) => t && t.targetID === other.id) : null;
-            // Only the actions influence pays for. The free ones (declaring war, forming an alliance)
-            // leave the treasury untouched, so nothing here could confirm them, and they are withheld.
-            if (!t1 || typeof t1.costYieldD !== "number" || !(t1.costYieldD > 0)) continue;
+            if (!t1 || typeof t1.costYieldD !== "number") continue;
+            // What would prove this happened. Influence-priced actions are confirmed by the treasury
+            // moving; the free ones are confirmed by the relationship itself changing. An action that
+            // is free and changes no relationship has no signal at all, so it is withheld.
+            const name = typeof d.actionTypeName === "string" ? d.actionTypeName : "";
+            const expect = (name === "DIPLOMACY_ACTION_DECLARE_WAR" || name === "DIPLOMACY_ACTION_DECLARE_FORMAL_WAR") ? "war"
+                         : (name === "DIPLOMACY_ACTION_FORM_ALLIANCE") ? "alliance"
+                         : (t1.costYieldD > 0) ? "influence" : null;
+            if (expect === null) continue;
             // The engine's own listing supplies the operation; the seat only ever names the pair.
             const diploArgs = { Amount: 1, Player1: BOUND_PLAYER_ID, Type: d.actionType };
             if (other.major) diploArgs.Player2 = other.id; else diploArgs.ID = other.id;
             const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, d.operationType, diploArgs, false);
             if (!check || check.Success !== true) continue;
             const cost = Math.floor(t1.costYieldD);
-            offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence,
+            offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence, expect: expect,
+              // War is not undone. The shipped map puts a confirmation in front of it too.
+              destructive: expect === "war" || undefined, requiresConfirmation: expect === "war" || undefined,
               typeKey: typeof d.actionTypeName === "string" ? d.actionTypeName : null,
               displayName: typeof d.actionDisplayName === "string" ? compose(d.actionDisplayName) : null,
               targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major,
@@ -423,6 +465,19 @@
               affordable: influence >= cost, canStart: true });
           }
         }
+      }
+    }
+    // Ending an alliance has no project row of its own: the shipped diplomacy panel sends the cancel
+    // operation carrying the alliance action type, once the seat is already allied.
+    if (isInt(PlayerOperationTypes.CANCEL_ALLIANCE) && typeof DiplomacyActionTypes !== "undefined" && isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE)) {
+      for (const other of metPlayers()) {
+        let allied = null; try { allied = player.Diplomacy.hasAllied(other.id); } catch (e) { allied = null; }
+        if (allied !== true) continue;
+        const cancelArgs = { Player1: BOUND_PLAYER_ID, Player2: other.id, Type: DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE };
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CANCEL_ALLIANCE, cancelArgs, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "CANCEL_ALLIANCE", arg: other.id, pre: 1, targetPlayerId: other.id, targetName: other.name,
+          targetIsMajor: other.major, displayName: "End alliance", canStart: true });
       }
     }
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {

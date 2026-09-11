@@ -96,6 +96,8 @@ DECISION_OF_KIND = {
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
     "expand_city": "population",
+    # Working a tile with a specialist is the same settlement-growth decision as expanding onto one.
+    "assign_specialist": "population",
     "activate_tradition": "policies",
     "confirm_traditions": "policies",
     "narrative_choice": "narrative",
@@ -114,6 +116,7 @@ DECISION_OF_KIND = {
     "assign_resource": "resources",
     "consider_resources": "resources",
     "start_diplomatic_action": "diplomacy",
+    "cancel_alliance": "diplomacy",
     "end_turn": "end_turn",
 }
 
@@ -124,7 +127,8 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "destructive", "requiresConfirmation", "warning", "guidance", "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
-                 "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget",
+                 "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
+                 "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",

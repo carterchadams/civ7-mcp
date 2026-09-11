@@ -92,7 +92,7 @@ VETTED_END = "    // END VETTED MET-PLAYER SCOPE\n"
 # past the bound player, and it may take only the three fields below. It is pinned here character for
 # character, so any edit to it -- widening the scope, reading a unit, a city or a yield -- fails the
 # test rather than passing unnoticed.
-VETTED_MET_PLAYER_SCOPE = """    const metPlayers = () => {
+VETTED_MET_PLAYER_SCOPE_OFFERS = """    const metPlayers = () => {
       const out = [];
       try {
         for (const other of Players.getEverAlive()) {
@@ -106,29 +106,41 @@ VETTED_MET_PLAYER_SCOPE = """    const metPlayers = () => {
 """
 
 
-def strip_vetted(source: str) -> str:
+# The read-back's own vetted block. It is narrower still: for each met player it reads two booleans
+# about this seat's relationship with them, which is what confirms a war declared or an alliance
+# formed. No name, no units, no cities, nothing about their state.
+VETTED_MET_PLAYER_SCOPE_READBACK = """    diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true }; } return m; }) : null,
+"""
+
+# Only these two payloads may carry a vetted block, and only with exactly this text.
+VETTED_SCOPES = {"offers.js": VETTED_MET_PLAYER_SCOPE_OFFERS, "readback.js": VETTED_MET_PLAYER_SCOPE_READBACK}
+
+
+def strip_vetted(source: str, name: str | None = None) -> str:
     """Replace the vetted met-player block with blank lines, keeping every other line number intact."""
     start = source.find(VETTED_BEGIN)
     if start == -1:
         return source
     body = start + len(VETTED_BEGIN)
     end = source.index(VETTED_END, body)
-    assert source[body:end] == VETTED_MET_PLAYER_SCOPE, (
-        "the vetted met-player scope has been edited; review it against the diplomacy policy before "
-        "updating VETTED_MET_PLAYER_SCOPE"
+    expected = VETTED_SCOPES.get(name) if name else next((v for v in VETTED_SCOPES.values() if v == source[body:end]), None)
+    assert expected is not None and source[body:end] == expected, (
+        f"the vetted met-player scope in {name or 'this payload'} has been edited; review it against "
+        "the diplomacy policy before updating VETTED_SCOPES"
     )
     return source[:body] + "\n" * source.count("\n", body, end) + source[end:]
 
 
-def test_the_vetted_met_player_scope_is_present_and_unchanged():
-    offers = (PAYLOAD_DIR / "offers.js").read_text(encoding="utf-8")
-    assert VETTED_BEGIN in offers, "offers.js must delimit its met-player scope"
-    strip_vetted(offers)   # asserts the block matches character for character
+@pytest.mark.parametrize("name", sorted(VETTED_SCOPES))
+def test_each_vetted_met_player_scope_is_present_and_unchanged(name):
+    source = (PAYLOAD_DIR / name).read_text(encoding="utf-8")
+    assert VETTED_BEGIN in source, f"{name} must delimit its met-player scope"
+    strip_vetted(source, name)   # asserts the block matches character for character
 
 
-def test_only_offers_js_may_carry_a_vetted_scope():
+def test_no_other_payload_may_carry_a_vetted_scope():
     for payload in PAYLOAD_DIR.iterdir():
-        if payload.name.endswith(".js") and payload.name != "offers.js":
+        if payload.name.endswith(".js") and payload.name not in VETTED_SCOPES:
             assert VETTED_BEGIN not in payload.read_text(encoding="utf-8"), f"{payload.name} may not exempt itself"
 
 

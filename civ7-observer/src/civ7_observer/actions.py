@@ -17,16 +17,26 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-# Shown on every destructive offer and repeated in the refusal when the confirmation is missing. It
-# says what is lost, because a seat weighing the option needs the cost, not a scolding.
-DISBAND_GUIDANCE = (
-    "Disbanding destroys this unit permanently. It is almost never the right move: the unit's "
-    "production and any promotions it earned are gone for nothing, and a unit with no use this turn "
-    "can simply be told to fortify, sleep or heal instead. Disband only to escape a gold or happiness "
-    "upkeep the seat genuinely cannot pay, or to clear a unit that can never act again."
-)
+# Shown on every offer that asks for a confirmation, and repeated in the refusal when one is missing.
+# Each says what the action costs and when it is nonetheless the right call, because a seat weighing
+# the option needs the trade, not a scolding.
+CONFIRMATION_GUIDANCE = {
+    "disband_unit": (
+        "Disbanding destroys this unit permanently. It is almost never the right move: the unit's "
+        "production and any promotions it earned are gone for nothing, and a unit with no use this "
+        "turn can simply be told to fortify, sleep or heal instead. Disband only to escape a gold or "
+        "happiness upkeep the seat genuinely cannot pay, or to clear a unit that can never act again."
+    ),
+    "start_diplomatic_action": (
+        "Declaring war cannot be taken back by this seat alone: peace needs the other civilization to "
+        "agree to it. Expect the relationship, any shared endeavors and any trade routes between you "
+        "to end, and expect to be attacked. It is a real strategic option, not a mistake, but take it "
+        "with a military that can hold what it takes, not on the strength of one good matchup."
+    ),
+}
+DISBAND_GUIDANCE = CONFIRMATION_GUIDANCE["disband_unit"]
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -406,18 +416,35 @@ class ActionRegistry:
                 for k in ("typeKey", "displayName", "tree", "cost", "turns", "currentTarget"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "ASSIGN_WORKER":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "specialist offer without a plot")
+                rec["arg2"] = o["arg2"]
+                for k in ("cityId", "cityName", "plotIndex", "x", "y", "workers", "maxWorkers",
+                          "cityWorkers", "cityWorkerCap", "yields", "yieldsNext", "upkeep", "upkeepNext", "terrainKey"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "DISBAND_UNIT":
                 rec["requiresConfirmation"] = True
                 for k in ("unitId", "unitTypeKey", "from", "destructive", "requiresConfirmation", "warning"):
                     if k in o:
                         entry[k] = o[k]
-                entry["guidance"] = DISBAND_GUIDANCE
+                entry["guidance"] = CONFIRMATION_GUIDANCE["disband_unit"]
             if kind == "START_DIPLOMATIC_ACTION":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "diplomatic offer without an action type")
                 rec["arg2"] = o["arg2"]
+                rec["expect"] = o.get("expect")
                 for k in ("typeKey", "displayName", "targetPlayerId", "targetName", "targetIsMajor",
-                          "group", "cost", "costYield", "influenceBalance", "affordable"):
+                          "group", "cost", "costYield", "influenceBalance", "affordable", "expect",
+                          "destructive", "requiresConfirmation"):
+                    if o.get(k) is not None:
+                        entry[k] = o[k]
+                if o.get("requiresConfirmation"):
+                    rec["requiresConfirmation"] = True
+                    entry["guidance"] = CONFIRMATION_GUIDANCE["start_diplomatic_action"]
+            if kind == "CANCEL_ALLIANCE":
+                for k in ("targetPlayerId", "targetName", "targetIsMajor", "displayName"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "PRODUCE_PROJECT":
@@ -654,17 +681,37 @@ class ActionRegistry:
                     held = rb.get("techTargetNode" if kind == "SET_TECH_TREE_TARGET_NODE" else "civicTargetNode")
                     if isinstance(held, int) and not isinstance(held, bool) and held == offer["arg"]:
                         effect = {"treeGoal": {"kind": PUBLIC_KIND[kind], "node": offer["arg"]}}
+                elif kind == "ASSIGN_WORKER":
+                    plots = rb.get("specialistPlots")
+                    now = plots.get(str(offer["arg2"])) if isinstance(plots, dict) else None
+                    if isinstance(now, int) and not isinstance(now, bool) and now > offer["pre"]:
+                        effect = {"specialistAssigned": {"cityId": offer["arg"], "plotIndex": offer["arg2"], "workers": now}}
                 elif kind == "DISBAND_UNIT":
                     locs = rb.get("unitLocations")
                     if isinstance(locs, dict) and str(offer["arg"]) not in locs:
                         effect = {"unitDisbanded": {"unitId": offer["arg"]}}
                 elif kind == "START_DIPLOMATIC_ACTION":
-                    # Influence, like gold, only moves on a mutation within a turn, so a lighter
-                    # balance is the positive effect. Free actions are never offered for this reason.
+                    # What proves it happened depends on what it does. Influence-priced actions move
+                    # the treasury, which nothing else does within a turn; war and alliance move the
+                    # relationship itself, which is the only signal a free action leaves.
+                    expect = offer.get("expect")
+                    rel = rb.get("diplomaticRelations")
+                    state = rel.get(str(offer["arg"])) if isinstance(rel, dict) else None
                     inf = rb.get("influenceBalance")
-                    if isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
+                    if expect == "war":
+                        if isinstance(state, dict) and state.get("atWar") is True:
+                            effect = {"warDeclared": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"]}}
+                    elif expect == "alliance":
+                        if isinstance(state, dict) and state.get("allied") is True:
+                            effect = {"allianceFormed": {"targetPlayerId": offer["arg"]}}
+                    elif isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
                         effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"],
                                                              "influenceSpent": offer["pre"] - inf}}
+                elif kind == "CANCEL_ALLIANCE":
+                    rel = rb.get("diplomaticRelations")
+                    state = rel.get(str(offer["arg"])) if isinstance(rel, dict) else None
+                    if isinstance(state, dict) and state.get("allied") is False:
+                        effect = {"allianceEnded": {"targetPlayerId": offer["arg"]}}
                 elif kind == "PRODUCE_PROJECT":
                     queues = rb.get("cityQueues")
                     q = queues.get(str(offer["arg"])) if isinstance(queues, dict) else None

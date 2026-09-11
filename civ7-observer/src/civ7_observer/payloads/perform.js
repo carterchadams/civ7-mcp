@@ -258,6 +258,29 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "ASSIGN_WORKER") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "specialist arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    let wcity = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { wcity = c; break; } } } catch (e) { wcity = null; }
+    if (!wcity || !wcity.Workers) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    let placements = null; try { placements = wcity.Workers.GetAllPlacementInfo(); } catch (e) { placements = null; }
+    if (!Array.isArray(placements)) return refuse("API_CONTRACT_MISMATCH", "the settlement's worker placement info is unavailable");
+    let slot = null;
+    for (const q of placements) { if (q && q.PlotIndex === ARG2) { slot = q; break; } }
+    if (!slot) return refuse("UNKNOWN_ACTION", "the plot is not one this settlement can work");
+    if (slot.IsBlocked === true) return refuse("ACTION_NOT_STARTABLE", "the plot is blocked for this settlement");
+    if (slot.NumWorkers !== PRE) return refuse("ACTION_EXPIRED", "the plot's specialists changed since the offer was made");
+    const workerArgs = { Location: ARG2, Amount: 1 };
+    const wcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], workerArgs, false);
+    if (!wcheck || wcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the assignment");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], workerArgs);
+    result.outcome = "sent";
+    let after = null;
+    try { for (const q of wcity.Workers.GetAllPlacementInfo()) { if (q && q.PlotIndex === ARG2) { after = q.NumWorkers; break; } } } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, plotIndex: ARG2, workersBefore: PRE, workers: isInt(after) ? after : null, matches: isInt(after) && after > PRE };
+    return JSON.stringify(result);
+  }
   if (KIND === "DISBAND_UNIT") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "disband argument is not an integer");
     if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.DELETE)) return refuse("API_CONTRACT_MISMATCH", "UnitCommandTypes.DELETE unavailable");
@@ -288,6 +311,8 @@
     if (hasMet !== true) return refuse("UNKNOWN_ACTION", "the target is not a civilization this seat has met");
     let influenceBefore = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceBefore = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceBefore = null; }
     if (influenceBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's influence changed since the action was offered");
+    let wasAtWar = null, wasAllied = null;
+    try { wasAtWar = player.Diplomacy.isAtWarWith(ARG) === true; wasAllied = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { wasAtWar = null; wasAllied = null; }
     // The operation is never named by the caller: it is read back out of the engine's own current
     // listing for this target, and only for a project the engine still reports as available.
     let listing = null;
@@ -297,7 +322,7 @@
     for (const d of listing) { if (d && d.actionType === ARG2 && d.projectStatus === DiplomacyProjectStatus.PROJECT_AVAILABLE) { project = d; break; } }
     if (!project) return refuse("ACTION_EXPIRED", "the action is no longer available against this target");
     const dTarget = Array.isArray(project.targetList1) ? project.targetList1.find((t) => t && t.targetID === ARG) : null;
-    if (!dTarget || typeof dTarget.costYieldD !== "number" || !(dTarget.costYieldD > 0)) return refuse("ACTION_EXPIRED", "the action no longer costs influence against this target");
+    if (!dTarget || typeof dTarget.costYieldD !== "number") return refuse("ACTION_EXPIRED", "the action no longer has a price against this target");
     let diploArgs = null;
     for (const shape of [{ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, Player2: ARG }, { Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, ID: ARG }]) {
       const probe = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false);
@@ -307,7 +332,29 @@
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, project.operationType, diploArgs);
     result.outcome = "sent";
     let influenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceAfter = null; }
-    result.readback = { kind: KIND, arg: ARG, actionType: ARG2, influenceBefore: PRE, influence: influenceAfter, matches: isInt(influenceAfter) && influenceAfter < PRE };
+    let nowAtWar = null, nowAllied = null;
+    try { nowAtWar = player.Diplomacy.isAtWarWith(ARG) === true; nowAllied = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { nowAtWar = null; nowAllied = null; }
+    result.readback = { kind: KIND, arg: ARG, actionType: ARG2, influenceBefore: PRE, influence: influenceAfter,
+      wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied,
+      matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CANCEL_ALLIANCE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "alliance argument is not an integer");
+    if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    if (typeof DiplomacyActionTypes === "undefined" || !isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE)) return refuse("API_CONTRACT_MISMATCH", "the alliance action type is unavailable");
+    let metTarget = null; try { metTarget = player.Diplomacy.hasMet(ARG); } catch (e) { metTarget = null; }
+    if (metTarget !== true) return refuse("UNKNOWN_ACTION", "the target is not a civilization this seat has met");
+    let alliedBefore = null; try { alliedBefore = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { alliedBefore = null; }
+    if (alliedBefore !== true) return refuse("ACTION_EXPIRED", "this seat is not allied with that civilization");
+    const cancelArgs = { Player1: BOUND_PLAYER_ID, Player2: ARG, Type: DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE };
+    const ccheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], cancelArgs, false);
+    if (!ccheck || ccheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused ending the alliance");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], cancelArgs);
+    result.outcome = "sent";
+    let alliedAfter = null; try { alliedAfter = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { alliedAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, wasAllied: true, allied: alliedAfter, matches: alliedAfter === false };
     return JSON.stringify(result);
   }
   if (KIND === "PURCHASE_CONSTRUCTIBLE") {
