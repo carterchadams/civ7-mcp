@@ -84,3 +84,11 @@ def test_the_game_tools_are_the_whole_mcp_surface_and_the_plan_comes_from_the_se
     assert "session.plan_text()" in source
     assert "PLAN.md" in driver.INSTRUCTIONS and "FRICTION.md" in driver.INSTRUCTIONS
     assert "report_friction" not in driver.INSTRUCTIONS and "get_plan" not in driver.INSTRUCTIONS
+
+
+def test_the_driver_injects_operator_directives_read_fresh_each_turn(driver):
+    source = DRIVER.read_text(encoding="utf-8")
+    assert '"--directives"' in source
+    assert "operator_directives(state_dir() / \"sessions\")" in source
+    assert "directives=directives)" in source
+    assert 'summary["directives"] = bool(directives)' in source

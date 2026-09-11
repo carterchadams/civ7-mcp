@@ -194,3 +194,16 @@ def test_a_provider_failure_stops_the_turn_without_acting(tmp_path):
     result = r.play_turn()
     assert result.status == "error" and "provider down" in result.error
     assert not any("sendRequest" in m for sock in f.all_sockets for m in sock.sent)
+
+
+def test_operator_directives_go_in_above_the_contract_the_cards_and_the_plan():
+    from test_brief import RESEARCH, offers_with
+    from civ7_observer.runner import assemble_system_prompt
+    from civ7_observer.brief import build_brief  # noqa: F401  (the brief shape below is what build_brief produces)
+    brief = {"decisions": [{"kind": "research", "required": True}]}
+    system = assemble_system_prompt(brief, "- Reach Writing", directives="- Open a trade route as soon as one is available.")
+    i_dir = system.index("# Operator directives"); i_goal = system.index("Open a trade route")
+    i_contract = system.index("## The turn loop"); i_plan = system.index("# Your plan")
+    assert i_dir < i_goal < i_contract < i_plan
+    assert "take priority over your own plan" in system and "check every turn" in system
+    assert "# Operator directives" not in assemble_system_prompt(brief, "- Reach Writing")

@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 
 from civ7_observer import skills
-from civ7_observer.session import EMPTY_PLAN, SeatSession
+from civ7_observer.session import EMPTY_PLAN, SeatSession, operator_directives
 
 
 def test_prepare_lays_out_the_directory_and_never_touches_the_agents_own_files(tmp_path):
@@ -66,3 +66,15 @@ def test_permission_rules_name_this_directory_only_in_the_clients_absolute_form(
 def test_a_session_needs_a_real_seat_number(tmp_path, bad):
     with pytest.raises(ValueError):
         SeatSession(root=tmp_path, seat=bad)
+
+
+def test_operator_directives_live_above_every_seat_and_are_none_when_absent_or_empty(tmp_path):
+    assert operator_directives(tmp_path) is None
+    (tmp_path / "DIRECTIVES.md").write_text("  \n", encoding="utf-8")
+    assert operator_directives(tmp_path) is None
+    (tmp_path / "DIRECTIVES.md").write_text("- Open a trade route as soon as one is available.\n", encoding="utf-8")
+    assert operator_directives(tmp_path) == "- Open a trade route as soon as one is available."
+    # a seat's own directory never contains it, so a seat cannot edit what it is told
+    s = SeatSession(root=tmp_path, seat=1); s.prepare()
+    assert not (s.dir / "DIRECTIVES.md").exists()
+    assert not str((tmp_path / "DIRECTIVES.md").resolve()).startswith(str(s.dir))

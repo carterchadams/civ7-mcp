@@ -118,3 +118,12 @@ over and nothing else on the machine (path-scoped rules in the client's absolute
 canonical `PLAN.md` there, and the driver injects that file into every prompt. Friction goes into
 `FRICTION.md` as Markdown entries, which the driver collects after each turn. Every skill card is
 copied into `skills/` so the agent can read one without leaving the directory.
+
+## Operator directives
+
+`<state>/sessions/DIRECTIVES.md` belongs to whoever is running the game, sits outside every seat's
+directory so no seat can edit it, and is injected verbatim at the top of every seat's prompt, above
+the contract, the cards and the plan, framed as goals that outrank the seat's own. It is read fresh
+each turn, so an edit takes effect at the next seat without a restart; delete or empty the file to
+withdraw it. Use it to steer what gets exercised, such as opening a trade route the moment one is
+available and checking every turn until then. `--directives PATH` points the driver elsewhere.

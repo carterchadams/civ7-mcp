@@ -16,6 +16,14 @@ directory could read its mind:
         skills/*.md     the skill cards, copied in so the agent can read any of them without leaving
 
 Nothing here is ever read for another seat, and nothing here touches the game.
+
+One file sits above the seat directories and belongs to the operator, not to any seat:
+
+    <root>/DIRECTIVES.md    testing goals every seat is given at the top of every prompt
+
+Seats cannot reach it (it is outside their directory) and the driver injects its text verbatim,
+so an operator can steer what gets exercised, such as "open a trade route as soon as one is
+available", without touching a seat's own plan.
 """
 
 from __future__ import annotations
@@ -25,6 +33,7 @@ from pathlib import Path
 
 from civ7_observer import skills
 
+DIRECTIVES_FILE = "DIRECTIVES.md"
 PLAN_FILE = "PLAN.md"
 FRICTION_FILE = "FRICTION.md"
 SKILLS_DIR = "skills"
@@ -111,3 +120,13 @@ class SeatSession:
         client's absolute-path form; a single leading slash is taken relative to the project and
         silently grants nothing (verified against this client)."""
         return [f"{tool}(//{self.dir}/**)" for tool in ("Read", "Write", "Edit", "Glob", "Grep")]
+
+
+def operator_directives(root: Path) -> str | None:
+    """The operator's standing directives for every seat, or None when the file is absent or empty.
+    Read fresh each turn, so an edit takes effect at the next seat turn without a restart."""
+    path = Path(root) / DIRECTIVES_FILE
+    if not path.exists():
+        return None
+    text = path.read_text(encoding="utf-8").strip()
+    return text or None

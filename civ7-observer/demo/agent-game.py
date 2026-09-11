@@ -31,7 +31,7 @@ from civ7_observer.curtain import tidy
 from civ7_observer.runner import assemble_system_prompt
 from civ7_observer.server import default_journal
 from civ7_observer.service import open_game_session
-from civ7_observer.session import SeatSession
+from civ7_observer.session import SeatSession, operator_directives
 
 PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
@@ -131,7 +131,7 @@ def tidy_curtains(*, raise_curtain: bool) -> dict:
 
 
 def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float, raise_curtain: bool = False,
-              effort: str | None = None) -> dict:
+              effort: str | None = None, directives_path: Path | None = None) -> dict:
     ctx = context()
     turn = ctx["turn"]
     tag = f"t{turn}-seat{seat}"
@@ -154,7 +154,15 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     session.prepare()
     friction_before = len(session.friction_entries())
     journal_before = len(journal_rows(seat))
-    system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir))
+    # The operator's standing testing goals, read fresh each turn so an edit lands at the next seat.
+    directives = None
+    if directives_path is not None:
+        directives = directives_path.read_text(encoding="utf-8").strip() or None if directives_path.exists() else None
+    else:
+        directives = operator_directives(state_dir() / "sessions")
+    summary["directives"] = bool(directives)
+    system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir),
+                                    directives=directives)
     system_path = RUNS / f"{tag}.system.md"
     system_path.write_text(system, encoding="utf-8")
     transcript = RUNS / f"{tag}.transcript.jsonl"
@@ -239,6 +247,8 @@ def main() -> int:
     ap.add_argument("--timeout", type=float, default=1200.0, help="per seat-turn wall clock cap in seconds")
     ap.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max", "default"],
                     help="reasoning effort passed to claude for each seat turn; 'default' omits the flag and takes the client's own setting")
+    ap.add_argument("--directives", type=Path, default=None,
+                    help="operator directives injected at the top of every seat's prompt (default: <state>/sessions/DIRECTIVES.md; read fresh each turn)")
     ap.add_argument("--raise-curtain", action="store_true", help="remove the hotseat curtain before each seat turn so play can be watched (default: only stale curtains are pruned)")
     args = ap.parse_args()
     if args.effort == "default":
@@ -258,12 +268,12 @@ def main() -> int:
         seat = live
         if True:
             res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout,
-                            raise_curtain=args.raise_curtain, effort=args.effort)
+                            raise_curtain=args.raise_curtain, effort=args.effort, directives_path=args.directives)
             played[seat] = played.get(seat, 0) + 1
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
             cur = res.get("curtain") or {}
-            line = (f"[{res['tag']}] {res['status']}"
+            line = (f"[{res['tag']}] {res['status']}" + (" [directives]" if res.get("directives") else "")
                     + (f" (curtains {cur.get('curtainsBefore')}->{cur.get('curtainsAfter')}" + (", advisor popup confirmed" if (cur.get('advisorPopup') or {}).get('confirmed') else "") + ")" if cur and "curtainsBefore" in cur else "")
                     + (f" in {res['elapsedS']}s, ${res.get('costUsd') or 0:.2f}, tools {res['toolCalls']}, receipts "
                        f"{[(r['kind'], r['status']) for r in res['receipts']]}, friction {len(res['friction'])}" if "elapsedS" in res else ""))
