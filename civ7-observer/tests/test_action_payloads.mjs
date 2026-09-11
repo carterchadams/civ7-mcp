@@ -183,11 +183,11 @@ test("perform SKIP_UNIT refuses an id that is not in the bound roster and never 
   assert.ok(!log.some((e) => e.startsWith("usendRequest")));
 });
 
-// ---- unit move (adjacent, known plots only, never an attack)
-function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [] } = {}) {
+// ---- unit move (anywhere the native path reaches this turn, visible plots only, never an attack)
+function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [], nextTurn = [] } = {}) {
   g.GameInfo.Features = table([{ $hash: 55, FeatureType: "FEATURE_FOREST" }]);
   g.GameInfo.Yields = [{ $hash: 619730924, YieldType: "YIELD_FOOD" }, { $hash: -1155936758, YieldType: "YIELD_PRODUCTION" }];
-  g.Units = { getPathTo: (uid, loc) => { g._log.push(`path(${uid.id},${loc.x},${loc.y})`); return unreachable.some(([ux, uy]) => ux === loc.x && uy === loc.y) ? { plots: [], turns: [], obstacles: [] } : { plots: [1, 2], turns: [1, 1], obstacles: [] }; } };
+  g.Units = { getPathTo: (uid, loc) => { g._log.push(`path(${uid.id},${loc.x},${loc.y})`); if (unreachable.some(([ux, uy]) => ux === loc.x && uy === loc.y)) return { plots: [], turns: [], obstacles: [] }; if (nextTurn.some(([ux, uy]) => ux === loc.x && uy === loc.y)) return { plots: [1, 2, 3], turns: [1, 1, 2], obstacles: [] }; return { plots: [1, 2], turns: [1, 1], obstacles: [] }; } };
   g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), SKIP_TURN: 745019656, MOVE_TO: 1477390184 };
   g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
   g.RevealedStates = { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 };
@@ -234,7 +234,7 @@ test("move offers cover everywhere reachable this turn, visible and with a nativ
   assert.ok(!log.some((e) => e.startsWith("usendRequest")));
 });
 
-test("perform MOVE_UNIT sends only for an adjacent known plot after canStart, and reads back the location", () => {
+test("perform MOVE_UNIT sends for any visible plot the native path reaches this turn, and reads back the location", () => {
   const log = [];
   const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
   const r = runPerformArgs(g, "MOVE_UNIT", 5, 11, 10);
@@ -245,9 +245,18 @@ test("perform MOVE_UNIT sends only for an adjacent known plot after canStart, an
   assert.ok(send && send.includes('"X":11,"Y":10,"Modifiers":0'));
 });
 
-test("perform MOVE_UNIT refuses non-adjacent, hidden, unknown-unit and canStart-false targets without sending", () => {
+test("perform MOVE_UNIT accepts a destination several tiles away when the path reaches it this turn", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const r = runPerformArgs(g, "MOVE_UNIT", 5, 13, 13);
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.ok(log.find((e) => e.startsWith("usendRequest(") && e.includes('"X":13,"Y":13')));
+});
+
+test("perform MOVE_UNIT refuses a plot the path reaches only next turn, and hidden, unknown-unit and canStart-false targets without sending", () => {
   for (const [label, mk, uid, x, y] of [
-    ["non-adjacent", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 5, 13, 13],
+    ["arrives next turn", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { nextTurn: [[13, 13]] }), 5, 13, 13],
     ["hidden", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]] }), 5, 11, 10],
     ["unknown unit", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 9, 11, 10],
     ["canStart false", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { moveOk: false }), 5, 11, 10],

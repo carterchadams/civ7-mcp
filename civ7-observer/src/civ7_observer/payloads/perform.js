@@ -77,9 +77,6 @@
     if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
     if (unit.isOnMap !== true || !unit.location || !isInt(unit.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
     if (GameplayMap.getIndexFromXY(unit.location.x, unit.location.y) !== PRE) return refuse("ACTION_EXPIRED", "unit is no longer where it was when the move was offered");
-    let adjacent = false;
-    for (let d = 0; d < 6; d++) { const loc = GameplayMap.getAdjacentPlotLocation(unit.location, d); if (loc && loc.x === ARG2 && loc.y === ARG3) { adjacent = true; break; } }
-    if (!adjacent) return refuse("ACTION_NOT_STARTABLE", "target plot is not adjacent to the unit");
     const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, ARG2, ARG3);
     if (!isInt(state) || state !== RevealedStates.VISIBLE) return refuse("ACTION_NOT_STARTABLE", "target plot is not currently visible to the bound player");
     const unitId = unit.id;
