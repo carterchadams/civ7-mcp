@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -393,6 +393,19 @@ class ActionRegistry:
                         entry[k] = o[k]
             if kind == "SET_AGE_TRANSITION_DATA" and "selectedCivilization" in o:
                 entry["selectedCivilization"] = o["selectedCivilization"]
+            if kind == "PURCHASE_CONSTRUCTIBLE":
+                if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "purchase offer without a constructible and plot")
+                rec["arg2"] = o["arg2"]
+                rec["arg3"] = o["arg3"]
+                for k in ("cityId", "cityName", "constructibleKey", "constructibleClass", "displayName",
+                          "cost", "goldBalance", "affordable", "plotIndex", "placement", "x", "y"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "UPGRADE_TOWN":
+                for k in ("cityId", "cityName", "cost", "goldBalance", "affordable"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "PURCHASE_UNIT":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "purchase offer without a unit type")
@@ -599,6 +612,17 @@ class ActionRegistry:
                     chosen = rb.get("ageTransitionCivilization")
                     if isinstance(chosen, str) and chosen == (readback.get("civilization") if isinstance(readback, dict) else None):
                         effect = {"ageTransitionCivilization": chosen}
+                elif kind == "PURCHASE_CONSTRUCTIBLE":
+                    # Only a mutation moves the treasury within a turn, so a lighter balance is the
+                    # specific effect; the building itself lands on the plot the offer named.
+                    gold = rb.get("goldBalance")
+                    if isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]:
+                        effect = {"constructiblePurchased": {"cityId": offer["arg"], "constructibleType": offer["arg2"],
+                                                            "plotIndex": offer["arg3"], "goldSpent": offer["pre"] - gold}}
+                elif kind == "UPGRADE_TOWN":
+                    flags = rb.get("townFlags")
+                    if isinstance(flags, dict) and flags.get(str(offer["arg"])) is False:
+                        effect = {"townUpgraded": {"cityId": offer["arg"]}}
                 elif kind == "PURCHASE_UNIT":
                     count = rb.get("unitCount")
                     if isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:
@@ -608,10 +632,13 @@ class ActionRegistry:
                     if isinstance(projects, dict) and projects.get(str(offer["arg"])) == offer["arg2"]:
                         effect = {"townProject": {"cityId": offer["arg"], "projectType": offer["arg2"]}}
                 elif kind == "PROMOTE_UNIT":
+                    # The counters do not move, so the confirmation is the promotion itself appearing
+                    # in the unit's held set (live: a Defilade that had really applied read as unknown
+                    # while this matched on getTotalPromotionsEarned, which stayed at four).
                     promos = rb.get("unitPromotions")
                     held = promos.get(str(offer["arg"])) if isinstance(promos, dict) else None
-                    if isinstance(held, int) and not isinstance(held, bool) and held > offer["pre"]:
-                        effect = {"unitPromoted": {"unitId": offer["arg"], "promotion": offer["arg2"], "promotions": held}}
+                    if isinstance(held, list) and offer["arg2"] in held:
+                        effect = {"unitPromoted": {"unitId": offer["arg"], "promotion": offer["arg2"]}}
                 elif kind == "ASSIGN_RESOURCE":
                     assigned = rb.get("resourceAssignments")
                     if isinstance(assigned, dict) and assigned.get(str(offer["arg"])) == offer["arg2"]:

@@ -24,12 +24,16 @@
     tradeRoutes: player ? t(() => player.Trade.countPlayerTradeRoutes()) : null,
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
-    unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Experience) m[String(u.id.id)] = Number.isInteger(u.Experience.getTotalPromotionsEarned) ? u.Experience.getTotalPromotionsEarned : null; } return m; }) : null,
+    // Neither getNumPromotions nor getTotalPromotionsEarned moves when a promotion is taken (both were
+    // tried live and stayed put), so the held set is the only positive signal. hasPromotion takes the
+    // discipline and promotion TYPE STRINGS, not hashes: a hash argument silently answers false.
+    unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (!u || !u.id || !u.Experience || typeof u.Experience.hasPromotion !== "function") continue; const held = []; for (const det of GameInfo.UnitPromotionDisciplineDetails) { if (!det || typeof det.UnitPromotionDisciplineType !== "string" || typeof det.UnitPromotionType !== "string") continue; try { if (u.Experience.hasPromotion(det.UnitPromotionDisciplineType, det.UnitPromotionType) === true) { const h = Database.makeHash(det.UnitPromotionType); if (held.indexOf(h) === -1) held.push(h); } } catch (e) {} } m[String(u.id.id)] = held; } return m; }) : null,
     unitsReadyToMove: player ? t(() => player.Units.getUnits().filter((u) => u.isReadyToMove === true).map((u) => u.id.id)) : null,
     cityQueues: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.getQueue().map((it) => it.type); } return m; }) : null,
     cityProduction: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.currentProductionTypeHash; } return m; }) : null,
     townProjects: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Growth) m[String(c.id.id)] = Number.isInteger(c.Growth.projectType) ? c.Growth.projectType : -1; } return m; }) : null,
     expandPlots: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) { const r = Game.CityCommands.canStart(c.id, CityCommandTypes.EXPAND, {}, false); m[String(c.id.id)] = r && Array.isArray(r.Plots) ? r.Plots : []; } } return m; }) : null,
+    townFlags: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) m[String(c.id.id)] = c.isTown === true; } return m; }) : null,
     cityLocations: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.location) m[String(c.id.id)] = [c.location.x, c.location.y]; } return m; }) : null,
     unitLocations: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.location) m[String(u.id.id)] = [u.location.x, u.location.y]; } return m; }) : null,
     curtainDisplayed: t(() => typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null)

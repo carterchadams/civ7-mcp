@@ -261,6 +261,50 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "PURCHASE_CONSTRUCTIBLE") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "purchase arguments are not integers");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.PURCHASE)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.PURCHASE unavailable");
+    let bcity = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { bcity = c; break; } } } catch (e) { bcity = null; }
+    if (!bcity) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const crow = GameInfo.Constructibles.lookup(ARG2);
+    if (!crow || typeof crow.ConstructibleType !== "string") return refuse("UNKNOWN_ACTION", "constructible type is not a constructible definition");
+    const cloc = GameplayMap.getLocationFromIndex(ARG3);
+    if (!cloc || !isInt(cloc.x) || !isInt(cloc.y) || cloc.x < 0) return refuse("UNKNOWN_ACTION", "plot index does not resolve to a plot");
+    // Gold is the precondition here: a purchase that went through is one the treasury paid for, and
+    // the treasury only moves on a mutation, so an unchanged balance means nothing happened.
+    let goldBefore = null; try { const g = player.Treasury.goldBalance; goldBefore = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldBefore = null; }
+    if (goldBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's treasury changed since the purchase was offered");
+    const bCityId = bcity.id;
+    const cbuyArgs = { ConstructibleType: ARG2, X: cloc.x, Y: cloc.y };
+    const cbcheck = Game.CityCommands.canStart(bCityId, CityCommandTypes.PURCHASE, cbuyArgs, false);
+    if (!cbcheck || cbcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the purchase");
+    Game.CityCommands.sendRequest(bCityId, CityCommandTypes.PURCHASE, cbuyArgs);
+    result.outcome = "sent";
+    let goldAfter = null; try { const g = player.Treasury.goldBalance; goldAfter = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plotIndex: ARG3, goldBefore: PRE, gold: goldAfter, matches: isInt(goldAfter) && goldAfter < PRE };
+    return JSON.stringify(result);
+  }
+  if (KIND === "UPGRADE_TOWN") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "upgrade argument is not an integer");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.PURCHASE)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.PURCHASE unavailable");
+    if (typeof OrderTypes === "undefined" || !isInt(OrderTypes.ORDER_TOWN_UPGRADE)) return refuse("API_CONTRACT_MISMATCH", "OrderTypes.ORDER_TOWN_UPGRADE unavailable");
+    let town = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { town = c; break; } } } catch (e) { town = null; }
+    if (!town) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    if (town.isTown !== true) return refuse("ACTION_EXPIRED", "the settlement is already a city");
+    let upGoldBefore = null; try { const g = player.Treasury.goldBalance; upGoldBefore = typeof g === "number" ? Math.floor(g) : null; } catch (e) { upGoldBefore = null; }
+    if (upGoldBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's treasury changed since the upgrade was offered");
+    const townId = town.id;
+    const upArgs = { Directive: OrderTypes.ORDER_TOWN_UPGRADE };
+    const upcheck = Game.CityCommands.canStart(townId, CityCommandTypes.PURCHASE, upArgs, false);
+    if (!upcheck || upcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the upgrade");
+    Game.CityCommands.sendRequest(townId, CityCommandTypes.PURCHASE, upArgs);
+    result.outcome = "sent";
+    let stillTown = null; try { stillTown = town.isTown === true; } catch (e) { stillTown = null; }
+    result.readback = { kind: KIND, arg: ARG, wasTown: true, isTown: stillTown, matches: stillTown === false };
+    return JSON.stringify(result);
+  }
   if (KIND === "PURCHASE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "purchase arguments are not integers");
     if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.PURCHASE)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.PURCHASE unavailable");

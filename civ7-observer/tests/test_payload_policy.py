@@ -55,6 +55,12 @@ MUTATION_ALLOWLIST = (
     'Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs)',
     'Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs)',
+    # buying a building: same command, but the placement plot rides along with the constructible
+    'Game.CityCommands.canStart(bCityId, CityCommandTypes.PURCHASE, cbuyArgs, false)',
+    'Game.CityCommands.sendRequest(bCityId, CityCommandTypes.PURCHASE, cbuyArgs)',
+    # promoting a town to a city: the same command carries the upgrade directive instead of a thing to buy
+    'Game.CityCommands.canStart(townId, CityCommandTypes.PURCHASE, upArgs, false)',
+    'Game.CityCommands.sendRequest(townId, CityCommandTypes.PURCHASE, upArgs)',
     'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
     # taking a legacy card takes its reward in the same action: the engine never reports an effect as spent
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)',
