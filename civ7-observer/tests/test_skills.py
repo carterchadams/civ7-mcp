@@ -36,6 +36,7 @@ def test_local_friction_card_is_available_and_not_generated():
     (["settle"], ["civ7-turn-management", "civ7-settlement-sites"]),
     (["population"], ["civ7-turn-management", "civ7-growth-and-specialists"]),
     (["policies"], ["civ7-turn-management", "civ7-happiness-and-government"]),
+    (["crisis"], ["civ7-turn-management", "civ7-ages-and-crises"]),
     (["narrative"], ["civ7-turn-management"]),
     (["pantheon"], ["civ7-turn-management", "civ7-religion-and-great-works"]),
     (["government"], ["civ7-turn-management", "civ7-happiness-and-government"]),

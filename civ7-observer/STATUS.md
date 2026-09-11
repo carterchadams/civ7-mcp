@@ -107,7 +107,7 @@ forward reload is not detected; after any load the host must be rebound explicit
    watches for a seat's turn or drives the hotseat curtain (agent seats play under it).
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
-3. The action catalog covers 22 of the game's decision kinds (pantheon and unit promotion not yet observed live); see `../plans/civ7-player-actions.md`
+3. The action catalog covers 23 of the game's decision kinds (pantheon and unit promotion not yet observed live); see `../plans/civ7-player-actions.md`
    (untracked) for the full inventory and `docs/action-contract.md` for what is implemented.
 4. Concealment behind the stock hotseat curtain is verified for consecutive agent seats (a 4-seat
    all-agent game); blocking popups, diplomacy and disconnect are not.

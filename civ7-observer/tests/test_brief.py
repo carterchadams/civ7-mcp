@@ -276,3 +276,20 @@ def test_town_project_notification_is_a_supported_decision(tmp_path):
     assert b["pause"] is None
     d = next(d for d in b["decisions"] if d["kind"] == "town_project")
     assert d["required"] is True and d["options"][0]["displayName"] == "Fort Town"
+
+
+def test_crisis_cards_answer_the_crisis_blocker_and_ordinary_cards_stay_in_policies(tmp_path):
+    """Live (turn 66): NOTIFICATION_CRISIS blocked with three activatable crisis cards already offered."""
+    cards = [
+        {"kind": "CHANGE_TRADITION", "arg": 11, "arg2": 9001, "pre": 0, "slot": "CRISIS_CULTURE_SLOT", "slotsTotal": 2, "slotsFree": 2, "slotsFreeAny": 14, "typeKey": "TRADITION_INCOMPETENT_MINISTERS", "displayName": "Incompetent Ministers", "description": "d", "isCrisis": True, "canStart": True},
+        {"kind": "CHANGE_TRADITION", "arg": 12, "arg2": 9002, "pre": 0, "slot": "POLICY_CULTURE_SLOT", "slotsTotal": 17, "slotsFree": 12, "slotsFreeAny": 14, "typeKey": "TRADITION_HONOR", "displayName": "Honor", "description": "d", "isCrisis": False, "canStart": True},
+        {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "slotsFreeAny": 14, "activatable": 2, "canStart": False},
+    ]
+    payload = offers_with(cards, end_can_start=False, blocking="CRISIS")
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    kinds = {d["kind"]: d for d in b["decisions"]}
+    assert kinds["crisis"]["required"] is True
+    assert [o["displayName"] for o in kinds["crisis"]["options"]] == ["Incompetent Ministers"]
+    assert [o["displayName"] for o in kinds["policies"]["options"]] == ["Honor"]
+    assert kinds["crisis"]["options"][0]["isCrisis"] is True

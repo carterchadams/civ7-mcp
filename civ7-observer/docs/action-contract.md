@@ -179,3 +179,14 @@ Live (turn 43): every `CityOperations BUILD {ProjectType}` was refused for a tow
 city, while `CityCommands CHANGE_GROWTH_MODE {Type: GrowthTypes.PROJECT, ProjectType, City}` was
 accepted for the town. `GrowthTypes` on this build: INVALID 0, EXPAND -1126871330, MIGRATE 1308026452,
 PROJECT -284569333. Eleven projects were offered for one town the first time the blocker appeared.
+
+## Lesson: a crisis is answered with the ordinary tradition operation
+
+Live (turn 66): `NOTIFICATION_CRISIS` blocked the turn with three activatable cards in the crisis
+culture slot. Crisis cards are `GameInfo.Traditions` rows with `IsCrisis` true and are activated by
+the same `CHANGE_TRADITION` operation as any policy, so no new engine call was needed: the blocker
+simply had no mapping, and the brief now routes cards by their `isCrisis` flag so a crisis decision
+is answered with crisis cards and ordinary policies stay separate.
+
+The traditions confirm is gated **per slot type**, not globally: that seat had 14 free slots overall
+but only crisis cards pending, and a global gate would have held the confirm back forever.

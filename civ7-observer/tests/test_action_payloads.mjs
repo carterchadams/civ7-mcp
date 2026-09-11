@@ -51,7 +51,7 @@ test("offers enumerate research/civic choices with native canStart and an end-tu
   const log = [];
   const r = runOffers(world({ log }));
   assert.equal(r.refused, null);
-  assert.deepEqual(r.context, { turn: 10, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789", blockingNotifications: [] });
+  assert.deepEqual(r.context, { turn: 10, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789", blockingNotifications: [], unitIds: null });
   assert.ok(r.offers.every((o) => typeof o.pre === "number"));
   const research = r.offers.filter((o) => o.kind === "SET_TECH_TREE_NODE");
   assert.deepEqual(research.map((o) => [o.arg, o.typeKey, o.displayName, o.tree, o.cost, o.turns, o.canStart]), [[701, "NODE_TECH_AQ_POTTERY", "Pottery", "TREE_TECHS_AQ", 60, 4, true], [702, "NODE_TECH_AQ_WRITING", "Writing", "TREE_TECHS_AQ", 100, 7, true]]);
@@ -1187,4 +1187,33 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   const rr = runPerformArgs(none, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
   assert.equal(rr.outcome, "sent");
   assert.equal(rr.readback.matches, false);
+});
+
+test("the traditions confirm is gated per slot type, so a free slot elsewhere does not hold it back", () => {
+  const log = [];
+  // two crisis slots free with crisis cards pending, and plenty of free ordinary slots with none
+  const g = withTraditions(world({ log, blocking: true })); g._log = log;
+  const cu = g.Players.get(1).Culture;
+  const rows = [{ $hash: 9001, $index: 11, TraditionType: "TRADITION_CRISIS_A", CultureSlotType: "CRISIS_CULTURE_SLOT", Name: "LOC_CA", Description: "LOC_CA_D", IsCrisis: true }];
+  g.GameInfo.Traditions = table(rows);
+  cu.getNumCultureSlots = (st) => (st === 3 ? 2 : st === 2 ? 17 : 0);
+  cu.getNumAllCultureSlots = () => 19;
+  cu.getUnlockedTraditions = (st) => (st === 3 ? [9001] : []);
+  cu.getActiveTraditions = () => [];
+  cu.isTraditionActive = () => false;
+  g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 4, type: 20 }];
+  g.Game.Notifications.find = () => ({ Type: 9, BlocksTurnAdvancement: true });
+  g.Game.Notifications.getTypeName = () => "NOTIFICATION_CRISIS";
+  const r = runOffers(g);
+  const card = r.offers.find((o) => o.kind === "CHANGE_TRADITION");
+  assert.equal(card.isCrisis, true);
+  const confirm = r.offers.find((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS");
+  assert.ok(confirm, "the crisis notification offers the confirm too");
+  assert.equal(confirm.canStart, false, "a free crisis slot with a pending crisis card holds the confirm back");
+  assert.deepEqual(confirm.pendingBySlot, { CRISIS_CULTURE_SLOT: 1 });
+});
+
+test("the offers context lists the seat's own unit ids", () => {
+  const g = withUnits(world({ log: [] }), [unit(5), unit(6)]); g._log = [];
+  assert.deepEqual(runOffers(g).context.unitIds, [5, 6]);
 });

@@ -63,6 +63,7 @@
     const blockingNotifications = [];
     try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ }
     result.context.blockingNotifications = blockingNotifications;
+    try { result.context.unitIds = player.Units.getUnits().filter((u) => u && u.id && isInt(u.id.id)).map((u) => u.id.id); } catch (e) { result.context.unitIds = null; }
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
     for (const [kind, comp] of kinds) {
       if (!comp || typeof comp.getAllAvailableNodeTypes !== "function") throw new Error(kind + " component unavailable");
@@ -309,6 +310,10 @@
       let allSlots = null, allActive = 0; try { allSlots = cu.getNumAllCultureSlots(); for (const k of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) { const st0 = CultureSlotTypes[k]; if (isInt(st0)) allActive += cu.getActiveTraditions(st0).length; } } catch (e) { allSlots = null; }
       const slotsFreeAny = isInt(allSlots) ? allSlots - allActive : null;
       let activatable = 0;
+      // Per slot type: a free crisis slot with an activatable crisis card is what keeps the crisis
+      // notification up, and the same for ordinary policies. A global count would gate the confirm
+      // forever once any slot anywhere is free (live: 14 free slots with only crisis cards pending).
+      const pending = {};
       for (const slotName of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) {
         const st = CultureSlotTypes[slotName];
         if (!isInt(st)) continue;
@@ -320,17 +325,25 @@
           if (!row || !isInt(row.$index) || cu.isTraditionActive(hash) === true) continue;
           const targs = { TraditionType: row.$index, Action: PlayerOperationParameters.Activate };
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_TRADITION, targs, false);
-          if (check && check.Success === true) activatable += 1;
+          if (check && check.Success === true) { activatable += 1; pending[slotName] = (pending[slotName] || 0) + 1; }
           offers.push({ kind: "CHANGE_TRADITION", arg: row.$index, arg2: hash, pre: active.length, slot: slotName, slotsTotal: total, slotsFree: total - active.length, slotsFreeAny: slotsFreeAny,
-            typeKey: typeof row.TraditionType === "string" ? row.TraditionType : null, displayName: compose(row.Name), description: compose(row.Description), canStart: !!(check && check.Success === true) });
+            typeKey: typeof row.TraditionType === "string" ? row.TraditionType : null, displayName: compose(row.Name), description: compose(row.Description),
+            isCrisis: row.IsCrisis === true, canStart: !!(check && check.Success === true) });
         }
       }
-      if (blocked && (blockerName(blockingType) === "TRADITIONS" || blockingNotifications.indexOf("NOTIFICATION_TRADITIONS_AVAILABLE") !== -1) && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
+      const traditionsBlocking = blocked && (blockerName(blockingType) === "TRADITIONS" || blockingNotifications.indexOf("NOTIFICATION_TRADITIONS_AVAILABLE") !== -1 || blockingNotifications.indexOf("NOTIFICATION_CRISIS") !== -1);
+      if (traditionsBlocking && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS, {}, false);
         // live (twice): confirming with a free slot and an activatable card leaves the notification in place,
         // so the confirm is only startable once no card can be slotted
-        const slotToFill = isInt(slotsFreeAny) && slotsFreeAny > 0 && activatable > 0;
-        offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) && !slotToFill, slotsFreeAny: slotsFreeAny, activatable: activatable });
+        let slotToFill = false;
+        for (const slotName of Object.keys(pending)) {
+          const st1 = CultureSlotTypes[slotName];
+          if (!isInt(st1)) continue;
+          const free = cu.getNumCultureSlots(st1) - cu.getActiveTraditions(st1).length;
+          if (free > 0 && pending[slotName] > 0) { slotToFill = true; break; }
+        }
+        offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) && !slotToFill, slotsFreeAny: slotsFreeAny, activatable: activatable, pendingBySlot: pending });
       }
     }
     if (isInt(PlayerOperationTypes.BUY_ATTRIBUTE_TREE_NODE) && player.Identity && typeof player.Identity.getAvailableAttributePoints === "function" && GameInfo.Attributes && typeof GameInfo.Attributes[Symbol.iterator] === "function") {

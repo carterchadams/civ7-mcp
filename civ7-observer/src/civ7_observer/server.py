@@ -237,8 +237,17 @@ def build_server(
         if isinstance(listing.get("attachment"), dict):
             last["attachment"] = listing["attachment"]
         options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
-        return {"unitId": unit_id, "attachment": listing["attachment"], "count": len(options), "options": options,
-                "reconciliationRequired": listing["reconciliationRequired"]}
+        roster = listing.get("unitIds")
+        # A unit can leave the roster between turns (destroyed, disbanded, converted). Say so, rather
+        # than returning an empty list that reads the same as "no legal actions right now".
+        present = (unit_id in roster) if isinstance(roster, list) else None
+        note = None
+        if present is False:
+            note = "this unit is no longer in the seat's roster; it was lost, disbanded or converted since it was last seen"
+        elif present is True and not options:
+            note = "this unit is still yours but has no legal action this turn"
+        return {"unitId": unit_id, "present": present, "note": note, "attachment": listing["attachment"],
+                "count": len(options), "options": options, "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="get_city_options", description=CITY_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
     def get_city_options(city_id: int) -> dict[str, Any]:

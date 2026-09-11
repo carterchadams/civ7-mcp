@@ -209,7 +209,9 @@ class Runner:
                     return {"error": {"code": "INVALID_ARGUMENT", "message": "unit_id must be an integer"}}
                 listing = self._session(lambda gs: self.registry.list_offers(gs, player=self.player, mode=self.mode))
                 options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
-                return {"unitId": unit_id, "count": len(options), "options": options}
+                roster = listing.get("unitIds")
+                present = (unit_id in roster) if isinstance(roster, list) else None
+                return {"unitId": unit_id, "present": present, "count": len(options), "options": options}
             if name == "get_city_options":
                 city_id = args.get("city_id")
                 if isinstance(city_id, bool) or not isinstance(city_id, int):

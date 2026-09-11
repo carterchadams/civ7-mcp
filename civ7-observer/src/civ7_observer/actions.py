@@ -391,14 +391,14 @@ class ActionRegistry:
                     if k in o:
                         entry[k] = o[k]
             if kind == "CONSIDER_ASSIGN_TRADITIONS":
-                for k in ("slotsFreeAny", "activatable"):
+                for k in ("slotsFreeAny", "activatable", "pendingBySlot"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "CHANGE_TRADITION":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "tradition offer without a type hash")
                 rec["arg2"] = o["arg2"]
-                for k in ("slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description"):
+                for k in ("slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description", "isCrisis"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "PRODUCE_UNIT":
@@ -416,8 +416,10 @@ class ActionRegistry:
         # offers from earlier turns or other matches can never be performed; drop them so the file stays small
         self._offers = {k: v for k, v in self._offers.items() if (v.get("turn"), v.get("age"), v.get("match"), v.get("generation")) == (gs.context.turn, gs.context.age, gs.context.game_guid, generation)}
         self._save_offers()
+        unit_ids = ctx.get("unitIds")
         attachment = {"match": gs.context.game_guid, "generation": generation, "seat": player, "turn": gs.context.turn, "age": gs.context.age}
-        return {"context": ctx, "offers": public, "generation": generation, "reattached": reattached, "attachment": attachment, "reconciliationRequired": self.needs_reconciliation()}
+        return {"context": ctx, "offers": public, "generation": generation, "reattached": reattached, "attachment": attachment,
+                "unitIds": unit_ids if isinstance(unit_ids, list) else None, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform
     def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str) -> dict[str, Any]:

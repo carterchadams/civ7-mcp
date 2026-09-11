@@ -26,6 +26,8 @@ BLOCKER_DECISION = {
     "STACKED_UNITS": "unit",
     "NEW_POPULATION": "population",
     "TRADITIONS": "policies",
+    "CRISIS": "crisis",
+    "NOTIFICATION_CRISIS": "crisis",
     "PANTHEON": "pantheon",
     "CONSIDER_GOVERNMENT_CHANGE": "government",
     "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
@@ -85,7 +87,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
-                 "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
+                 "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
@@ -108,6 +110,17 @@ BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the en
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "
                         "appears; call get_unit_options with its unitId to see where it can go. Each move option carries "
                         "tooCloseToSettle: head for plots where it is false.")
+
+
+def _decision_of(offer: dict[str, Any], required: list[str]) -> str | None:
+    """Which decision an offer belongs to. Crisis policy cards are the same engine operation as
+    ordinary ones but answer a different blocker, so they are routed by their own flag."""
+    kind = offer["kind"]
+    if kind == "activate_tradition":
+        return "crisis" if offer.get("isCrisis") else "policies"
+    if kind == "confirm_traditions":
+        return "crisis" if "crisis" in required else "policies"
+    return DECISION_OF_KIND.get(kind)
 
 
 def _option(offer: dict[str, Any]) -> dict[str, Any]:
@@ -191,14 +204,14 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
                                               "tooCloseToSettle": offer.get("tooCloseToSettle")})
                     group["note"] = BLOCKED_SETTLER_NOTE
             continue
-        decision = DECISION_OF_KIND.get(offer["kind"])
+        decision = _decision_of(offer, required)
         if decision is None:
             continue
         group = group_for(decision)
         group.setdefault("_buckets", {}).setdefault(bucket_of(offer), []).append(offer)
         if decision == "production":
             group["note"] = PRODUCTION_NOTE
-        if decision == "policies":
+        if decision in ("policies", "crisis"):
             group["note"] = POLICIES_NOTE
         if decision == "attributes":
             group["note"] = ATTRIBUTES_NOTE

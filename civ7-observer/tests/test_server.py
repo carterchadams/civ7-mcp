@@ -274,3 +274,19 @@ def test_get_city_options_returns_only_that_settlements_offers(tmp_path):
     out = tool(s, "get_city_options").fn(city_id=65536)
     assert out["cityId"] == 65536 and out["count"] == 1 and out["options"][0]["cityName"] == "Tokyo"
     assert tool(s, "get_city_options").fn(city_id=None)["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_get_unit_options_says_when_a_unit_has_left_the_roster(tmp_path):
+    """Live friction (turn 66): a tracked settler vanished and an empty option list read the same as
+    'nothing to do', so the seat could not tell it had been lost."""
+    from test_brief import UNITS, offers_with
+    ctx = json.dumps(GAME)
+    payload = offers_with(UNITS, end_can_start=False, blocking="UNITS")
+    payload["context"] = {**payload["context"], "unitIds": [5, 7]}
+    scripts = {"a": [reply(1, ctx), reply(1, ctx), reply(2, json.dumps(payload)), reply(3, ctx),
+                     reply(1, ctx), reply(1, ctx), reply(2, json.dumps(payload)), reply(3, ctx)]}
+    s, _ = make_acting(scripts, journal=tmp_path / "j.jsonl")
+    gone = tool(s, "get_unit_options").fn(unit_id=99)
+    assert gone["present"] is False and gone["count"] == 0 and "no longer in the seat's roster" in gone["note"]
+    idle = tool(s, "get_unit_options").fn(unit_id=7)
+    assert idle["present"] is True and idle["count"] == 0 and "no legal action this turn" in idle["note"]
