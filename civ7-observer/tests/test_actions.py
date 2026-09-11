@@ -687,3 +687,80 @@ def test_attachment_is_reported_with_offers(tmp_path):
     with gs:
         offers = reg.list_offers(gs, player=1, mode="singleplayer")
     assert offers["attachment"] == {"match": "ABCDEF0123456789", "generation": offers["generation"], "seat": 1, "turn": 12, "age": 4242}
+
+
+# ---- scenario test: the whole lifecycle in one sequence, asserting the invariants
+
+def test_scenario_observe_offer_act_crash_other_seat_recover(tmp_path):
+    """observe -> offer -> dispatch -> crash -> another seat blocked -> reconcile -> resume.
+
+    Invariants asserted throughout: no dispatch while any write is unresolved; no
+    stale-generation mutation; a duplicate request never repeats a write.
+    """
+    import websocket
+    seat1 = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    seat0 = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+
+    def dispatched(factory):
+        return [m for sock in factory.all_sockets for m in sock.sent if "sendRequest" in m or "sendTurnComplete" in m]
+
+    # 1. seat 1 lists offers and dispatches; the connection dies before an outcome is known
+    gs, f1 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), websocket.WebSocketConnectionClosedException()]})
+    with gs:
+        offers = seat1.list_offers(gs, player=1, mode="singleplayer")
+        assert offers["reconciliationRequired"] == []
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        with pytest.raises(service.ObserverError) as ei:
+            seat1.perform(gs, action_id=pottery["actionId"], request_id="s-1", player=1, mode="singleplayer")
+    assert ei.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+    # 2. a different seat's registry, never having opened seat 1's journal, is blocked
+    fresh = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs2:
+        out = fresh.list_offers(gs2, player=1, mode="singleplayer")
+        assert "s-1" in out["reconciliationRequired"]
+        with pytest.raises(service.ObserverError) as e2:
+            fresh.perform(gs2, action_id=out["offers"][0]["actionId"], request_id="s-2", player=1, mode="singleplayer")
+    assert e2.value.code == "RECONCILIATION_REQUIRED"
+    assert dispatched(f2) == [], "no dispatch while any write is unresolved"
+
+    # 3. the human verifies and reconciles; the barrier clears for every seat
+    fresh.reconcile("s-1", "rejected", note="human checked the research panel: unchanged")
+    assert fresh.needs_reconciliation() == [] and seat0.needs_reconciliation() == []
+
+    # 4. a save is loaded that the game cannot signal: explicit rebind kills old offers
+    seat1.rebind(match="ABCDEF0123456789", note="loaded an alternate save at the same turn")
+    gs3, f3 = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs3, pytest.raises(service.ObserverError) as e3:
+        seat1.perform(gs3, action_id=pottery["actionId"], request_id="s-3", player=1, mode="singleplayer")
+    assert e3.value.code in ("ACTION_EXPIRED", "UNKNOWN_ACTION")
+    assert dispatched(f3) == [], "no stale-generation mutation"
+
+    # 5. fresh offers under the new generation work, and a duplicate request never repeats the write
+    gs4, f4 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(PERFORMED)), ctx_reply(5)]})
+    with gs4:
+        offers4 = seat1.list_offers(gs4, player=1, mode="singleplayer")
+        pottery4 = next(o for o in offers4["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        first = seat1.perform(gs4, action_id=pottery4["actionId"], request_id="s-4", player=1, mode="singleplayer")
+        again = seat1.perform(gs4, action_id=pottery4["actionId"], request_id="s-4", player=1, mode="singleplayer")
+    assert first["status"] == "confirmed" and again == first
+    assert len(dispatched(f4)) == 1, "a duplicate request must never repeat the write"
+    assert json.loads(seat1.inflight_path.read_text()) == {}, "no reservation may outlive a recorded outcome"
+
+
+def test_reconciling_from_another_seat_clears_the_owning_seat_view(tmp_path):
+    import websocket
+    owner = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), websocket.WebSocketConnectionClosedException()]})
+    with gs:
+        offers = owner.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        with pytest.raises(service.ObserverError):
+            owner.perform(gs, action_id=pottery["actionId"], request_id="own-1", player=1, mode="singleplayer")
+    other = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    other.reconcile("own-1", "rejected", note="human verified from the other seat")
+    assert other.needs_reconciliation() == []
+    reopened = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    assert reopened.needs_reconciliation() == [], "the owning seat must not still report an unknown outcome"
+    assert reopened.get_result("own-1")["status"] == "rejected"

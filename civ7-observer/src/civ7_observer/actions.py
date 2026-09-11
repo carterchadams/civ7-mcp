@@ -243,9 +243,17 @@ class ActionRegistry:
             prior = {"requestId": request_id, **shared, "status": "unknown", "note": "recovered from game-wide state; owner journal not available"}
         if prior["status"] != "unknown":
             raise ValueError(f"request {request_id!r} is not awaiting reconciliation")
-        entry = {**prior, "status": status, "reconciled": True, "note": note, "at": _now()}
+        entry = {k: v for k, v in prior.items() if k != "journal"}
+        entry = {**entry, "status": status, "reconciled": True, "note": note, "at": _now()}
         self._results[request_id] = entry
+        # The outcome belongs to the seat that made the request: write it to that seat's journal,
+        # so its own view stops reporting an unknown outcome after someone else reconciles.
+        owner = (self._read_shared(self.inflight_path).get(request_id) or self._read_shared(self.unresolved_path).get(request_id) or {}).get("journal")
         self._journal(entry)
+        if owner and Path(owner) != self.journal_path:
+            Path(owner).parent.mkdir(parents=True, exist_ok=True)
+            with open(owner, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry) + "\n")
         self._clear_unresolved(request_id)
         self._release_inflight(request_id)
 
