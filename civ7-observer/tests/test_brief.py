@@ -304,3 +304,14 @@ def test_choose_civilization_is_a_supported_age_transition_decision(tmp_path):
     assert b["pause"] is None
     d = next(d for d in b["decisions"] if d["kind"] == "age_transition")
     assert d["required"] is True and d["options"][0]["historical"] is True and "one-way" in d["note"]
+
+
+def test_age_transition_notification_in_the_new_age_is_the_legacies_decision(tmp_path):
+    lg = [{"kind": "ADVANCED_START_MODIFY_DECK", "arg": 1875644328, "pre": 0, "cardId": "CARD_AT_EX_DEFAULT_1", "displayName": "Umm al-belad", "description": "2 merchants", "cost": 1, "pointsAvailable": 3, "needsPlacement": False, "canStart": True},
+          {"kind": "ADVANCED_START_MARK_COMPLETED", "arg": 0, "pre": 0, "deck": [], "pointsAvailable": 3, "unappliedEffects": 0, "canStart": True}]
+    payload = offers_with(lg, end_can_start=False, blocking="NOTIFICATION_CHOOSE_CITY_PRODUCTION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_AGE_TRANSITION"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "legacies")
+    assert d["required"] is True and d["options"][0]["pointsAvailable"] == 3 and "forfeits unspent" in d["note"]

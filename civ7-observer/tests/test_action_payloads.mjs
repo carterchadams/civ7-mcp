@@ -1312,3 +1312,63 @@ test("a notification whose own blocking field went stale is not counted once the
   assert.deepEqual(r.context.blockingNotifications, ["NOTIFICATION_COMMAND_UNITS"]);
   assert.equal(r.offers.filter((o) => o.kind === "CHOOSE_AGE_CIVILIZATION" || o.kind === "SET_AGE_TRANSITION_DATA").length, 0, "the transition is not offered again once satisfied");
 });
+
+// ---- new-age legacy cards
+function withLegacies(g, { deck = [], points = 3, usable = true, placement = false } = {}) {
+  const me = g.Players.get(1);
+  const cards = [
+    { id: "CARD_A", name: "LOC_CA", description: "LOC_CA_D", cost: [{ category: 1, value: 1 }], effects: [{ id: "EFF_A", amount: 1, isPlacementEffect: false }] },
+    { id: "CARD_B", name: "LOC_CB", description: "LOC_CB_D", cost: [{ category: 1, value: 2 }], effects: [{ id: "EFF_B", amount: 1, isPlacementEffect: placement }] },
+  ];
+  let inDeck = deck.slice(); const applied = {};
+  me.AdvancedStart = { getAvailableCards: () => cards, getCards: () => cards.filter((c) => inDeck.includes(c.id)), getLegacyPoints: () => [{ category: 1, value: points }] };
+  g.Database = { makeHash: (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0; return h; } };
+  g.PlayerOperationTypes.ADVANCED_START_MODIFY_DECK = 214839009; g.PlayerOperationTypes.ADVANCED_START_USE_EFFECT = 1398940173; g.PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED = 867990583;
+  g.Game.Notifications.getEndTurnBlockingType = () => 780; g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 9, type: 20 }]; g.Game.Notifications.find = () => ({ Type: 4, BlocksTurnAdvancement: true }); g.Game.Notifications.getTypeName = () => "NOTIFICATION_AGE_TRANSITION";
+  const inner = g.Game.PlayerOperations;
+  const ops = new Set([214839009, 1398940173, 867990583]);
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (!ops.has(op)) return inner.canStart(pid, op, args, show); g._log.push(`lcanStart(${pid},${op},${JSON.stringify(args)},${show})`);
+      if (op === 214839009) return { Success: args.Type === "ADD" ? !inDeck.includes(args.ID) : inDeck.includes(args.ID) };
+      if (op === 1398940173) { const owner = cards.find((c) => c.effects.some((e) => e.id === args.ID)); return { Success: usable && !!owner && inDeck.includes(owner.id) && !applied[args.ID] }; }
+      return { Success: true }; },
+    sendRequest: (pid, op, args) => { g._log.push(`lsendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === 214839009 && args.Type === "ADD") inDeck.push(args.ID); if (op === 1398940173) applied[args.ID] = true; },
+  };
+  return { g, hash: g.Database.makeHash };
+}
+
+test("legacy offers: cards not yet in the deck with cost and points, effects of picked cards, and the finish gated on applied effects", () => {
+  const log = [];
+  const { g, hash } = withLegacies(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const picks = r.offers.filter((o) => o.kind === "ADVANCED_START_MODIFY_DECK");
+  assert.deepEqual(picks.map((o) => [o.arg, o.pre, o.cardId, o.displayName, o.description, o.cost, o.pointsAvailable, o.needsPlacement, o.canStart]),
+    [[hash("CARD_A"), 0, "CARD_A", "LOC_CA", "LOC_CA_D", 1, 3, false, true], [hash("CARD_B"), 0, "CARD_B", "LOC_CB", "LOC_CB_D", 2, 3, false, true]]);
+  assert.equal(r.offers.filter((o) => o.kind === "ADVANCED_START_USE_EFFECT").length, 0, "no effects before a card is picked");
+  const fin = r.offers.find((o) => o.kind === "ADVANCED_START_MARK_COMPLETED");
+  assert.deepEqual([fin.canStart, fin.deck, fin.unappliedEffects], [true, [], 0]);
+  const { g: h } = withLegacies(world({ log: [] }), { deck: ["CARD_A"] }); h._log = [];
+  const hr = runOffers(h);
+  const eff = hr.offers.filter((o) => o.kind === "ADVANCED_START_USE_EFFECT");
+  assert.deepEqual(eff.map((o) => [o.effectId, o.cardId, o.pre, o.canStart]), [["EFF_A", "CARD_A", 1, true]]);
+  assert.equal(hr.offers.find((o) => o.kind === "ADVANCED_START_MARK_COMPLETED").canStart, false, "an unapplied effect withholds the finish");
+  assert.ok(!hr.offers.some((o) => o.kind === "ADVANCED_START_MODIFY_DECK" && o.cardId === "CARD_A"), "a picked card is not offered again");
+  const { g: pl } = withLegacies(world({ log: [] }), { placement: true }); pl._log = [];
+  assert.equal(runOffers(pl).offers.find((o) => o.cardId === "CARD_B").canStart, false, "a placement card is listed but not startable");
+});
+
+test("perform the legacy sequence: add a card, apply its effect, then finish, each re-checking the deck", () => {
+  const log = [];
+  const { g, hash } = withLegacies(world({ log })); g._log = log;
+  const a = runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 });
+  assert.equal(a.refused, null); assert.deepEqual(a.readback, { kind: "ADVANCED_START_MODIFY_DECK", arg: hash("CARD_A"), deck: ["CARD_A"], matches: true });
+  assert.equal(runPerform(g, "ADVANCED_START_MARK_COMPLETED", 0, { pre: 1 }).refused.code, "ACTION_NOT_STARTABLE", "the effect is still unapplied");
+  const e = runPerformArgs(g, "ADVANCED_START_USE_EFFECT", hash("EFF_A"), hash("CARD_A"), 0, { pre: 1 });
+  assert.equal(e.refused, null); assert.equal(e.outcome, "sent");
+  assert.ok(log.find((l) => l === 'lsendRequest(1,1398940173,{"ID":"EFF_A"})'));
+  const m = runPerform(g, "ADVANCED_START_MARK_COMPLETED", 0, { pre: 1 });
+  assert.equal(m.outcome, "sent");
+  assert.ok(log.find((l) => l === "lsendRequest(1,867990583,{})"));
+  assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 }).refused.code, "ACTION_EXPIRED", "stale deck size");
+  assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", 4242, { pre: 1 }).refused.code, "UNKNOWN_ACTION");
+});

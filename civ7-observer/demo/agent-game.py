@@ -126,6 +126,10 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
         summary["curtain"] = {"error": str(exc)}
 
     brief = brief_for(seat, mode)
+    age_type = str((brief.get("context") or {}).get("ageType") or "")
+    if age_type.startswith("AGE_") and age_type != "AGE_ANTIQUITY":
+        tag = f"{age_type[4:].lower()}-{tag}"
+        summary["tag"] = tag
     if brief.get("pause"):
         return {**summary, "status": "paused", "pause": brief["pause"], "brief": brief}
     workspace = Workspace(root=state_dir() / "workspace", seat=seat)

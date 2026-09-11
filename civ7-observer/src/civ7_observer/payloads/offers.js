@@ -421,6 +421,37 @@
         offers.push({ kind: "CONSIDER_ASSIGN_RESOURCE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) && !(rpre > 0 && assignable > 0), toAssign: rpre, assignable: assignable });
       }
     }
+    if (isInt(PlayerOperationTypes.ADVANCED_START_MODIFY_DECK) && isInt(PlayerOperationTypes.ADVANCED_START_USE_EFFECT) && isInt(PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED) && player.AdvancedStart && blocked && blockingNotifications.indexOf("NOTIFICATION_AGE_TRANSITION") !== -1) {
+      // New age: the shipped legacies screen adds cards to the deck (ADVANCED_START_MODIFY_DECK ADD), then on
+      // confirm uses every selected card's effects (ADVANCED_START_USE_EFFECT per effect) and marks the deck
+      // completed. Card and effect ids are strings; their Database.makeHash is the integer handle here.
+      const A = player.AdvancedStart;
+      const available = A.getAvailableCards(); const deck = A.getCards();
+      if (!Array.isArray(available) || !Array.isArray(deck)) throw new Error("advanced start card contract unavailable");
+      const deckIds = deck.map((c) => c && c.id).filter((x) => typeof x === "string");
+      let points = null; try { const lp = A.getLegacyPoints(); points = Array.isArray(lp) ? lp.reduce((s, x) => s + (x && isInt(x.value) ? x.value : 0), 0) : null; } catch (e) { points = null; }
+      const costOf = (c) => Array.isArray(c.cost) ? c.cost.reduce((s, x) => s + (x && isInt(x.value) ? x.value : 0), 0) : null;
+      for (const c of available) {
+        if (!c || typeof c.id !== "string" || deckIds.indexOf(c.id) !== -1) continue;
+        const placement = Array.isArray(c.effects) && c.effects.some((e) => e && e.isPlacementEffect === true);
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MODIFY_DECK, { Type: "ADD", ID: c.id }, false);
+        offers.push({ kind: "ADVANCED_START_MODIFY_DECK", arg: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, displayName: compose(c.name), description: compose(c.description),
+          cost: costOf(c), pointsAvailable: points, needsPlacement: placement, canStart: !!(check && check.Success === true) && !placement });
+      }
+      let usable = 0;
+      for (const c of deck) {
+        if (!c || typeof c.id !== "string" || !Array.isArray(c.effects)) continue;
+        for (const e of c.effects) {
+          if (!e || typeof e.id !== "string") continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false);
+          const ok = !!(check && check.Success === true) && e.isPlacementEffect !== true;
+          if (ok) usable += 1;
+          if (ok) offers.push({ kind: "ADVANCED_START_USE_EFFECT", arg: Database.makeHash(e.id), arg2: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, effectId: e.id, displayName: compose(c.name), description: compose(c.description), amount: isInt(e.amount) ? e.amount : 1, canStart: true });
+        }
+      }
+      const mcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED, {}, false);
+      offers.push({ kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, pre: deckIds.length, deck: deckIds, pointsAvailable: points, unappliedEffects: usable, canStart: !!(mcheck && mcheck.Success === true) && usable === 0 });
+    }
     if (isInt(PlayerOperationTypes.SET_AGE_TRANSITION_DATA) && typeof GameSetup !== "undefined" && typeof GameSetup.findPlayerParameter === "function" && blockingNotifications.indexOf("NOTIFICATION_CHOOSE_CIVILIZATION") !== -1) {
       // Age transition: the shipped in-game screen sets the bound player's AgeTransitionPlayerCivilization
       // setup parameter (its domain carries a validity reason per civilization) and then sends

@@ -311,6 +311,42 @@
     result.readback = { kind: KIND, arg: 0, matches: false };
     return JSON.stringify(result);
   }
+  if (KIND === "ADVANCED_START_MODIFY_DECK" || KIND === "ADVANCED_START_USE_EFFECT" || KIND === "ADVANCED_START_MARK_COMPLETED") {
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.AdvancedStart) return refuse("API_CONTRACT_MISMATCH", "advanced start contract unavailable");
+    const A = player.AdvancedStart;
+    let deck = null; try { deck = A.getCards(); } catch (e) { deck = null; }
+    if (!Array.isArray(deck)) return refuse("API_CONTRACT_MISMATCH", "advanced start deck unavailable");
+    const deckIds = deck.map((c) => c && c.id).filter((x) => typeof x === "string");
+    if (deckIds.length !== PRE) return refuse("ACTION_EXPIRED", "the legacy deck changed since the offer was made");
+    let args = null;
+    if (KIND === "ADVANCED_START_MODIFY_DECK") {
+      if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "card argument is not an integer");
+      let card = null; try { for (const c of A.getAvailableCards()) { if (c && typeof c.id === "string" && Database.makeHash(c.id) === ARG) { card = c; break; } } } catch (e) { card = null; }
+      if (!card) return refuse("UNKNOWN_ACTION", "card is not among the seat's available legacy cards");
+      if (deckIds.indexOf(card.id) !== -1) return refuse("ACTION_EXPIRED", "that card is already in the deck");
+      if (Array.isArray(card.effects) && card.effects.some((e) => e && e.isPlacementEffect === true)) return refuse("ACTION_NOT_STARTABLE", "cards with a placement effect are not supported yet");
+      args = { Type: "ADD", ID: card.id };
+    } else if (KIND === "ADVANCED_START_USE_EFFECT") {
+      if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "effect arguments are not integers");
+      let effect = null;
+      for (const c of deck) { if (!c || typeof c.id !== "string" || Database.makeHash(c.id) !== ARG2 || !Array.isArray(c.effects)) continue; for (const e of c.effects) { if (e && typeof e.id === "string" && Database.makeHash(e.id) === ARG) { effect = e; break; } } }
+      if (!effect) return refuse("UNKNOWN_ACTION", "effect is not on a card in the deck");
+      if (effect.isPlacementEffect === true) return refuse("ACTION_NOT_STARTABLE", "placement effects are not supported yet");
+      args = { ID: effect.id };
+    } else {
+      let pending = 0;
+      try { for (const c of deck) { if (!c || !Array.isArray(c.effects)) continue; for (const e of c.effects) { if (!e || typeof e.id !== "string" || e.isPlacementEffect === true) continue; const u = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false); if (u && u.Success === true) pending += 1; } } } catch (e) { pending = 0; }
+      if (pending > 0) return refuse("ACTION_NOT_STARTABLE", "apply every selected card's effect before finishing", { unappliedEffects: pending });
+      args = {};
+    }
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the advanced start operation");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let after = null; try { after = A.getCards().map((c) => c && c.id); } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, deck: after, matches: KIND === "ADVANCED_START_MODIFY_DECK" ? (Array.isArray(after) && after.indexOf(args.ID) !== -1) : false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CHOOSE_AGE_CIVILIZATION") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "civilization argument is not an integer");
     if (typeof GameSetup === "undefined" || typeof GameSetup.findPlayerParameter !== "function" || typeof GameSetup.setPlayerParameterValue !== "function") return refuse("API_CONTRACT_MISMATCH", "game setup parameters unavailable");

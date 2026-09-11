@@ -52,10 +52,12 @@ MUTATION_ALLOWLIST = (
     'Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs)',
     'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
+    # a read of a second operation type: finishing the legacy deck must first prove no picked card's effect is still usable
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)',
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false)',
     'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 
@@ -138,7 +140,9 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     for call in calls:
         assert any(call.startswith(a) for a in MUTATION_ALLOWLIST), f"non-allowlisted engine call: {call!r}"
     assert not re.search(MUTATION_FORBIDDEN, src), "mutation payload references a forbidden surface"
-    assert "PlayerOperationTypes[OP_KIND]" in src and "PlayerOperationTypes." not in src
+    assert "PlayerOperationTypes[OP_KIND]" in src
+    # every operation is sent through the host-substituted kind; the one literal type name is a read-only check
+    assert src.count("PlayerOperationTypes.") == src.count("PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)")
     stripped = src
     for a in MUTATION_ALLOWLIST:
         stripped = stripped.replace(a, "")

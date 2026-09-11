@@ -1084,3 +1084,29 @@ def test_age_transition_choice_confirms_on_the_parameter_and_the_finish_on_the_n
         fin = next(o for o in out["offers"] if o["kind"] == "finish_age_transition")
         res2 = reg.perform(gs, action_id=fin["actionId"], request_id="fin-1", player=1, mode="singleplayer")
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"civilizationChoiceClosed": True, "endTurnBlocking": "NONE"}
+
+
+def test_legacy_card_actions_confirm_on_the_deck_the_usable_effects_and_the_notification(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "ADVANCED_START_MODIFY_DECK", "arg": 1875644328, "pre": 0, "cardId": "CARD_AT_EX_DEFAULT_1", "displayName": "Umm al-belad", "description": "2 merchants", "cost": 1, "pointsAvailable": 3, "needsPlacement": False, "canStart": True},
+        {"kind": "ADVANCED_START_USE_EFFECT", "arg": 777, "arg2": 1875644328, "pre": 1, "cardId": "CARD_AT_EX_DEFAULT_1", "effectId": "CARD_EFFECT_AT_EX_DEFAULT_1", "displayName": "Umm al-belad", "description": "2 merchants", "amount": 1, "canStart": True},
+        {"kind": "ADVANCED_START_MARK_COMPLETED", "arg": 0, "pre": 1, "deck": ["CARD_AT_EX_DEFAULT_1"], "pointsAvailable": 2, "unappliedEffects": 0, "canStart": True}]}
+    sent = lambda kind, arg: {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": kind, "arg": arg, "deck": [], "matches": False}}
+    rb_pick = {**RB, "legacyDeck": [1875644328], "legacyUsableEffects": [777]}
+    rb_use = {**RB, "legacyDeck": [1875644328], "legacyUsableEffects": []}
+    rb_fin = {**RB, "blockingNotifications": ["NOTIFICATION_COMMAND_UNITS"]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3),
+                                reply(4, json.dumps(sent("ADVANCED_START_MODIFY_DECK", 1875644328))), reply(5, json.dumps(rb_pick)),
+                                reply(6, json.dumps(sent("ADVANCED_START_USE_EFFECT", 777))), reply(7, json.dumps(rb_use)),
+                                reply(8, json.dumps(sent("ADVANCED_START_MARK_COMPLETED", 0))), reply(9, json.dumps(rb_fin))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        by = {o["kind"]: o for o in out["offers"]}
+        assert by["pick_legacy_card"]["cost"] == 1 and by["pick_legacy_card"]["pointsAvailable"] == 3 and "arg" not in by["pick_legacy_card"]
+        r1 = reg.perform(gs, action_id=by["pick_legacy_card"]["actionId"], request_id="lc-1", player=1, mode="singleplayer")
+        assert r1["status"] == "confirmed" and r1["confirmedBy"]["effect"] == {"legacyCardAdded": 1875644328}
+        r2 = reg.perform(gs, action_id=by["apply_legacy_effect"]["actionId"], request_id="lc-2", player=1, mode="singleplayer")
+        assert r2["status"] == "confirmed" and r2["confirmedBy"]["effect"] == {"legacyEffectApplied": 777}
+        r3 = reg.perform(gs, action_id=by["finish_legacy_deck"]["actionId"], request_id="lc-3", player=1, mode="singleplayer")
+    assert r3["status"] == "confirmed" and r3["confirmedBy"]["effect"] == {"legacyDeckCompleted": True}
