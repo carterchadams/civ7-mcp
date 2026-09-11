@@ -374,12 +374,6 @@ class ActionRegistry:
             if kind == "MAKE_TRADE_ROUTE" and isinstance(o.get("activeRoutes"), int):
                 rec["activeRoutes"] = o["activeRoutes"]
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
-            qkey = ":".join(str(v) for v in (gs.context.game_guid, kind, o.get("arg"), o.get("arg2", 0), o.get("arg3", 0)))
-            if qkey in quarantined:
-                rec["canStart"] = entry["canStart"] = False
-                entry["quarantined"] = True
-                entry["reason"] = (f"withheld: this exact action came back unknown {quarantined[qkey]['unknowns']} times in this match "
-                                   f"(a human can lift the quarantine); choose another target")
             if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY", "PROMOTE_UNIT", "MAKE_TRADE_ROUTE", "UNIT_ORDER"):
                 if isinstance(o.get("unitId"), int):
                     entry["unitId"] = o["unitId"]
@@ -617,6 +611,15 @@ class ActionRegistry:
                 for k in ("cityId", "cityName", "unitTypeKey", "displayName", "turns", "queue", "queueLength"):
                     if k in o:
                         entry[k] = o[k]
+            # Keyed on the arguments as bound, not as offered: a founding carries its plot as x/y until here
+            # (live: the first quarantine keyed on the raw offer and let the hung plot through a fifth time).
+            qkey = ":".join(str(v) for v in (gs.context.game_guid, kind, rec.get("arg"), rec.get("arg2", 0), rec.get("arg3", 0)))
+            if qkey in quarantined:
+                rec["canStart"] = entry["canStart"] = False
+                entry["quarantined"] = True
+                entry["reason"] = (f"withheld: this exact action came back unknown {quarantined[qkey]['unknowns']} times in this match "
+                                   f"(a human can lift the quarantine); choose another target")
+
             self._offers[action_id] = rec
             for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent", "unitTypeKey", "movesRemaining", "location"):
                 if k in o:

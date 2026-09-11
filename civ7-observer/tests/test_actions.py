@@ -1295,6 +1295,23 @@ def test_an_action_that_goes_unknown_twice_for_the_same_target_is_quarantined_an
     assert reg.lift_quarantine(CTX["gameGuid"], "SET_TECH_TREE_NODE", 701) is False
 
 
+def test_the_quarantine_keys_on_the_bound_arguments_so_a_plot_action_is_caught(tmp_path):
+    """Live: the first quarantine keyed on the raw offer, where a founding carries its plot as x/y, and
+    let the hung plot through a fifth time."""
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    with reg._locked():
+        reg._record_unknown({"match": CTX["gameGuid"], "kind": "FOUND_CITY", "arg": 5, "arg2": 15, "arg3": 27, "seat": 1, "requestId": "a", "turn": 12})
+        reg._record_unknown({"match": CTX["gameGuid"], "kind": "FOUND_CITY", "arg": 5, "arg2": 15, "arg3": 27, "seat": 1, "requestId": "b", "turn": 12})
+    found = {"kind": "FOUND_CITY", "arg": 5, "x": 15, "y": 27, "pre": 2715, "unitId": 5, "from": {"x": 15, "y": 27}, "unitTypeKey": "UNIT_SETTLER", "canStart": True}
+    elsewhere = {"kind": "FOUND_CITY", "arg": 6, "x": 20, "y": 20, "pre": 2020, "unitId": 6, "from": {"x": 20, "y": 20}, "unitTypeKey": "UNIT_SETTLER", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [found, elsewhere]}
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), ctx_reply(3)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        fc = [o for o in out["offers"] if o["kind"] == "found_city"]
+        assert [(o["unitId"], o["canStart"], o.get("quarantined", False)) for o in fc] == [(5, False, True), (6, True, False)]
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 
