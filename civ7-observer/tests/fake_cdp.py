@@ -15,6 +15,7 @@ import hashlib
 import json
 import socket
 import struct
+from collections import deque
 import threading
 import time
 from dataclasses import dataclass, field
@@ -196,14 +197,23 @@ class FakeCdpServer:
             "HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\n"
             f"Sec-WebSocket-Accept: {accept}\r\n\r\n".encode()
         )
-        for action in self.ws_scripts[path]:
+        script = self.ws_scripts[path]
+        for action in script:
             if isinstance(action, Send):
                 conn.sendall(text_frame(action.text))
             elif isinstance(action, SendRaw):
                 conn.sendall(action.data)
             elif isinstance(action, Reply):
-                opcode, payload = read_client_frame(conn)
+                try:
+                    opcode, payload = read_client_frame(conn)
+                except (ConnectionError, OSError):
+                    # the client went away before using this reply: leave it for the next connection
+                    if hasattr(script, "pushback"):
+                        script.pushback(action)
+                    return
                 if opcode == 0x8:
+                    if hasattr(script, "pushback"):
+                        script.pushback(action)
                     return
                 req = json.loads(payload.decode("utf-8"))
                 self.received.append(req)
@@ -220,6 +230,26 @@ class FakeCdpServer:
                     return
         except (ConnectionError, OSError):
             return
+
+
+class SharedScript:
+    """A ws script consumed across connections instead of replayed from the start on each one.
+
+    The default behaviour (a plain list) replays for every connection, which suits one-shot tests.
+    A multi-call flow (brief, then act) opens several connections in sequence and wants each to
+    continue where the last left off. An action the server pulled but could not use, because the
+    client had already disconnected, is pushed back so the next connection sees it.
+    """
+
+    def __init__(self, actions):
+        self._pending = deque(actions)
+
+    def __iter__(self):
+        while self._pending:
+            yield self._pending.popleft()
+
+    def pushback(self, action) -> None:
+        self._pending.appendleft(action)
 
 
 def echo_value(value: object) -> Reply:

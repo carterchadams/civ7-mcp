@@ -17,8 +17,9 @@ observation-only any more: `act perform` mutates the running game.
 |---|---|
 | read-only observation of one bound seat (settlements, units, technology, civics, visible map) | working, live-verified |
 | stdio MCP server exposing `get_observation` / `get_status` | working, live-verified |
-| constrained native actions (research, civic, skip unit, move unit, produce unit, end turn) | working, live-verified via CLI only |
-| actions exposed over MCP | **not implemented** (CLI only) |
+| constrained native actions (research, civic, skip unit, move unit, produce unit, end turn) | working, live-verified |
+| compact turn brief (`get_turn_brief`): the required decision, bounded options, explicit pause | working, live-verified (~4 KB, ~150 ms) |
+| actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
 | agent runner / scheduler | **not implemented** |
 | in-game mod, remote seats, containers | **not implemented, deferred** (see release scope) |
 
@@ -28,12 +29,19 @@ observation-only any more: `act perform` mutates the running game.
 python -m civ7_observer doctor   [--json] [--port] [--timeout] [--target-id]
 python -m civ7_observer probe    --out FILE [--player N] [--json]         # developer diagnostics
 python -m civ7_observer snapshot --mode MODE [--player N] --out FILE [--json]
-python -m civ7_observer serve    --player N --mode MODE                   # stdio MCP, read-only tools
+python -m civ7_observer serve    --player N --mode MODE [--allow-actions] [--journal FILE]
 python -m civ7_observer act      {list|perform|result|reconcile|rebind} --player N --mode MODE [...]
 ```
 
 `MODE` is `singleplayer` or `local-hotseat` and must match the running game. `--player` is an
 engine player id and must equal both `localPlayerID` and `localObserverID` at the time of the call.
+
+### MCP tools
+
+Read-only by default: `get_observation`, `get_status`. With `--allow-actions` the seat's action
+catalog is added: `get_turn_brief` (start here each turn), `list_actions`, `perform_action`
+(`action_id` + a caller-chosen `request_id` that makes it idempotent) and `get_action_result`.
+A client only ever sees opaque action ids; engine operation names and arguments stay host-side.
 
 ## Host state (persistent, outside the repo)
 
@@ -78,7 +86,7 @@ forward reload is not detected; after any load the host must be rebound explicit
 
 ## Known gaps and non-claims
 
-1. Actions are CLI-only; an agent cannot take them through MCP yet.
+1. No agent runner or scheduler yet: a client must be driven by hand or by an external agent.
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
 3. The action catalog covers 6 of the game's decision kinds; see `../plans/civ7-player-actions.md`

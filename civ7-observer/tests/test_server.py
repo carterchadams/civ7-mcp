@@ -138,3 +138,78 @@ def test_observation_ids_fresh_and_session_stable_across_calls():
     b = tool(s, "get_observation").fn()
     assert a["observationId"] != b["observationId"]
     assert a["sessionId"] == b["sessionId"]
+
+
+# ---- action tools (opt-in)
+
+def make_acting(scripts, player=1, mode="singleplayer", targets=None, journal=None):
+    tl = targets if targets is not None else [target("a")]
+    f = Factory(scripts)
+    s = srv.build_server(port=9444, timeout=1, player=player, mode=mode, allow_actions=True,
+                         journal_path=journal, discover=lambda p, t: tl, session_factory=f)
+    return s, f
+
+
+def test_read_only_server_exposes_no_action_tools():
+    s, _ = make({"a": []})
+    assert sorted(t.name for t in s._tool_manager.list_tools()) == ["get_observation", "get_status"]
+
+
+def test_acting_server_exposes_the_action_tools_with_honest_annotations(tmp_path):
+    s, _ = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
+    names = sorted(t.name for t in s._tool_manager.list_tools())
+    assert names == ["get_action_result", "get_observation", "get_status", "get_turn_brief", "list_actions", "perform_action"]
+    perform = tool(s, "perform_action")
+    assert perform.annotations.readOnlyHint is False and perform.annotations.idempotentHint is True
+    assert perform.annotations.openWorldHint is False
+    assert set(perform.parameters["properties"]) == {"action_id", "request_id"}
+    for read_only in ("get_turn_brief", "list_actions", "get_observation", "get_status"):
+        assert tool(s, read_only).annotations.readOnlyHint is True
+    assert tool(s, "get_turn_brief").parameters.get("properties", {}) == {}
+
+
+def test_turn_brief_and_actions_flow_through_the_same_service(tmp_path):
+    from test_brief import RESEARCH, offers_with
+    ctx = json.dumps(GAME)
+    payload = json.dumps(offers_with(RESEARCH, end_can_start=False, blocking="RESEARCH"))
+    performed = {"payloadVersion": 1, "refused": None, "context": {**OBS["context"], "curtainDisplayed": False, "gameGuid": "ABCDEF0123456789"},
+                 "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_NODE", "arg": 701, "observedType": 701, "matches": True}}
+    # each tool call opens its own session: doctor(1), reopened context(1), then the tool's reads
+    scripts = {"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx),      # get_turn_brief
+                     reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx),      # list_actions
+                     reply(1, ctx), reply(1, ctx), reply(2, json.dumps(performed))]}      # perform_action
+    s, _ = make_acting(scripts, journal=tmp_path / "j.jsonl")
+    b = tool(s, "get_turn_brief").fn()
+    assert b["endTurn"]["blocking"] == "RESEARCH"
+    required = [d for d in b["decisions"] if d["required"]]
+    assert required and required[0]["kind"] == "research"
+    listing = tool(s, "list_actions").fn()
+    assert listing["attachment"]["seat"] == 1 and any(o["kind"] == "research" for o in listing["offers"])
+    action_id = next(o["actionId"] for o in listing["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+    result = tool(s, "perform_action").fn(action_id=action_id, request_id="mcp-1")
+    assert result["status"] == "confirmed" and result["requestId"] == "mcp-1"
+    assert tool(s, "get_action_result").fn(request_id="mcp-1")["status"] == "confirmed"
+
+
+def test_action_tools_return_typed_errors_never_exceptions(tmp_path):
+    s, _ = make_acting({"a": [reply(1, json.dumps(MENU)), reply(1, json.dumps(MENU))]}, journal=tmp_path / "j.jsonl")
+    assert tool(s, "get_turn_brief").fn()["error"]["code"] == "NOT_IN_GAME"
+    assert tool(s, "list_actions").fn()["error"]["code"] == "NOT_IN_GAME"
+
+
+def test_perform_action_validates_its_arguments_without_touching_the_game(tmp_path):
+    s, f = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
+    for bad in ({"action_id": "x", "request_id": "r"}, {"action_id": "a" * 24, "request_id": "bad id!"}):
+        out = tool(s, "perform_action").fn(**bad)
+        assert out["error"]["code"] in ("UNKNOWN_ACTION", "INVALID_REQUEST_ID")
+    assert f.connects == [], "argument validation must not open a game session"
+
+
+def test_get_action_result_is_unknown_for_an_unseen_request(tmp_path):
+    s, _ = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
+    assert tool(s, "get_action_result").fn(request_id="never")["status"] == "no_such_request"
+
+
+def test_seat_journals_default_to_the_host_state_directory(tmp_path):
+    s, _ = make_acting({"a": []})
+    assert str(srv.default_journal(1)) == str(tmp_path / "host-state" / "journals" / "seat1.jsonl")

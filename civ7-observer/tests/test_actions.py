@@ -1,15 +1,10 @@
 import json
+from pathlib import Path
 
 import pytest
 
 from civ7_observer import actions, service
 
-
-@pytest.fixture(autouse=True)
-def _state_dir(tmp_path, monkeypatch):
-    # every test gets its own game-wide state directory (lock, unresolved barrier, generations)
-    monkeypatch.setenv("CIV7_OBSERVER_STATE_DIR", str(tmp_path / "state"))
-    yield
 from test_targets import GAME, Factory, reply, target
 
 CTX = {"turn": 12, "age": 4242, "playerId": 1, "localPlayerId": 1, "localObserverId": 1, "mode": "singleplayer", "isTurnActive": True, "curtainDisplayed": False, "gameGuid": "ABCDEF0123456789"}
@@ -764,3 +759,9 @@ def test_reconciling_from_another_seat_clears_the_owning_seat_view(tmp_path):
     reopened = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
     assert reopened.needs_reconciliation() == [], "the owning seat must not still report an unknown outcome"
     assert reopened.get_result("own-1")["status"] == "rejected"
+
+
+def test_tests_never_use_the_real_host_state_directory():
+    """Guard for the conftest isolation: a stray write here could block the user's live game."""
+    from civ7_observer.attachment import state_dir
+    assert str(state_dir()) != str(Path.home() / ".local" / "state" / "civ7-observer")

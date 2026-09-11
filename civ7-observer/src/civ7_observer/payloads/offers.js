@@ -32,7 +32,7 @@
   if (player.isTurnActive !== true) return refuse("TURN_NOT_READY", "bound player's turn is not active");
   const matchId = (typeof flags.campaignSetupGUID === "string" && flags.campaignSetupGUID) ? flags.campaignSetupGUID : ((typeof flags.gameGUIDHexString === "string" && flags.gameGUIDHexString) ? flags.gameGUIDHexString : null);
   if (matchId === null) return refuse("NOT_IN_GAME", "no match identity available");
-  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain(), gameGuid: matchId };
+  result.context = { turn: turn, age: age, ageType: lookupKey(GameInfo.Ages, age, "AgeType"), playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain(), gameGuid: matchId };
 
   // ---- offers
   const offers = [];
@@ -113,7 +113,7 @@
           const buildArgs = { UnitType: row.$hash };
           const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
           if (!check || check.Success !== true) continue;   // only buildable units are offered
-          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: typeof c.name === "string" ? c.name : null,
+          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
             unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
         }
       }

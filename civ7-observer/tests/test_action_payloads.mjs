@@ -34,7 +34,7 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
     PlayerOperationTypes: { SET_TECH_TREE_NODE: 9001, SET_CULTURE_TREE_NODE: 9002, GRANT_TREE_NODE: 9999 },
     ProgressionTreeNodeState: STATE,
     GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }]), ProgressionTreeNodes: table([{ $hash: 701, ProgressionTreeNodeType: "NODE_TECH_AQ_POTTERY", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_P" }, { $hash: 702, ProgressionTreeNodeType: "NODE_TECH_AQ_WRITING", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_W" }, { $hash: 801, ProgressionTreeNodeType: "NODE_CIVIC_AQ_MAIN_MYSTICISM", ProgressionTree: "TREE_CIVICS_AQ_MAIN", Name: "LOC_M" }]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]) },
-    Locale: { compose: (k) => ({ LOC_P: "Pottery", LOC_W: "Writing", LOC_M: "Mysticism" })[k] ?? k },
+    Locale: { compose: (k) => ({ LOC_P: "Pottery", LOC_W: "Writing", LOC_M: "Mysticism", LOC_C: "Cordoba" })[k] ?? k },
     document: { getElementById: (id) => (id === "hotseat-screen-curtain" && curtain ? {} : null) },
   };
 }
@@ -51,7 +51,7 @@ test("offers enumerate research/civic choices with native canStart and an end-tu
   const log = [];
   const r = runOffers(world({ log }));
   assert.equal(r.refused, null);
-  assert.deepEqual(r.context, { turn: 10, age: 4242, playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789" });
+  assert.deepEqual(r.context, { turn: 10, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789" });
   assert.ok(r.offers.every((o) => typeof o.pre === "number"));
   const research = r.offers.filter((o) => o.kind === "SET_TECH_TREE_NODE");
   assert.deepEqual(research.map((o) => [o.arg, o.typeKey, o.displayName, o.tree, o.cost, o.turns, o.canStart]), [[701, "NODE_TECH_AQ_POTTERY", "Pottery", "TREE_TECHS_AQ", 60, 4, true], [702, "NODE_TECH_AQ_WRITING", "Writing", "TREE_TECHS_AQ", 100, 7, true]]);
@@ -270,7 +270,7 @@ test("produce offers list units the native BUILD canStart accepts, per owned cit
   const r = runOffers(g);
   const prod = r.offers.filter((o) => o.kind === "PRODUCE_UNIT");
   assert.deepEqual(prod.map((o) => [o.arg, o.arg2, o.unitTypeKey, o.canStart]), [[65536, 99, "UNIT_SCOUT", true], [65536, 100, "UNIT_WARRIOR", true]]);
-  assert.ok(prod.every((o) => o.cityName === "LOC_C" && o.cityId === 65536));
+  assert.ok(prod.every((o) => o.cityName === "Cordoba" && o.cityId === 65536), "city names must be localized, not raw keys");
   assert.ok(log.filter((e) => e.startsWith("ccanStart(")).every((e) => e.includes('"owner":1') && e.includes(",5551,") && e.endsWith(",false)")));
   assert.ok(!log.includes("PURCHASE") && !log.some((e) => e.startsWith("csendRequest")));
 });

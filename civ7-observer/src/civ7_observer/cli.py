@@ -59,6 +59,9 @@ def _build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--port", type=int, default=DEFAULT_PORT)
     sv.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     sv.add_argument("--target-id", default=None)
+    sv.add_argument("--allow-actions", action="store_true",
+                    help="also expose the seat's constrained action catalog (get_turn_brief, list_actions, perform_action, get_action_result). This lets the client change the game.")
+    sv.add_argument("--journal", type=Path, default=None, help="action journal for this seat (default: the host state directory)")
     sv.add_argument("-v", "--verbose", action="store_true")
 
     act = sub.add_parser("act", help="constrained actions for one bound seat (research/civic selection, end turn)")
@@ -189,7 +192,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_act(args)
     if args.command == "serve":
         from civ7_observer.server import serve
-        return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id)
+        return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id,
+                     allow_actions=args.allow_actions, journal_path=args.journal)
     result = run_doctor(port=args.port, timeout=args.timeout, target_id=args.target_id)
     if args.json:
         print(result.to_json())

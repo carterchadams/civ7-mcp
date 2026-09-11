@@ -123,3 +123,29 @@ units, production) was handled by the action catalog alone.
 | `skip_unit` 196609 | `confirmed`, `confirmedBy.effect = {"unitNoLongerReady": 196609}` with match/turn/age/player/observer |
 | load of a **different** game (single-player, turn 2, match `E8D5748A…`) | PASS: doctor context shows the new match id; performing an offer id from the previous game was refused (`WRONG_PLAYER`, the old offer belonged to seat 1; a same-seat id would fail `ACTION_EXPIRED`) with nothing dispatched; listing registered the new match with `generation 1`, `reattached true`; `generations.json` now holds both matches; the previous game's 14 stale offers were pruned |
 | reload of an earlier save of the **same** campaign (saved at turn 2, played to turn 3, loaded turn 2) | PASS: `campaignSetupGUID` **unchanged** across the reload (`E8D5748A…`), so the native id alone would not have detected it; the host generation did: performing a turn-3 offer after the reload was refused `ACTION_EXPIRED` with nothing dispatched, `generations.json` moved to `generation 2, maxTurn 2`, and the pre-reload journal rows keep `generation 1`. Note: the regression was first observed by the `perform` call, which consumed the `reattached` flag; the following `list` reported `reattached false` with generation 2 |
+
+## Closed loop through MCP (game 2, player 0, turn 13, curtain up)
+
+A real MCP client (not our CLI) asked for a brief, chose from the offered options, acted, and read
+the receipt back. Same validated service the CLI uses; the client never saw an engine operation
+name or argument.
+
+| step | result |
+|---|---|
+| tool surface with `--allow-actions` | `get_observation`, `get_status`, `get_turn_brief`, `list_actions` (read-only) and `perform_action` (readOnlyHint false), `get_action_result` |
+| `get_turn_brief` | **148 ms, 3,911 bytes** (the full observation is ~45 KB); named the required decision `produce_unit` from the native blocker `PRODUCTION`, with 4 legal options, plus 3 optional decisions and 19 unit options summarised to 6 with `omitted: 13` |
+| `perform_action` (Warrior in Baghdād) | **334 ms**, `confirmed`, `confirmedBy.effect = {cityProduction: {cityId: 65536, unitType: …}}` with match, turn, age, seat and observer |
+| repeating the same `request_id` | returned the identical receipt; nothing was sent twice |
+| brief again | end turn still blocked, now on `UNITS`: the loop advances to the next decision |
+| `get_action_result` | `confirmed` |
+
+Fixed on the way: city names in offers were raw localization keys (now composed, "Baghdād"), and
+the offers context now carries `ageType`.
+
+### Test isolation defect found and fixed
+
+The suite was writing to the machine's real host state directory: a fixture's uncertain write had
+left an entry in `unresolved.json` that would have blocked the live game's actions. Every test now
+gets its own state directory via an autouse fixture, spawned MCP servers inherit it explicitly
+(the stdio client otherwise gives a child a minimal default environment), and a guard test asserts
+the real directory is never used. The stale entry was removed from the live state.
