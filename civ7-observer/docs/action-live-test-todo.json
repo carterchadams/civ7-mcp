@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 173,
+          "confirmed": 175,
           "rejected": 0,
           "unknown": 0
         }
@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 528,
+          "confirmed": 537,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,7 +139,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2099,
+          "confirmed": 2155,
           "rejected": 12,
           "unknown": 0
         }
@@ -163,8 +163,8 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1730,
-          "rejected": 22,
+          "confirmed": 1807,
+          "rejected": 23,
           "unknown": 1
         }
       }
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 150,
+          "confirmed": 151,
           "rejected": 2,
           "unknown": 1
         }
@@ -211,7 +211,7 @@
       "expected_evidence": "a confirmed `PRODUCE_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 0
         }
@@ -235,7 +235,7 @@
       "expected_evidence": "a confirmed `FOUND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 37,
+          "confirmed": 38,
           "rejected": 5,
           "unknown": 5
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 219,
+          "confirmed": 226,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 82,
+          "confirmed": 86,
           "rejected": 0,
           "unknown": 0
         }
@@ -355,7 +355,7 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 65,
+          "confirmed": 67,
           "rejected": 0,
           "unknown": 0
         }
@@ -427,7 +427,7 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 12,
+          "confirmed": 13,
           "rejected": 0,
           "unknown": 0
         }
@@ -451,7 +451,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_ATTRIBUTE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 0,
           "unknown": 0
         }
@@ -475,7 +475,7 @@
       "expected_evidence": "a confirmed `CHOOSE_GOLDEN_AGE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 87,
+          "confirmed": 88,
           "rejected": 0,
           "unknown": 0
         }
@@ -499,7 +499,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 76,
+          "confirmed": 79,
           "rejected": 8,
           "unknown": 1
         }
@@ -523,7 +523,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 30,
+          "confirmed": 32,
           "rejected": 0,
           "unknown": 0
         }
@@ -547,7 +547,7 @@
       "expected_evidence": "a confirmed `PROMOTE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 24,
+          "confirmed": 25,
           "rejected": 0,
           "unknown": 2
         }
@@ -571,9 +571,33 @@
       "expected_evidence": "a confirmed `CHOOSE_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 8,
-          "rejected": 2,
-          "unknown": 2
+          "confirmed": 9,
+          "rejected": 4,
+          "unknown": 4
+        }
+      }
+    },
+    {
+      "case_id": "LT-keep_town_focus",
+      "action_family": "keep_town_focus",
+      "expected_kind": "CONSIDER_TOWN_PROJECT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "keep_town_focus"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `keep_town_focus` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 6,
+          "rejected": 0,
+          "unknown": 0
         }
       }
     },
@@ -643,8 +667,8 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
-          "rejected": 0,
+          "confirmed": 3,
+          "rejected": 1,
           "unknown": 0
         }
       }
@@ -811,7 +835,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 20,
+          "confirmed": 23,
           "rejected": 5,
           "unknown": 0
         }
@@ -896,7 +920,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "support_diplomatic_action"
@@ -905,7 +929,13 @@
       "consequence_class": "low",
       "procedure": "take a `support_diplomatic_action` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SUPPORT_DIPLOMATIC_ACTION` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-acknowledge_advisor_warning",
@@ -1220,7 +1250,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "wake_unit"
@@ -1229,7 +1259,13 @@
       "consequence_class": "low",
       "procedure": "take a `wake_unit` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 1
+        }
+      }
     },
     {
       "case_id": "LT-cancel_order",
@@ -1267,7 +1303,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 124,
+          "confirmed": 157,
           "rejected": 1,
           "unknown": 1
         }
@@ -1562,6 +1598,132 @@
       }
     },
     {
+      "case_id": "LT-select_capital",
+      "action_family": "select_capital",
+      "expected_kind": "SELECT_CAPITAL",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "select_capital"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `select_capital` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SELECT_CAPITAL` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-syncretism_units",
+      "action_family": "syncretism_units",
+      "expected_kind": "CHOOSE_SYNCRETISM_UNITS",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "syncretism_units"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `syncretism_units` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_UNITS` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-syncretism_infrastructure",
+      "action_family": "syncretism_infrastructure",
+      "expected_kind": "CHOOSE_SYNCRETISM_INFRASTRUCTURE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "syncretism_infrastructure"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `syncretism_infrastructure` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_INFRASTRUCTURE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-syncretism_self",
+      "action_family": "syncretism_self",
+      "expected_kind": "CHOOSE_SYNCRETISM_SELF",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "syncretism_self"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `syncretism_self` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_SELF` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-drop_legacy_card",
+      "action_family": "drop_legacy_card",
+      "expected_kind": "ADVANCED_START_REMOVE_CARD",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "drop_legacy_card"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `drop_legacy_card` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADVANCED_START_REMOVE_CARD` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-place_legacy_settlement",
+      "action_family": "place_legacy_settlement",
+      "expected_kind": "ADVANCED_START_PLACE_SETTLEMENT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "place_legacy_settlement"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `place_legacy_settlement` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ADVANCED_START_PLACE_SETTLEMENT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-resettle",
+      "action_family": "resettle",
+      "expected_kind": "RESETTLE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "resettle"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `resettle` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `RESETTLE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
       "case_id": "PLAN-A01",
       "action_family": "Captured settlement keep/raze/liberate",
       "expected_kind": null,
@@ -1648,7 +1810,7 @@
       "variant": "plan-item",
       "priority": 1,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
@@ -1844,15 +2006,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "select_capital"
+      ],
       "consequence_class": "medium",
       "procedure": "Capital selection",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1861,15 +2025,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "syncretism_units",
+        "syncretism_infrastructure",
+        "syncretism_self"
+      ],
       "consequence_class": "medium",
       "procedure": "Syncretism choices",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1878,15 +2046,18 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "drop_legacy_card",
+        "place_legacy_settlement"
+      ],
       "consequence_class": "medium",
       "procedure": "Legacy deck revise and placement effects",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1895,15 +2066,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "resettle"
+      ],
       "consequence_class": "medium",
       "procedure": "Resettle/migrant and alternate founding",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {

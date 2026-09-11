@@ -45,6 +45,8 @@ BLOCKER_DECISION = {
     "NOTIFICATION_AGE_TRANSITION": "legacies",
     "CHOOSE_CIVILIZATION": "age_transition",
     "NOTIFICATION_CHOOSE_CIVILIZATION": "age_transition",
+    "NOTIFICATION_CHOOSE_SYNCRETISM": "syncretism",
+    "CHOOSE_SYNCRETISM": "syncretism",
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_RELIGION": "religion",
@@ -149,6 +151,13 @@ DECISION_OF_KIND = {
     "greet_new_civilization": "first_meet",
     "pick_legacy_card": "legacies",
     "finish_legacy_deck": "legacies",
+    "drop_legacy_card": "legacies",
+    "place_legacy_settlement": "legacies",
+    "select_capital": "legacies",
+    "syncretism_units": "syncretism",
+    "syncretism_infrastructure": "syncretism",
+    "syncretism_self": "syncretism",
+    "resettle": "unit",
     "choose_age_civilization": "age_transition",
     "finish_age_transition": "age_transition",
     "town_project": "town_project",
@@ -186,7 +195,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "movesLeft", "charges", "currentProject", "currentProjectKey", "position", "toPosition", "itemKey", "otherResourceKey", "otherCityName", "otherCityId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
                  "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
@@ -209,8 +218,15 @@ FIRST_MEET_NOTE = ("a civilization has been met and the game will not let the tu
                    "neutral or unfriendly, each costing `influenceCost` against `influenceBalance`. The greeting sets the "
                    "starting relationship; nothing else about that civilization is visible to this seat")
 
-LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (`cost` each) with pick_legacy_card, which also "
-                 "takes that card's reward, then finish_legacy_deck once. Finishing forfeits any unspent points, so pick first")
+LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (`cost` each) with pick_legacy_card; drop_legacy_card "
+                 "puts one back for its points. A card with `needsPlacement` grants a settlement to place with place_legacy_settlement "
+                 "(one option per legal plot). select_capital moves the capital to another settlement; without it the capital stays. "
+                 "Then finish_legacy_deck once: it takes every picked card's reward, forfeits any unspent points, and turns any unplaced "
+                 "settlement (`pendingPlacements`) into a plain settler, so pick and place first")
+
+SYNCRETISM_NOTE = ("this civilization may take on a related civilization's inheritance in exactly one of three ways: its units "
+                   "(syncretism_units), its buildings and quarters (syncretism_infrastructure), or its own tradition and a culture "
+                   "slot (syncretism_self); `unlocks` lists what each gives. The choice is permanent and does not block the turn")
 
 MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
@@ -355,6 +371,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = AGE_TRANSITION_NOTE
         if decision == "legacies":
             group["note"] = LEGACIES_NOTE
+        if decision == "syncretism":
+            group["note"] = SYNCRETISM_NOTE
         if decision == "first_meet":
             group["note"] = FIRST_MEET_NOTE
         if decision == "production":

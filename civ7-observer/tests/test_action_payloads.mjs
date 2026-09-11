@@ -2670,7 +2670,7 @@ test("a notification whose own blocking field went stale is not counted once the
 });
 
 // ---- new-age legacy cards
-function withLegacies(g, { deck = [], points = 3, usable = true, placement = false } = {}) {
+function withLegacies(g, { deck = [], points = 3, usable = true, placement = false, plotsListed = null, placeOk = [[5, 5], [6, 5]], potentialCapitals = [], civChanged = false } = {}) {
   const me = g.Players.get(1);
   const cards = [
     { id: "CARD_A", name: "LOC_CA", description: "LOC_CA_D", cost: [{ category: 1, value: 1 }], effects: [{ id: "EFF_A", amount: 1, isPlacementEffect: false }] },
@@ -2690,7 +2690,27 @@ function withLegacies(g, { deck = [], points = 3, usable = true, placement = fal
       if (op === 214839009) return { Success: args.Type === "ADD" ? !inDeck.includes(args.ID) : inDeck.includes(args.ID) };
       if (op === 1398940173) { const owner = cards.find((c) => c.effects.some((e) => e.id === args.ID)); return { Success: usable && !!owner && inDeck.includes(owner.id) && !applied[args.ID] }; }
       return { Success: true }; },
-    sendRequest: (pid, op, args) => { g._log.push(`lsendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === 214839009 && args.Type === "ADD") inDeck.push(args.ID); if (op === 1398940173) applied[args.ID] = true; },
+    sendRequest: (pid, op, args) => { g._log.push(`lsendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === 214839009 && args.Type === "ADD") inDeck.push(args.ID); if (op === 214839009 && args.Type === "REMOVE") inDeck = inDeck.filter((x) => x !== args.ID); if (op === 1398940173) applied[args.ID] = true; },
+  };
+  // placement (555001) and the capital (555002) sit beside the deck operations
+  g.PlayerOperationTypes.ADVANCED_START_PLACE_SETTLEMENT = 555001; g.PlayerOperationTypes.SELECT_CAPITAL = 555002;
+  const cities = [{ id: { owner: 1, id: 65536, type: 1 }, name: "LOC_C", location: { x: 3, y: 4 }, population: 5, isTown: false },
+                  { id: { owner: 1, id: 131072, type: 1 }, name: "LOC_T", location: { x: 12, y: 4 }, population: 3, isTown: true }];
+  let capital = cities[0];
+  me.Cities = { getCities: () => cities, getCapital: () => capital, getPotentialSwitchCapitalCityIds: () => potentialCapitals.map((id) => ({ owner: 1, id, type: 1 })) };
+  me.civilizationType = 7; me.previousAgeCivilizationType = civChanged ? 6 : 7;
+  g.GameplayMap = { getGridWidth: () => 20, getGridHeight: () => 20, getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getTerrainType: () => 1 };
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
+  const deckOps = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op === 555001) { g._log.push(`pcanStart(${JSON.stringify(args)})`); const eff = cards[1].effects[0]; if (args.X === undefined) return { Success: true, Plots: plotsListed }; return { Success: inDeck.includes("CARD_B") && eff.isPlacementEffect && eff.amount > 0 && placeOk.some(([x, y]) => x === args.X && y === args.Y) }; }
+      if (op === 555002) { g._log.push(`kcanStart(${JSON.stringify(args)})`); return { Success: potentialCapitals.includes(args.City) }; }
+      return deckOps.canStart(pid, op, args, show); },
+    sendRequest: (pid, op, args) => {
+      if (op === 555001) { g._log.push(`psendRequest(${JSON.stringify(args)})`); cards[1].effects[0].amount -= 1; return; }
+      if (op === 555002) { g._log.push(`ksendRequest(${JSON.stringify(args)})`); capital = cities.find((c) => c.id.id === args.City); return; }
+      return deckOps.sendRequest(pid, op, args); },
   };
   return { g, hash: g.Database.makeHash };
 }
@@ -2710,22 +2730,136 @@ test("legacy offers list unpicked cards with cost and points, and the finish", (
   assert.ok(!hr.offers.some((o) => o.kind === "ADVANCED_START_MODIFY_DECK" && o.cardId === "CARD_A"), "a picked card is not offered again");
   assert.deepEqual(hr.offers.find((o) => o.kind === "ADVANCED_START_MARK_COMPLETED").deck, ["CARD_A"]);
   const { g: pl } = withLegacies(world({ log: [] }), { placement: true }); pl._log = [];
-  assert.equal(runOffers(pl).offers.find((o) => o.cardId === "CARD_B").canStart, false, "a placement card is listed but not startable");
+  const plo = runOffers(pl).offers;
+  assert.deepEqual([plo.find((o) => o.cardId === "CARD_B" && o.kind === "ADVANCED_START_MODIFY_DECK").canStart, plo.find((o) => o.cardId === "CARD_B").needsPlacement], [true, true], "a placement card is pickable and says so");
+  assert.equal(plo.find((o) => o.kind === "ADVANCED_START_MARK_COMPLETED").pendingPlacements, 0, "nothing to place until the card is picked");
+  assert.equal(plo.filter((o) => o.kind === "ADVANCED_START_REMOVE_CARD").length, 0, "nothing to put back while the deck is empty");
+  assert.equal(plo.filter((o) => o.kind === "SELECT_CAPITAL").length, 0, "no other settlement may be the capital here");
 });
 
-test("picking a legacy card adds it and applies its own effects once each, then the finish marks the deck", () => {
+test("picked cards are offered back; a picked placement card offers its settlement on each plot the engine accepts, from its Plots list or a probe around the seat's settlements, and the finish counts what is unplaced", () => {
+  const { g, hash } = withLegacies(world({ log: [] }), { deck: ["CARD_A", "CARD_B"], placement: true, potentialCapitals: [131072] }); g._log = [];
+  const r = runOffers(g).offers;
+  assert.deepEqual(r.filter((o) => o.kind === "ADVANCED_START_REMOVE_CARD").map((o) => [o.arg, o.pre, o.cardId, o.cost, o.deck, o.canStart]),
+    [[hash("CARD_A"), 2, "CARD_A", 1, ["CARD_A", "CARD_B"], true], [hash("CARD_B"), 2, "CARD_B", 2, ["CARD_A", "CARD_B"], true]]);
+  const places = r.filter((o) => o.kind === "ADVANCED_START_PLACE_SETTLEMENT");
+  assert.deepEqual(places.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.effectId, o.cardId, o.remaining, o.terrainKey, o.canStart]),
+    [[hash("EFF_B"), 5, 5, 1, "EFF_B", "CARD_B", 1, "TERRAIN_FLAT", true], [hash("EFF_B"), 6, 5, 1, "EFF_B", "CARD_B", 1, "TERRAIN_FLAT", true]]);
+  assert.ok(g._log.filter((e) => e.startsWith("pcanStart(") && e.includes('"X"')).length > 100, "with no Plots list the plots around both settlements are probed");
+  assert.equal(r.find((o) => o.kind === "ADVANCED_START_MARK_COMPLETED").pendingPlacements, 1);
+  assert.deepEqual(r.filter((o) => o.kind === "SELECT_CAPITAL").map((o) => [o.arg, o.arg2, o.pre, o.cityName, o.population, o.isTown, o.currentCapitalName, o.swap, o.canStart]),
+    [[131072, 0, 65536, "LOC_T", 3, true, "Cordoba", false, true]]);
+  const { g: listed } = withLegacies(world({ log: [] }), { deck: ["CARD_B"], placement: true, plotsListed: [505, 606], civChanged: true, potentialCapitals: [131072] }); listed._log = [];
+  const lr = runOffers(listed).offers;
+  assert.deepEqual(lr.filter((o) => o.kind === "ADVANCED_START_PLACE_SETTLEMENT").map((o) => [o.arg2, o.arg3]), [[5, 5]], "an engine Plots list is used as given, each plot still checked");
+  assert.equal(lr.find((o) => o.kind === "SELECT_CAPITAL").arg2, 1, "a changed civilization renames the new capital, as the shipped confirm sends it");
+  assert.ok(!listed._log.some((e) => e.startsWith("psendRequest") || e.startsWith("ksendRequest")));
+});
+
+test("putting a card back, placing a settlement and moving the capital each re-check and read back their own effect", () => {
+  const { g, hash } = withLegacies(world({ log: [] }), { deck: ["CARD_A", "CARD_B"], placement: true, potentialCapitals: [131072] }); g._log = [];
+  const rm = runPerform(g, "ADVANCED_START_REMOVE_CARD", hash("CARD_A"), { pre: 2 });
+  assert.equal(rm.refused, null);
+  assert.deepEqual(rm.readback, { kind: "ADVANCED_START_REMOVE_CARD", arg: hash("CARD_A"), card: "CARD_A", deck: ["CARD_B"], matches: true });
+  assert.ok(g._log.find((l) => l === 'lsendRequest(1,214839009,{"Type":"REMOVE","ID":"CARD_A"})'));
+  assert.ok(!g._log.some((l) => l.includes("1398940173")), "no reward is touched by putting a card back");
+  assert.equal(runPerform(g, "ADVANCED_START_REMOVE_CARD", hash("CARD_A"), { pre: 1 }).refused.code, "UNKNOWN_ACTION", "a card not in the deck cannot be put back");
+  const pl = runPerformArgs(g, "ADVANCED_START_PLACE_SETTLEMENT", hash("EFF_B"), 6, 5, { pre: 1 });
+  assert.equal(pl.refused, null);
+  assert.deepEqual(pl.readback, { kind: "ADVANCED_START_PLACE_SETTLEMENT", arg: hash("EFF_B"), effect: "EFF_B", at: { x: 6, y: 5 }, remaining: 0, matches: true });
+  assert.ok(g._log.find((l) => l === 'psendRequest({"ID":"EFF_B","X":6,"Y":5})'));
+  assert.equal(runPerformArgs(g, "ADVANCED_START_PLACE_SETTLEMENT", hash("EFF_B"), 5, 5, { pre: 1 }).refused.code, "ACTION_EXPIRED", "spent placements are not re-placed");
+  assert.equal(runPerformArgs(g, "ADVANCED_START_PLACE_SETTLEMENT", hash("EFF_A"), 5, 5, { pre: 1 }).refused.code, "UNKNOWN_ACTION", "an instant effect is not a placement");
+  const cap = runPerformArgs(g, "SELECT_CAPITAL", 131072, 0, 0, { pre: 65536 });
+  assert.equal(cap.refused, null);
+  assert.deepEqual(cap.readback, { kind: "SELECT_CAPITAL", arg: 131072, capitalCityId: 131072, matches: true });
+  assert.ok(g._log.find((l) => l === 'ksendRequest({"Player1":1,"City":131072,"Swap":false})'));
+  assert.equal(runPerformArgs(g, "SELECT_CAPITAL", 65536, 0, 0, { pre: 131072 }).refused.code, "ACTION_NOT_STARTABLE", "only the engine's legal set");
+  assert.equal(runPerformArgs(g, "SELECT_CAPITAL", 131072, 0, 0, { pre: 65536 }).refused.code, "ACTION_EXPIRED", "a moved capital expires the offer");
+  assert.equal(runPerformArgs(g, "SELECT_CAPITAL", 131072, 1, 0, { pre: 131072 }).refused.code, "ACTION_EXPIRED", "the naming flag is bound");
+});
+
+test("picking a legacy card adds it without its reward; the finish applies every picked card's reward once each and then marks the deck", () => {
   const log = [];
-  const { g, hash } = withLegacies(world({ log })); g._log = log;
+  const { g, hash } = withLegacies(world({ log }), { placement: true }); g._log = log;
   const a = runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 });
   assert.equal(a.refused, null);
-  assert.deepEqual(a.readback, { kind: "ADVANCED_START_MODIFY_DECK", arg: hash("CARD_A"), card: "CARD_A", effectsApplied: 1, deck: ["CARD_A"], matches: true });
+  assert.deepEqual(a.readback, { kind: "ADVANCED_START_MODIFY_DECK", arg: hash("CARD_A"), card: "CARD_A", deck: ["CARD_A"], matches: true });
   assert.ok(log.find((l) => l === 'lsendRequest(1,214839009,{"Type":"ADD","ID":"CARD_A"})'));
-  assert.equal(log.filter((l) => l === 'lsendRequest(1,1398940173,{"ID":"EFF_A"})').length, 1, "the effect is applied exactly once");
-  const m = runPerform(g, "ADVANCED_START_MARK_COMPLETED", 0, { pre: 1 });
+  assert.ok(!log.some((l) => l.includes("1398940173")), "no reward is applied by a pick");
+  assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_B"), { pre: 1 }).refused, null, "a placement card is picked like any other");
+  const m = runPerform(g, "ADVANCED_START_MARK_COMPLETED", 0, { pre: 2 });
   assert.equal(m.outcome, "sent");
+  assert.deepEqual(m.readback, { kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, effectsApplied: 1, matches: false });
+  assert.equal(log.filter((l) => l === 'lsendRequest(1,1398940173,{"ID":"EFF_A"})').length, 1, "the instant effect is applied exactly once");
+  assert.ok(!log.some((l) => l.includes('{"ID":"EFF_B"}')), "a placement effect is never applied as a reward");
+  assert.ok(log.indexOf('lsendRequest(1,1398940173,{"ID":"EFF_A"})') < log.indexOf("lsendRequest(1,867990583,{})"), "rewards land before the mark");
   assert.ok(log.find((l) => l === "lsendRequest(1,867990583,{})"));
   assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 }).refused.code, "ACTION_EXPIRED", "stale deck size");
-  assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", 4242, { pre: 1 }).refused.code, "UNKNOWN_ACTION");
+  assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", 4242, { pre: 2 }).refused.code, "UNKNOWN_ACTION");
+});
+
+// ---- syncretism: three operations over the same civilization list, made once
+function withSyncretism(g, { civs = { UNITS: [7001], INFRASTRUCTURE: [7001, 7002], SELF: [] }, chosen = -1, ok = true } = {}) {
+  const me = g.Players.get(1);
+  me.Identity = { getSyncreticCivType: () => chosen, getSyncreticChoiceType: () => (chosen === -1 ? -1 : 2) };
+  g.SyncreticChoiceTypes = { SYNCRETIC_CHOICE_UNITS: 1, SYNCRETIC_CHOICE_INFRASTRUCTURE: 2, SYNCRETIC_CHOICE_SELF: 3 };
+  g.PlayerOperationTypes.CHOOSE_SYNCRETISM_UNITS = 6101; g.PlayerOperationTypes.CHOOSE_SYNCRETISM_INFRASTRUCTURE = 6102; g.PlayerOperationTypes.CHOOSE_SYNCRETISM_SELF = 6103;
+  g.GameInfo.LegacyCivilizationTraits = table([{ $hash: 7001, CivilizationType: "CIVILIZATION_ABBASID" }, { $hash: 7002, CivilizationType: "CIVILIZATION_MING" }]);
+  g.GameInfo.Civilizations = { lookup: (k) => ({ CIVILIZATION_ABBASID: { $hash: 7001, CivilizationType: "CIVILIZATION_ABBASID", Name: "LOC_ABB" }, CIVILIZATION_MING: { $hash: 7002, CivilizationType: "CIVILIZATION_MING", Name: "LOC_MING" }, 7001: { $hash: 7001, CivilizationType: "CIVILIZATION_ABBASID", Name: "LOC_ABB" }, 7002: { $hash: 7002, CivilizationType: "CIVILIZATION_MING", Name: "LOC_MING" } })[k] ?? null };
+  g.GameInfo.Constructibles = table([{ $hash: 8801, ConstructibleType: "BUILDING_MADRASA" }]);
+  g.GameInfo.Traditions = table([{ $hash: 8901, TraditionType: "TRADITION_ABBASID_SYNCRETISM" }]);
+  g.Game.Unlocks = {
+    getSyncreticCivUnlocksForChoice: (pid, flag) => { g._log.push(`syncList(${pid},${flag})`); return civs[{ 1: "UNITS", 2: "INFRASTRUCTURE", 3: "SELF" }[flag]]; },
+    getUnitChoiceSyncreticUnlocks: () => [{ kind: "KIND_UNIT", typeHash: 99 }],
+    getInfrastructureChoiceSyncreticUnlocks: () => [{ kind: "KIND_CONSTRUCTIBLE", typeHash: 8801 }, { kind: "KIND_QUARTER", typeHash: 4444 }],
+    getSelfChoiceSyncreticUnlocks: () => [{ kind: "KIND_TRADITION", typeHash: 8901 }],
+  };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op < 6101 || op > 6103) return inner.canStart(pid, op, args, show); g._log.push(`scanStart(${pid},${op},${JSON.stringify(args)},${show})`); return { Success: ok, Units: [99], AdditionalDescription: ["LOC_UNIT_NOTE"] }; },
+    sendRequest: (pid, op, args) => { if (op < 6101 || op > 6103) return inner.sendRequest(pid, op, args); g._log.push(`ssendRequest(${pid},${op},${JSON.stringify(args)})`); chosen = args.CivilizationType; },
+  };
+  return g;
+}
+
+test("syncretism offers one option per civilization per choice kind, naming what each gives, only until a choice is made", () => {
+  const g = withSyncretism(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runOffers(g).offers.filter((o) => o.kind.startsWith("CHOOSE_SYNCRETISM"));
+  assert.deepEqual(r.map((o) => [o.kind, o.arg, o.pre, o.civKey, o.displayName, o.choice, o.unlocks, o.description, o.canStart]), [
+    ["CHOOSE_SYNCRETISM_UNITS", 7001, -1, "CIVILIZATION_ABBASID", "LOC_ABB", "SYNCRETIC_CHOICE_UNITS", [{ kind: "KIND_UNIT", key: "UNIT_SCOUT" }], "LOC_UNIT_NOTE", true],
+    ["CHOOSE_SYNCRETISM_INFRASTRUCTURE", 7001, -1, "CIVILIZATION_ABBASID", "LOC_ABB", "SYNCRETIC_CHOICE_INFRASTRUCTURE", [{ kind: "KIND_CONSTRUCTIBLE", key: "BUILDING_MADRASA" }, { kind: "KIND_QUARTER", key: "4444" }], "LOC_UNIT_NOTE", true],
+    ["CHOOSE_SYNCRETISM_INFRASTRUCTURE", 7002, -1, "CIVILIZATION_MING", "LOC_MING", "SYNCRETIC_CHOICE_INFRASTRUCTURE", [{ kind: "KIND_CONSTRUCTIBLE", key: "BUILDING_MADRASA" }, { kind: "KIND_QUARTER", key: "4444" }], "LOC_UNIT_NOTE", true],
+  ]);
+  assert.ok(g._log.filter((e) => e.startsWith("scanStart(")).every((e) => e.includes('"CivilizationType":')));
+  const done = withSyncretism(withUnits(world({ log: [] }), []), { chosen: 7001 }); done._log = [];
+  assert.equal(runOffers(done).offers.filter((o) => o.kind.startsWith("CHOOSE_SYNCRETISM")).length, 0, "a made choice is not offered again");
+});
+
+test("perform a syncretism choice re-checks the civilization is in that kind's list and reads back the identity", () => {
+  const g = withSyncretism(withUnits(world({ log: [] }), [])); g._log = [];
+  assert.equal(runPerform(g, "CHOOSE_SYNCRETISM_UNITS", 7002, { pre: -1 }).refused.code, "ACTION_NOT_STARTABLE", "Ming is only an infrastructure choice here");
+  const r = runPerform(g, "CHOOSE_SYNCRETISM_INFRASTRUCTURE", 7002, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CHOOSE_SYNCRETISM_INFRASTRUCTURE", arg: 7002, syncreticCiv: 7002, matches: true });
+  assert.ok(g._log.find((e) => e === 'ssendRequest(1,6102,{"CivilizationType":7002})'));
+  assert.equal(runPerform(g, "CHOOSE_SYNCRETISM_UNITS", 7001, { pre: -1 }).refused.code, "ACTION_EXPIRED", "made once");
+});
+
+test("a migrant's resettle lists the engine's plots with what each would build and sends the plot alone; the unit being spent is the proof", () => {
+  const g = withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: ["RESETTLE"], plots: [1011, 1012], gone: true }); g._log = [];
+  g.UnitCommandTypes.RESETTLE = 7007;
+  g.GameInfo.Constructibles = table([{ $hash: 31, ConstructibleType: "IMPROVEMENT_FARM" }, { $hash: 32, ConstructibleType: "IMPROVEMENT_MINE" }]);
+  const prev = g.Game.UnitCommands;
+  g.Game.UnitCommands = { canStart: (uid, cmd, args, show) => { if (cmd !== 7007) return prev.canStart(uid, cmd, args, show); g._log.push(`rcanStart(${JSON.stringify(args)})`); return { Success: true, Plots: [1011, 1012], ConstructibleTypes: [31, 32] }; },
+                          sendRequest: (uid, cmd, args) => { if (cmd !== 7007) return prev.sendRequest(uid, cmd, args); g._log.push(`rsendRequest(${JSON.stringify(args)})`); g.Players.get(1).Units = { getUnits: () => [] }; } };
+  const r = runOffers(g).offers.filter((o) => o.kind === "RESETTLE");
+  assert.deepEqual(r.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.expect, o.constructibleKey, o.canStart]), [[5, 11, 10, 1, "gone", "IMPROVEMENT_FARM", true], [5, 12, 10, 1, "gone", "IMPROVEMENT_MINE", true]]);
+  assert.ok(g._log.includes("rcanStart({})"), "listed with the empty argument the shipped mode uses");
+  const p = runPerformArgs(g, "RESETTLE", 5, 12, 10, { pre: 1 });
+  assert.equal(p.refused, null);
+  assert.deepEqual([p.readback.present, p.readback.matches], [false, true]);
+  assert.ok(g._log.includes('rsendRequest({"X":12,"Y":10})'), "the plot alone, no ability field");
 });
 
 // ---- first contact (the other player's id comes from the seat's own notification text)

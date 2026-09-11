@@ -279,13 +279,13 @@
   // The six generic unit commands. The kind IS the engine's command name, validated host-side against
   // the catalog, so nothing a caller says ever reaches UnitCommandTypes as text.
   if (KIND === "UPGRADE" || KIND === "PACK_ARMY" || KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" ||
-      KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON" || KIND === "WAKE" || KIND === "CANCEL" || KIND === "PLUNDER_TRADE_ROUTE") {
+      KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON" || KIND === "WAKE" || KIND === "CANCEL" || KIND === "PLUNDER_TRADE_ROUTE" || KIND === "RESETTLE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "unit command argument is not an integer");
     if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit command type unavailable");
-    const needsPlot = KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" || KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON";
+    const needsPlot = KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" || KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON" || KIND === "RESETTLE";
     const expect = (KIND === "UPGRADE") ? "type"
                  : (KIND === "PACK_ARMY" || KIND === "UNPACK_ARMY") ? "armySize"
-                 : (KIND === "ACTIVATE_GREAT_PERSON") ? "gone"
+                 : (KIND === "ACTIVATE_GREAT_PERSON" || KIND === "RESETTLE") ? "gone"
                  : (KIND === "WAKE" || KIND === "CANCEL") ? "awake"
                  : (KIND === "PLUNDER_TRADE_ROUTE") ? "spent" : "army";
     let actor = null;
@@ -303,7 +303,8 @@
     let cmdArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
     if (needsPlot) {
       if (!isInt(ARG2) || !isInt(ARG3) || ARG2 < 0 || ARG3 < 0) return refuse("UNKNOWN_ACTION", "this command needs a target plot");
-      cmdArgs = { X: ARG2, Y: ARG3, UnitAbilityType: -1 };
+      // resettling sends the plot alone, as the shipped acquire-tile mode does
+      cmdArgs = KIND === "RESETTLE" ? { X: ARG2, Y: ARG3 } : { X: ARG2, Y: ARG3, UnitAbilityType: -1 };
     }
     const commandType = UnitCommandTypes[OP_KIND];
     const ccheck = Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false);
@@ -937,31 +938,76 @@
     result.readback = { kind: KIND, arg: 0, matches: false };
     return JSON.stringify(result);
   }
-  if (KIND === "ADVANCED_START_MODIFY_DECK" || KIND === "ADVANCED_START_MARK_COMPLETED") {
-    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.AdvancedStart) return refuse("API_CONTRACT_MISMATCH", "advanced start contract unavailable");
+  if (KIND === "ADVANCED_START_MODIFY_DECK" || KIND === "ADVANCED_START_MARK_COMPLETED" || KIND === "ADVANCED_START_REMOVE_CARD" || KIND === "ADVANCED_START_PLACE_SETTLEMENT") {
+    // Adding and putting back are both the one MODIFY_DECK operation, told apart by Type, so the deck
+    // operation is reached by its literal name; the finish and a placement are their own operations.
+    const deckOp = PlayerOperationTypes["ADVANCED_START_MODIFY_DECK"];
+    if (!isInt(deckOp) || !isInt(PlayerOperationTypes.ADVANCED_START_USE_EFFECT) || !player.AdvancedStart) return refuse("API_CONTRACT_MISMATCH", "advanced start contract unavailable");
+    if ((KIND === "ADVANCED_START_MARK_COMPLETED" || KIND === "ADVANCED_START_PLACE_SETTLEMENT") && !isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "advanced start operation unavailable");
     const A = player.AdvancedStart;
     // a deck entry wraps the card under `info`; an available card is the card itself
     const cardOf = (c) => (c && c.info ? c.info : c);
     let deck = null; try { deck = A.getCards(); } catch (e) { deck = null; }
     if (!Array.isArray(deck)) return refuse("API_CONTRACT_MISMATCH", "advanced start deck unavailable");
     const deckIds = deck.map((c) => cardOf(c) && cardOf(c).id).filter((x) => typeof x === "string");
+    const deckNow = () => { try { return A.getCards().map((c) => cardOf(c) && cardOf(c).id); } catch (e) { return null; } };
+    if (KIND === "ADVANCED_START_PLACE_SETTLEMENT") {
+      if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "placement arguments are not integers");
+      let effect = null;
+      for (const d of deck) { const c = cardOf(d); if (!c || !Array.isArray(c.effects)) continue; for (const e of c.effects) { if (e && typeof e.id === "string" && e.isPlacementEffect === true && Database.makeHash(e.id) === ARG) effect = e; } }
+      if (!effect) return refuse("UNKNOWN_ACTION", "effect is not a placement effect of a card in the deck");
+      if (!isInt(effect.amount) || effect.amount !== PRE || PRE <= 0) return refuse("ACTION_EXPIRED", "the effect's remaining placements changed since the offer was made");
+      const placeArgs = { ID: effect.id, X: ARG2, Y: ARG3 };
+      const pcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], placeArgs, false);
+      if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused placing the settlement there");
+      Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], placeArgs);
+      result.outcome = "sent";
+      let left = null; try { for (const d of A.getCards()) { const c = cardOf(d); for (const e of ((c && c.effects) || [])) { if (e && e.id === effect.id && isInt(e.amount)) left = e.amount; } } } catch (e) { left = null; }
+      result.readback = { kind: KIND, arg: ARG, effect: effect.id, at: { x: ARG2, y: ARG3 }, remaining: left, matches: isInt(left) && left < PRE };
+      return JSON.stringify(result);
+    }
     if (deckIds.length !== PRE) return refuse("ACTION_EXPIRED", "the legacy deck changed since the offer was made");
-    let args = null;
     if (KIND === "ADVANCED_START_MODIFY_DECK") {
       if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "card argument is not an integer");
       let card = null; try { for (const c of A.getAvailableCards()) { if (c && typeof c.id === "string" && Database.makeHash(c.id) === ARG) { card = c; break; } } } catch (e) { card = null; }
       if (!card) return refuse("UNKNOWN_ACTION", "card is not among the seat's available legacy cards");
       if (deckIds.indexOf(card.id) !== -1) return refuse("ACTION_EXPIRED", "that card is already in the deck");
-      if (Array.isArray(card.effects) && card.effects.some((e) => e && e.isPlacementEffect === true)) return refuse("ACTION_NOT_STARTABLE", "cards with a placement effect are not supported yet");
       const addArgs = { Type: "ADD", ID: card.id };
-      const addCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], addArgs, false);
+      const addCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, deckOp, addArgs, false);
       if (!addCheck || addCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused adding the card");
-      Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], addArgs);
-      // Taking a card is taking its reward. The shipped screen applies every picked card's effects when
-      // it confirms, and ADVANCED_START_USE_EFFECT keeps reporting startable after use (live: an applied
-      // effect still read true), so applying here, once per pick, is the only way each lands exactly once.
-      let applied = 0;
-      for (const e of (card.effects || [])) {
+      Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, deckOp, addArgs);
+      // The card's rewards are applied when the deck is finished, as the shipped screen does, so a card
+      // can be put back for its points in the meantime without its reward having landed.
+      result.outcome = "sent";
+      const now = deckNow();
+      result.readback = { kind: KIND, arg: ARG, card: card.id, deck: now, matches: Array.isArray(now) && now.indexOf(card.id) !== -1 };
+      return JSON.stringify(result);
+    }
+    if (KIND === "ADVANCED_START_REMOVE_CARD") {
+      if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "card argument is not an integer");
+      let card = null; for (const d of deck) { const c = cardOf(d); if (c && typeof c.id === "string" && Database.makeHash(c.id) === ARG) { card = c; break; } }
+      if (!card) return refuse("UNKNOWN_ACTION", "card is not in the deck");
+      const removeArgs = { Type: "REMOVE", ID: card.id };
+      const removeCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, deckOp, removeArgs, false);
+      if (!removeCheck || removeCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused putting the card back");
+      Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, deckOp, removeArgs);
+      result.outcome = "sent";
+      const now = deckNow();
+      result.readback = { kind: KIND, arg: ARG, card: card.id, deck: now, matches: Array.isArray(now) && now.indexOf(card.id) === -1 };
+      return JSON.stringify(result);
+    }
+    const markArgs = {};
+    const markCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], markArgs, false);
+    if (!markCheck || markCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused finishing the deck");
+    // Finishing takes every picked card's reward, as the shipped confirm does: ADVANCED_START_USE_EFFECT
+    // once per effect per amount. The engine keeps reporting an applied effect as startable (live: an
+    // applied effect still read true), so applying here, once, right before the mark that ends the
+    // deck, is the only way each lands exactly once. Placement effects are not rewards to apply: an
+    // unplaced one becomes a plain settler when the deck is marked complete.
+    let applied = 0;
+    for (const d of deck) {
+      const c = cardOf(d);
+      for (const e of ((c && c.effects) || [])) {
         if (!e || typeof e.id !== "string" || e.isPlacementEffect === true) continue;
         const times = isInt(e.amount) && e.amount > 0 ? e.amount : 1;
         for (let i = 0; i < times; i++) {
@@ -971,17 +1017,45 @@
           applied += 1;
         }
       }
-      result.outcome = "sent";
-      let deckNow = null; try { deckNow = A.getCards().map((c) => cardOf(c) && cardOf(c).id); } catch (e) { deckNow = null; }
-      result.readback = { kind: KIND, arg: ARG, card: card.id, effectsApplied: applied, deck: deckNow, matches: Array.isArray(deckNow) && deckNow.indexOf(card.id) !== -1 };
-      return JSON.stringify(result);
     }
-    const markArgs = {};
-    const markCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], markArgs, false);
-    if (!markCheck || markCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused finishing the deck");
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], markArgs);
     result.outcome = "sent";
-    result.readback = { kind: KIND, arg: 0, matches: false };
+    result.readback = { kind: KIND, arg: 0, effectsApplied: applied, matches: false };
+    return JSON.stringify(result);
+  }
+  if (KIND === "SELECT_CAPITAL") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "capital arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Cities || typeof player.Cities.getPotentialSwitchCapitalCityIds !== "function") return refuse("API_CONTRACT_MISMATCH", "capital selection unavailable");
+    let capId = -1; try { const cap = player.Cities.getCapital(); capId = cap && cap.id && isInt(cap.id.id) ? cap.id.id : -1; } catch (e) { capId = -1; }
+    if (capId !== PRE) return refuse("ACTION_EXPIRED", "the capital changed since the offer was made");
+    let legal = false; try { for (const cid of player.Cities.getPotentialSwitchCapitalCityIds()) { if (cid && cid.id === ARG && cid.owner === BOUND_PLAYER_ID) legal = true; } } catch (e) { legal = false; }
+    if (!legal) return refuse("ACTION_NOT_STARTABLE", "city is not among the legal new capitals");
+    const swap = player.previousAgeCivilizationType !== player.civilizationType;
+    if ((swap ? 1 : 0) !== ARG2) return refuse("ACTION_EXPIRED", "the capital's naming changed since the offer was made");
+    const capArgs = { Player1: BOUND_PLAYER_ID, City: ARG, Swap: swap };
+    const capCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], capArgs, false);
+    if (!capCheck || capCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused moving the capital");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], capArgs);
+    result.outcome = "sent";
+    let now = null; try { const cap = player.Cities.getCapital(); now = cap && cap.id && isInt(cap.id.id) ? cap.id.id : null; } catch (e) { now = null; }
+    result.readback = { kind: KIND, arg: ARG, capitalCityId: now, matches: now === ARG };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CHOOSE_SYNCRETISM_UNITS" || KIND === "CHOOSE_SYNCRETISM_INFRASTRUCTURE" || KIND === "CHOOSE_SYNCRETISM_SELF") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "civilization argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof SyncreticChoiceTypes === "undefined" || !Game.Unlocks || !player.Identity) return refuse("API_CONTRACT_MISMATCH", "syncretism unavailable");
+    let chosen = -1; try { const ct = player.Identity.getSyncreticCivType(); chosen = isInt(ct) && GameInfo.Civilizations.lookup(ct) ? ct : -1; } catch (e) { chosen = -1; }
+    if (chosen !== -1) return refuse("ACTION_EXPIRED", "a syncretic civilization is already chosen");
+    const flagName = KIND === "CHOOSE_SYNCRETISM_UNITS" ? "SYNCRETIC_CHOICE_UNITS" : KIND === "CHOOSE_SYNCRETISM_INFRASTRUCTURE" ? "SYNCRETIC_CHOICE_INFRASTRUCTURE" : "SYNCRETIC_CHOICE_SELF";
+    let civs = null; try { civs = Game.Unlocks.getSyncreticCivUnlocksForChoice(BOUND_PLAYER_ID, SyncreticChoiceTypes[flagName]); } catch (e) { civs = null; }
+    if (!Array.isArray(civs) || civs.indexOf(ARG) === -1) return refuse("ACTION_NOT_STARTABLE", "civilization is not among this seat's choices for that kind of syncretism");
+    const syncArgs = { CivilizationType: ARG };
+    const syncCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], syncArgs, false);
+    if (!syncCheck || syncCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the syncretism choice");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], syncArgs);
+    result.outcome = "sent";
+    let now = null; try { const ct = player.Identity.getSyncreticCivType(); now = isInt(ct) ? ct : null; } catch (e) { now = null; }
+    result.readback = { kind: KIND, arg: ARG, syncreticCiv: now, matches: now === ARG };
     return JSON.stringify(result);
   }
   if (KIND === "CHOOSE_AGE_CIVILIZATION") {

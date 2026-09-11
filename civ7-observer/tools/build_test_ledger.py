@@ -46,6 +46,8 @@ PLAN_KINDS = {
     "A08": ["pillage", "coastal_raid", "pillage_route", "plunder_trade_route"], "A09": ["spread_religion"],
     "A10": ["queue_remove", "queue_move_up", "queue_move_down"], "A11": ["deactivate_tradition"],
     "A12": ["unassign_resource", "swap_resources"], "A13": ["town_growth_mode"], "A14": ["wake_unit", "cancel_order"],
+    "A15": ["select_capital"], "A16": ["syncretism_units", "syncretism_infrastructure", "syncretism_self"],
+    "A17": ["drop_legacy_card", "place_legacy_settlement"], "A18": ["resettle"],
 }
 
 

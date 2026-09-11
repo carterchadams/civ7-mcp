@@ -80,6 +80,11 @@ MUTATION_ALLOWLIST = (
     'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, project.operationType, diploArgs)',
     'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
     # taking a legacy card takes its reward in the same action: the engine never reports an effect as spent
+    # the deck operation by its literal name: adding and putting back a card are one operation told apart by Type
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, deckOp, addArgs, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, deckOp, addArgs)',
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, deckOp, removeArgs, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, deckOp, removeArgs)',
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)',
     'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id })',
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false)',
@@ -313,9 +318,10 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     # every other operation is sent through the host-substituted kind; the one literal type name is the
     # legacy effect applied alongside its card, which the engine cannot report as already spent
     assert src.count("PlayerOperationTypes.") == src.count("PlayerOperationTypes.ADVANCED_START_USE_EFFECT")
-    # two operations are reached by a literal name because their kind is not the operation (a
-    # deactivation is CHANGE_TRADITION; an unassignment is ASSIGN_RESOURCE); nothing else may be
-    assert sorted(set(re.findall(r'PlayerOperationTypes\["([A-Z_]+)"\]', src))) == ["ASSIGN_RESOURCE", "CHANGE_TRADITION"]
+    # three operations are reached by a literal name because their kind is not the operation (a
+    # deactivation is CHANGE_TRADITION; an unassignment is ASSIGN_RESOURCE; putting a legacy card
+    # back is ADVANCED_START_MODIFY_DECK); nothing else may be
+    assert sorted(set(re.findall(r'PlayerOperationTypes\["([A-Z_]+)"\]', src))) == ["ADVANCED_START_MODIFY_DECK", "ASSIGN_RESOURCE", "CHANGE_TRADITION"]
     stripped = src
     for a in MUTATION_ALLOWLIST:
         stripped = stripped.replace(a, "")

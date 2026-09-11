@@ -1081,6 +1081,21 @@ def test_a_unit_upgrade_confirms_on_the_type_changing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitCommand": {"unitId": 5, "command": "upgrade_unit", "was": 99, "now": 100}}
 
 
+def test_a_wake_confirms_through_the_host_read_back_when_the_unit_becomes_ready_after_the_payload_looked(tmp_path):
+    wk = {"kind": "WAKE", "arg": 5, "pre": 0, "unitId": 5, "expect": "awake", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [wk]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "WAKE", "arg": 5, "expect": "awake", "before": 0, "after": 0, "present": True, "matches": False}}
+    rb = {**RB, "unitAwake": {"5": 1}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        w = next(o for o in out["offers"] if o["kind"] == "wake_unit")
+        res = reg.perform(gs, action_id=w["actionId"], request_id="wk-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitCommand": {"unitId": 5, "command": "wake_unit", "was": 0, "now": 1}}
+
+
 def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
     gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}

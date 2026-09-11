@@ -466,6 +466,9 @@
         ["WAKE", false, "awake"],
         ["CANCEL", false, "awake"],
         ["PLUNDER_TRADE_ROUTE", false, "spent"],
+        // A migrant settles into a settlement's plot, growing it by one; the plot list is the engine's,
+        // and the shipped acquire-tile mode lists with an empty argument and sends the plot alone.
+        ["RESETTLE", true, "gone"],
       ];
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
@@ -474,7 +477,7 @@
         for (const [command, needsPlot, expect] of COMMANDS) {
           const commandType = UnitCommandTypes[command];
           if (!isInt(commandType)) continue;
-          const check = Game.UnitCommands.canStart(unitId, commandType, NO_TARGET, false);
+          const check = Game.UnitCommands.canStart(unitId, commandType, command === "RESETTLE" ? {} : NO_TARGET, false);
           if (!check || check.Success !== true) continue;
           // The engine returns the gold price and what the unit becomes as one composed line, which
           // is what the shipped tooltip shows; there is no separate accessor for either.
@@ -495,16 +498,20 @@
             try { if (u.shouldShowActivationPlots(command === "ACTIVATE_GREAT_PERSON" ? "UNITCOMMAND_ACTIVATE_GREAT_PERSON" : command)) { const p = u.getActivationPlots("UNITCOMMAND_ACTIVATE_GREAT_PERSON", false); if (Array.isArray(p)) plots = p; } } catch (e) { /* none */ }
           }
           let offeredHere = 0;
-          for (const pi of plots) {
-            if (offeredHere >= 6) break;
+          for (let k = 0; k < plots.length; k++) {
+            const pi = plots[k];
+            if (offeredHere >= (command === "RESETTLE" ? 10 : 6)) break;
             if (!isInt(pi)) continue;
             const loc = GameplayMap.getLocationFromIndex(pi);
             if (!loc || !isInt(loc.x) || loc.x < 0) continue;
-            const cmdArgs = { X: loc.x, Y: loc.y, UnitAbilityType: -1 };
+            const cmdArgs = command === "RESETTLE" ? { X: loc.x, Y: loc.y } : { X: loc.x, Y: loc.y, UnitAbilityType: -1 };
             const at = Game.UnitCommands.canStart(unitId, commandType, cmdArgs, false);
             if (!at || at.Success !== true) continue;
-            offers.push({ ...common, arg2: loc.x, arg3: loc.y, pre: pre, to: { x: loc.x, y: loc.y }, plotIndex: pi,
-              terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") });
+            const offer = { ...common, arg2: loc.x, arg3: loc.y, pre: pre, to: { x: loc.x, y: loc.y }, plotIndex: pi,
+              terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") };
+            // the engine names, per plot, what the settling migrant would build there
+            if (command === "RESETTLE") offer.constructibleKey = Array.isArray(check.ConstructibleTypes) && isInt(check.ConstructibleTypes[k]) ? lookupKey(GameInfo.Constructibles, check.ConstructibleTypes[k], "ConstructibleType") : null;
+            offers.push(offer);
             offeredHere++;
           }
         }
@@ -1227,10 +1234,109 @@
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MODIFY_DECK, { Type: "ADD", ID: c.id }, false);
         offers.push({ kind: "ADVANCED_START_MODIFY_DECK", arg: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, displayName: compose(c.name), description: compose(c.description),
           cost: costOf(c), pointsAvailable: points, needsPlacement: placement, effectCount: Array.isArray(c.effects) ? c.effects.length : 0,
-          canStart: !!(check && check.Success === true) && !placement });
+          canStart: !!(check && check.Success === true) });
+      }
+      // A picked card can be put back (Type REMOVE) and its points return; rewards are only applied when
+      // the deck is finished, as the shipped screen does, so putting a card back costs nothing.
+      for (const d of deck) {
+        const c = cardOf(d);
+        if (!c || typeof c.id !== "string") continue;
+        const rcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MODIFY_DECK, { Type: "REMOVE", ID: c.id }, false);
+        offers.push({ kind: "ADVANCED_START_REMOVE_CARD", arg: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, displayName: compose(c.name), cost: costOf(c), deck: deckIds, canStart: !!(rcheck && rcheck.Success === true) });
+      }
+      // A placement effect (a free city or town) takes a plot: ADVANCED_START_PLACE_SETTLEMENT {ID, X, Y}.
+      // The shipped screen validates only at the click and keeps no plot list, so candidates are probed
+      // within six plots of the seat's own settlements unless the engine hands back a Plots list.
+      let pendingPlacements = 0;
+      if (isInt(PlayerOperationTypes.ADVANCED_START_PLACE_SETTLEMENT)) {
+        for (const d of deck) {
+          const c = cardOf(d);
+          if (!c || typeof c.id !== "string" || !Array.isArray(c.effects)) continue;
+          for (const e of c.effects) {
+            if (!e || typeof e.id !== "string" || e.isPlacementEffect !== true || !isInt(e.amount) || e.amount <= 0) continue;
+            pendingPlacements += e.amount;
+            const listing = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_PLACE_SETTLEMENT, { ID: e.id }, false);
+            const candidates = [];
+            if (listing && Array.isArray(listing.Plots) && listing.Plots.length > 0) {
+              for (const pi of listing.Plots) { if (!isInt(pi)) continue; const loc = GameplayMap.getLocationFromIndex(pi); if (loc && isInt(loc.x) && loc.x >= 0) candidates.push({ x: loc.x, y: loc.y }); }
+            } else {
+              const w = GameplayMap.getGridWidth(), h = GameplayMap.getGridHeight();
+              const mark = {};
+              for (const city of player.Cities.getCities()) {
+                if (!city || !city.location || !isInt(city.location.x)) continue;
+                for (let dy = -6; dy <= 6; dy++) for (let dx = -6; dx <= 6; dx++) {
+                  const x = city.location.x + dx, y = city.location.y + dy;
+                  if (x < 0 || y < 0 || x >= w || y >= h || mark[x + "," + y]) continue;
+                  mark[x + "," + y] = true; candidates.push({ x: x, y: y });
+                }
+              }
+            }
+            let offeredHere = 0;
+            for (const p of candidates) {
+              if (offeredHere >= 24) break;
+              const pc = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_PLACE_SETTLEMENT, { ID: e.id, X: p.x, Y: p.y }, false);
+              if (!pc || pc.Success !== true) continue;
+              offers.push({ kind: "ADVANCED_START_PLACE_SETTLEMENT", arg: Database.makeHash(e.id), arg2: p.x, arg3: p.y, pre: e.amount, effectId: e.id, cardId: c.id,
+                displayName: compose(e.name), description: compose(e.description), to: { x: p.x, y: p.y }, plotIndex: GameplayMap.getIndexFromXY(p.x, p.y),
+                terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(p.x, p.y), "TerrainType"), remaining: e.amount, canStart: true });
+              offeredHere++;
+            }
+          }
+        }
       }
       const mcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED, {}, false);
-      offers.push({ kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, pre: deckIds.length, deck: deckIds, pointsAvailable: points, canStart: !!(mcheck && mcheck.Success === true) });
+      offers.push({ kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, pre: deckIds.length, deck: deckIds, pointsAvailable: points, pendingPlacements: pendingPlacements, canStart: !!(mcheck && mcheck.Success === true) });
+      // The same screen lets the capital move to another settlement (SELECT_CAPITAL {Player1, City, Swap});
+      // the legal set is the engine's, the current capital stays unless a choice is sent, and Swap (rename
+      // the capital) is true only when the civilization changed with the age, as the shipped confirm sends it.
+      if (isInt(PlayerOperationTypes.SELECT_CAPITAL) && typeof player.Cities.getPotentialSwitchCapitalCityIds === "function") {
+        const capital = player.Cities.getCapital();
+        const capId = capital && capital.id && isInt(capital.id.id) ? capital.id.id : -1;
+        const swap = player.previousAgeCivilizationType !== player.civilizationType;
+        let potential = null; try { potential = player.Cities.getPotentialSwitchCapitalCityIds(); } catch (e) { potential = null; }
+        for (const cid of (Array.isArray(potential) ? potential : [])) {
+          if (!cid || !isInt(cid.id) || cid.owner !== BOUND_PLAYER_ID || cid.id === capId) continue;
+          let city = null; for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === cid.id) { city = c; break; } }
+          if (!city) continue;
+          const sc = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.SELECT_CAPITAL, { Player1: BOUND_PLAYER_ID, City: cid.id, Swap: swap }, false);
+          offers.push({ kind: "SELECT_CAPITAL", arg: cid.id, arg2: swap ? 1 : 0, pre: capId, cityId: cid.id, cityName: compose(city.name), population: isInt(city.population) ? city.population : null,
+            isTown: city.isTown === true, currentCapitalName: capital ? compose(capital.name) : null, swap: swap, canStart: !!(sc && sc.Success === true) });
+        }
+      }
+    }
+    // ---- syncretism (A16): one of three ways to take on a related civilization's inheritance. The shipped
+    // screen lists the civilizations per choice type from Game.Unlocks and sends the matching operation with
+    // {CivilizationType}; it treats the choice as made once Identity names a syncretic civilization.
+    if (typeof SyncreticChoiceTypes !== "undefined" && Game.Unlocks && player.Identity && typeof Game.Unlocks.getSyncreticCivUnlocksForChoice === "function") {
+      let chosen = -1; try { const ct = player.Identity.getSyncreticCivType(); chosen = isInt(ct) && GameInfo.Civilizations.lookup(ct) ? ct : -1; } catch (e) { chosen = -1; }
+      const unlockKey = (item) => {
+        const k = item.kind, h = item.typeHash;
+        if (k === "KIND_UNIT") return lookupKey(GameInfo.Units, h, "UnitType");
+        if (k === "KIND_CONSTRUCTIBLE") return lookupKey(GameInfo.Constructibles, h, "ConstructibleType");
+        if (k === "KIND_TRADITION") return lookupKey(GameInfo.Traditions, h, "TraditionType");
+        return String(h);
+      };
+      const CHOICES = [["CHOOSE_SYNCRETISM_UNITS", "SYNCRETIC_CHOICE_UNITS", "getUnitChoiceSyncreticUnlocks"],
+                       ["CHOOSE_SYNCRETISM_INFRASTRUCTURE", "SYNCRETIC_CHOICE_INFRASTRUCTURE", "getInfrastructureChoiceSyncreticUnlocks"],
+                       ["CHOOSE_SYNCRETISM_SELF", "SYNCRETIC_CHOICE_SELF", "getSelfChoiceSyncreticUnlocks"]];
+      for (const [op, flagName, listFn] of (chosen === -1 ? CHOICES : [])) {
+        if (!isInt(PlayerOperationTypes[op]) || !isInt(SyncreticChoiceTypes[flagName])) continue;
+        let civs = null; try { civs = Game.Unlocks.getSyncreticCivUnlocksForChoice(BOUND_PLAYER_ID, SyncreticChoiceTypes[flagName]); } catch (e) { civs = null; }
+        if (!Array.isArray(civs)) continue;
+        for (const civ of civs) {
+          if (!isInt(civ)) continue;
+          const trait = GameInfo.LegacyCivilizationTraits ? GameInfo.LegacyCivilizationTraits.lookup(civ) : null;
+          const civKey = trait && typeof trait.CivilizationType === "string" ? trait.CivilizationType : null;
+          const row = civKey ? GameInfo.Civilizations.lookup(civKey) : GameInfo.Civilizations.lookup(civ);
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[op], { CivilizationType: civ }, false);
+          const unlocks = [];
+          try { if (civKey && typeof Game.Unlocks[listFn] === "function") for (const item of Game.Unlocks[listFn](civKey)) { if (item && isInt(item.typeHash)) unlocks.push({ kind: typeof item.kind === "string" ? item.kind : null, key: unlockKey(item) }); } } catch (e) { /* names are a nicety */ }
+          const extra = check && check.AdditionalDescription;
+          const description = typeof extra === "string" ? compose(extra) : Array.isArray(extra) ? extra.filter((x) => typeof x === "string").map(compose).join("; ") : null;
+          offers.push({ kind: op, arg: civ, pre: -1, civKey: civKey || (row && typeof row.CivilizationType === "string" ? row.CivilizationType : null), displayName: row ? compose(row.Name) : null,
+            choice: flagName, unlocks: unlocks, description: description, canStart: !!(check && check.Success === true) });
+        }
+      }
     }
     if (isInt(PlayerOperationTypes.SET_AGE_TRANSITION_DATA) && typeof GameSetup !== "undefined" && typeof GameSetup.findPlayerParameter === "function" && blockingNotifications.indexOf("NOTIFICATION_CHOOSE_CIVILIZATION") !== -1) {
       // Age transition: the shipped in-game screen sets the bound player's AgeTransitionPlayerCivilization

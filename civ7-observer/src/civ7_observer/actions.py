@@ -63,13 +63,16 @@ DISBAND_GUIDANCE = CONFIRMATION_GUIDANCE["disband_unit"]
 # The six generic unit commands, and whether each needs a target plot.
 UNIT_COMMAND_KINDS = {"UPGRADE": False, "PACK_ARMY": False, "ADD_TO_ARMY": True,
                       "REMOVE_FROM_ARMY": True, "UNPACK_ARMY": True, "ACTIVATE_GREAT_PERSON": True,
-                      "WAKE": False, "CANCEL": False, "PLUNDER_TRADE_ROUTE": False}
+                      "WAKE": False, "CANCEL": False, "PLUNDER_TRADE_ROUTE": False, "RESETTLE": True}
 
 PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "CONSIDER_TOWN_PROJECT": "keep_town_focus", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "SEND_MERCHANT": "send_merchant", "KEEP_CITY": "keep_captured_city", "RAZE_CITY": "raze_captured_city", "LIBERATE_CITY": "liberate_captured_city",
                "CHOOSE_CITY_STATE_BONUS": "choose_city_state_bonus", "SUPPORT_DIPLOMATIC_ACTION": "support_diplomatic_action", "VIEWED_ADVISOR_WARNING": "acknowledge_advisor_warning", "DECLARE_WAR": "join_ally_war", "PROPOSE_PEACE": "propose_peace", "ACCEPT_PEACE": "accept_peace", "REJECT_PEACE": "reject_peace", "PILLAGE": "pillage", "COASTAL_RAID": "coastal_raid", "PILLAGE_ROUTE": "pillage_route", "PLUNDER_TRADE_ROUTE": "plunder_trade_route",
                "SPREAD_RELIGION": "spread_religion", "TOWN_GROWTH_MODE": "town_growth_mode", "QUEUE_REMOVE": "queue_remove", "QUEUE_MOVE_UP": "queue_move_up", "QUEUE_MOVE_DOWN": "queue_move_down",
                "DEACTIVATE_TRADITION": "deactivate_tradition", "UNASSIGN_RESOURCE": "unassign_resource", "SWAP_RESOURCES": "swap_resources", "WAKE": "wake_unit", "CANCEL": "cancel_order", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
-               "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
+               "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action",
+               "SELECT_CAPITAL": "select_capital", "CHOOSE_SYNCRETISM_UNITS": "syncretism_units", "CHOOSE_SYNCRETISM_INFRASTRUCTURE": "syncretism_infrastructure", "CHOOSE_SYNCRETISM_SELF": "syncretism_self",
+               "ADVANCED_START_REMOVE_CARD": "drop_legacy_card", "ADVANCED_START_PLACE_SETTLEMENT": "place_legacy_settlement", "RESETTLE": "resettle"}
+SYNCRETISM_KINDS = ("CHOOSE_SYNCRETISM_UNITS", "CHOOSE_SYNCRETISM_INFRASTRUCTURE", "CHOOSE_SYNCRETISM_SELF")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -476,8 +479,26 @@ class ActionRegistry:
                 for k in ("greeting", "otherPlayer", "influenceCost", "influenceBalance", "note"):
                     if k in o:
                         entry[k] = o[k]
-            if kind in ("ADVANCED_START_MODIFY_DECK", "ADVANCED_START_MARK_COMPLETED"):
-                for k in ("cardId", "description", "cost", "pointsAvailable", "needsPlacement", "effectCount", "deck"):
+            if kind in ("ADVANCED_START_MODIFY_DECK", "ADVANCED_START_MARK_COMPLETED", "ADVANCED_START_REMOVE_CARD"):
+                for k in ("cardId", "description", "cost", "pointsAvailable", "needsPlacement", "effectCount", "deck", "pendingPlacements"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "ADVANCED_START_PLACE_SETTLEMENT":
+                if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "placement offer without a plot")
+                rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
+                for k in ("effectId", "cardId", "displayName", "description", "to", "plotIndex", "terrainKey", "remaining"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "SELECT_CAPITAL":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "capital offer without its naming flag")
+                rec["arg2"] = o["arg2"]
+                for k in ("cityId", "cityName", "population", "isTown", "currentCapitalName", "swap"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind in SYNCRETISM_KINDS:
+                for k in ("civKey", "displayName", "choice", "unlocks", "description"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "CHOOSE_AGE_CIVILIZATION":
@@ -497,7 +518,7 @@ class ActionRegistry:
                     rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
                 rec["expect"] = o.get("expect")
                 for k in ("unitId", "unitTypeKey", "from", "to", "plotIndex", "description", "armyId",
-                          "isCommander", "expect", "terrainKey"):
+                          "isCommander", "expect", "terrainKey", "constructibleKey"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
                 if kind == "ACTIVATE_GREAT_PERSON":
@@ -858,6 +879,23 @@ class ActionRegistry:
                     deck = rb.get("legacyDeck")
                     if isinstance(deck, list) and offer["arg"] in deck:
                         effect = {"legacyCardAdded": offer["arg"]}
+                elif kind == "ADVANCED_START_REMOVE_CARD":
+                    deck = rb.get("legacyDeck")
+                    if isinstance(deck, list) and offer["arg"] not in deck:
+                        effect = {"legacyCardRemoved": offer["arg"]}
+                elif kind == "ADVANCED_START_PLACE_SETTLEMENT":
+                    left = rb.get("legacyPlacements")
+                    now = left.get(str(offer["arg"])) if isinstance(left, dict) else None
+                    if isinstance(now, int) and not isinstance(now, bool) and now < offer["pre"]:
+                        effect = {"legacySettlementPlaced": {"effect": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "remaining": now}}
+                elif kind == "SELECT_CAPITAL":
+                    cap = rb.get("capitalCityId")
+                    if isinstance(cap, int) and not isinstance(cap, bool) and cap == offer["arg"]:
+                        effect = {"capitalSelected": {"cityId": offer["arg"]}}
+                elif kind in SYNCRETISM_KINDS:
+                    civ = rb.get("syncreticCiv")
+                    if isinstance(civ, int) and not isinstance(civ, bool) and civ == offer["arg"]:
+                        effect = {"syncretism": {"choice": PUBLIC_KIND[kind], "civilization": offer["arg"]}}
                 elif kind == "MAKE_TRADE_ROUTE":
                     active = rb.get("tradeRoutes")
                     before = offer.get("activeRoutes")
@@ -887,9 +925,12 @@ class ActionRegistry:
                     if want == "gone":
                         locs = rb.get("unitLocations")
                         if isinstance(locs, dict) and unit_key not in locs:
-                            effect = {"greatPersonActivated": {"unitId": offer["arg"]}}
+                            effect = {("resettled" if kind == "RESETTLE" else "greatPersonActivated"): {"unitId": offer["arg"]}}
                     else:
-                        field = {"type": "unitTypes", "army": "unitArmies", "armySize": "armySizes"}.get(want)
+                        # a wake or a cancel shows as the unit becoming ready to move; a plunder as moves spent
+                        # (live: a wake landed after the payload's own read-back, and had no host signal to
+                        # confirm it by, so the seat stopped on an unknown outcome for an order that had applied)
+                        field = {"type": "unitTypes", "army": "unitArmies", "armySize": "armySizes", "awake": "unitAwake", "spent": "unitMoves"}.get(want)
                         table = rb.get(field) if field else None
                         now = table.get(unit_key) if isinstance(table, dict) else None
                         if isinstance(now, int) and not isinstance(now, bool) and now != offer["pre"]:

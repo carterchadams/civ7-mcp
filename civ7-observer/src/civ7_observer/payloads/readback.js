@@ -18,6 +18,11 @@
     attributeNodes: player ? t(() => { const m = {}; for (const nd of GameInfo.ProgressionTreeNodes) { if (nd && typeof nd.ProgressionTree === "string" && nd.ProgressionTree.indexOf("TREE_ATTRIBUTE") === 0) { const ns = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, nd.$hash); m[String(nd.$hash)] = ns && Number.isInteger(ns.state) ? ns.state : null; } } return m; }) : null,
     resourceAssignments: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Resources) for (const ar of c.Resources.getAssignedResources()) { if (ar && Number.isInteger(ar.value)) m[String(ar.value)] = c.id.id; } } return m; }) : null,
     legacyDeck: player ? t(() => player.AdvancedStart.getCards().map((c) => Database.makeHash((c.info || c).id))) : null,
+    // remaining placements per placement effect of a card in the deck, keyed by the effect's hash
+    legacyPlacements: player ? t(() => { const m = {}; for (const d of player.AdvancedStart.getCards()) { const c = d && d.info ? d.info : d; for (const e of ((c && c.effects) || [])) { if (e && e.isPlacementEffect === true && typeof e.id === "string") m[String(Database.makeHash(e.id))] = e.amount; } } return m; }) : null,
+    capitalCityId: player ? t(() => player.Cities.getCapital().id.id) : null,
+    syncreticCiv: player ? t(() => { const c = player.Identity.getSyncreticCivType(); return Number.isInteger(c) ? c : null; }) : null,
+    syncreticChoice: player ? t(() => player.Identity.getSyncreticChoiceType()) : null,
     ageTransitionCivilization: t(() => { const p = GameSetup.findPlayerParameter(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization"); return p && p.value ? p.value.value : null; }),
     goldenAgeChoices: player ? t(() => player.Culture.getGoldenAgeChoices().length) : null,
     governmentType: player ? t(() => player.Culture.getGovernmentType()) : null,
@@ -42,6 +47,8 @@
     unitTypes: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && Number.isInteger(u.type)) m[String(u.id.id)] = u.type; } return m; }) : null,
     unitArmies: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id) m[String(u.id.id)] = u.armyId && Number.isInteger(u.armyId.id) ? u.armyId.id : -1; } return m; }) : null,
     armySizes: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (!u || !u.id || !u.armyId || !Number.isInteger(u.armyId.id) || u.armyId.id < 0) continue; const a = Armies.get(u.armyId); m[String(u.id.id)] = a && Number.isInteger(a.unitCount) ? a.unitCount : -1; } return m; }) : null,
+    // whether each unit is ready to move, the same reading the wake and cancel offers take as their precondition
+    unitAwake: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && Number.isInteger(u.id.id)) m[String(u.id.id)] = u.isReadyToMove === true ? 1 : 0; } return m; }) : null,
     unitMoves: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Movement && Number.isInteger(u.Movement.movementMovesRemaining)) m[String(u.id.id)] = u.Movement.movementMovesRemaining; } return m; }) : null,
     unitCharges: player ? t(() => { const m = {}; if (typeof UnitOperationTypes === "undefined" || !Number.isInteger(UnitOperationTypes.SPREAD_RELIGION)) return m; for (const u of player.Units.getUnits()) { if (!u || !u.id) continue; const r = Game.UnitOperations.canStart(u.id, UnitOperationTypes.SPREAD_RELIGION, { X: -9999, Y: -9999, UnitAbilityType: -1 }, false); if (r && Number.isInteger(r.ChargesRemaining)) m[String(u.id.id)] = r.ChargesRemaining; } return m; }) : null,
     unitAttacks: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Combat && Number.isInteger(u.Combat.attacksRemaining)) m[String(u.id.id)] = u.Combat.attacksRemaining; } return m; }) : null,
