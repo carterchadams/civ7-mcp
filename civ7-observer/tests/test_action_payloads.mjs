@@ -959,6 +959,12 @@ test("resource offers pair each resource with every city the native check accept
   assert.deepEqual([consider.canStart, consider.toAssign, consider.assignable], [false, 1, 2]);
   const done = withResources(world({ log: [] }), { toAssign: 0 }); done._log = [];
   assert.equal(runOffers(done).offers.find((o) => o.kind === "CONSIDER_ASSIGN_RESOURCE").canStart, true);
+  // one left to assign, but the only legal move is of a resource already placed: a reassignment, which
+  // never reduces what is left, so the confirm is startable
+  const shuffle = withResources(world({ log: [] }), { toAssign: 1, legal: { "1698:131073": true } }); shuffle._log = [];
+  const so = runOffers(shuffle).offers;
+  assert.deepEqual(so.filter((o) => o.kind === "ASSIGN_RESOURCE").map((o) => [o.arg, o.arg2, o.reassignment]), [[1698, 131073, true]]);
+  assert.equal(so.find((o) => o.kind === "CONSIDER_ASSIGN_RESOURCE").canStart, true, "a reassignment does not withhold the confirm");
 });
 
 test("perform ASSIGN_RESOURCE checks ownership, the pending count and canStart, sends Location and City, and reads back the assignment", () => {

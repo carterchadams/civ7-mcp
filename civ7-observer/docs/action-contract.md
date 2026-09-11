@@ -456,3 +456,9 @@ instance id was accepted by `canStart` (which checks nothing for this operation:
 building also reads true) and silently dropped by the engine. The shipped screen sends the building's
 constructible type; the offer now binds that, and the perform matches it against the settlement's
 buildings with an empty slot.
+
+**Lesson (turn 82, live):** the engine still counted one resource to assign while every unplaced
+resource had no legal settlement; the seat shuffled an ivory that was already placed between two
+towns for a whole turn, each move confirmed, because the confirm was withheld while any assignment
+was possible. Only an unplaced resource with a legal settlement counts now; moving a placed one is
+offered as a `reassignment`, which never answers the blocker.

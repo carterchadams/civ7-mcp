@@ -768,7 +768,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "resource offer without a city")
                 rec["arg2"] = o["arg2"]
-                for k in ("plotIndex", "from", "resourceKey", "resourceClass", "description", "assignedCityId", "originCityName", "cityId", "cityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign"):
+                for k in ("plotIndex", "from", "resourceKey", "resourceClass", "description", "assignedCityId", "originCityName", "reassignment", "cityId", "cityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "CONSIDER_ASSIGN_RESOURCE":

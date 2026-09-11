@@ -1368,8 +1368,12 @@
           const rargs = { Location: { x: loc.x, y: loc.y }, City: ci.c.id.id };
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ASSIGN_RESOURCE, rargs, false);
           if (!check || check.Success !== true) continue;
-          assignable += 1;
-          offers.push({ kind: "ASSIGN_RESOURCE", arg: r.value, arg2: ci.c.id.id, pre: rpre, plotIndex: r.value, from: { x: loc.x, y: loc.y }, resourceKey: def && typeof def.ResourceType === "string" ? def.ResourceType : null,
+          // Only a resource not yet placed anywhere counts toward satisfying the blocker. Moving one
+          // that is already placed is a reassignment: legal, but it never reduces what is left to
+          // assign (live, turn 82: a seat shuffled one ivory between towns for a whole turn while
+          // the confirm was withheld, because every move was counted as an assignment).
+          if (assignedTo === -1) assignable += 1;
+          offers.push({ kind: "ASSIGN_RESOURCE", arg: r.value, arg2: ci.c.id.id, pre: rpre, plotIndex: r.value, from: { x: loc.x, y: loc.y }, resourceKey: def && typeof def.ResourceType === "string" ? def.ResourceType : null, reassignment: assignedTo !== -1,
             displayName: def ? compose(def.Name) : null, resourceClass: def && typeof def.ResourceClassType === "string" ? def.ResourceClassType : null, description: def ? compose(def.Tooltip) : null,
             assignedCityId: assignedTo === -1 ? null : assignedTo, originCityName: originName, cityId: ci.c.id.id, cityName: compose(ci.c.name), cityIsTown: ci.c.isTown === true, cityCap: ci.cap, cityAssigned: ci.cnt, toAssign: rpre, canStart: true });
         }

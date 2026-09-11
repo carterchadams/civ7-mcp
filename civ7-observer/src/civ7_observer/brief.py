@@ -239,7 +239,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "movesLeft", "charges", "currentProject", "currentProjectKey", "position", "toPosition", "itemKey", "otherResourceKey", "otherCityName", "otherCityId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "currentName", "needsText", "acceptsText", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "reassignment", "currentName", "needsText", "acceptsText", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
                  "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
@@ -251,7 +251,9 @@ ATTRIBUTES_NOTE = ("buy a node whose attribute has a point available (wildcard p
                    "consider_attributes to close the decision; nodes cost one point each")
 
 RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity (`cityCap` minus `cityAssigned`; `description` is "
-                  "the resource's effect), then consider_resources; it is not startable while a resource can still be assigned")
+                  "the resource's effect), then consider_resources; it is not startable while an unplaced resource can still be "
+                  "assigned somewhere. An option marked `reassignment` moves a resource that is already placed: legal, but it "
+                  "never reduces `toAssign`, so it does not answer the blocker")
 
 AGE_TRANSITION_NOTE = ("the age is over: choose the civilization this seat becomes in the next age (each option's `description` is its "
                        "unique ability; `historical: true` marks the choices the game considers this civilization's natural successors), "
