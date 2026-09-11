@@ -185,5 +185,5 @@ Ekklesia) between the turn-14 probe and this capture.
 | tile keys | 6 terrain, 5 biome, 10 feature keys resolved; 18 river tiles; 0 unresolved hashes |
 | serialized tile fields | exactly x, y, index, terrain(+Key), biome(+Key), feature(+Key), elevation, isRiver, riverType; no resource, yield, unit, or owner fields |
 | omitted features | resources, foreign units/settlements, diplomacy, notifications, yields, hidden and fogged tiles, seed, other players |
-| fog regression | pending: move a scout out of an area, capture, confirm those tiles leave the export (no fresh fogged state) |
+| fog regression | PASS: scout 131072 moved (58, 34) → (60, 34); 17 previously visible tiles (e.g. 56,31 … 58,34) are absent from the new export, 13 new tiles appear; counts 116/94/3194 → 112/98/3194 (fogged +4 net, hidden unchanged); no stale record for a departed tile |
 | anti-leak fixtures (offline) | Node fixtures plant an omniscient opponent, global unit/city maps, a resource and bulk-visibility reader; tests fail if any is touched or if detail is read before visibility |
