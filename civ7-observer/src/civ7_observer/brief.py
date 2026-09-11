@@ -74,7 +74,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
-                 "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description",
+                 "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration", "effects", "unlocksTraditions", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 

@@ -358,6 +358,10 @@ class ActionRegistry:
                 for k in ("storyId", "storyKey", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "CONSIDER_ASSIGN_TRADITIONS":
+                for k in ("slotsFreeAny", "activatable"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "CHANGE_TRADITION":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "tradition offer without a type hash")

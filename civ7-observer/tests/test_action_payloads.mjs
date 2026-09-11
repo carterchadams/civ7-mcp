@@ -551,8 +551,13 @@ test("tradition offers list unlocked, inactive cards per slot type with slot cou
   const r = runOffers(g);
   const trads = r.offers.filter((o) => o.kind === "CHANGE_TRADITION");
   assert.deepEqual(trads.map((o) => [o.arg, o.arg2, o.pre, o.slot, o.slotsTotal, o.slotsFree, o.slotsFreeAny, o.typeKey, o.canStart]), [[11, 9001, 1, "TRADITION_CULTURE_SLOT", 1, 0, 0, "TRADITION_A", false]]);
-  assert.equal(r.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS").length, 1);
+  const confirm = r.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS");
+  assert.equal(confirm.length, 1);
+  assert.deepEqual([confirm[0].canStart, confirm[0].slotsFreeAny, confirm[0].activatable], [true, 0, 0], "slot full: confirming is the right move");
   assert.ok(log.filter((e) => e.startsWith("tcanStart(")).every((e) => e.startsWith("tcanStart(1,") && e.endsWith(",false)")));
+  const free = withTraditions(world({ log: [], blocking: true })); free._log = [];
+  const fc = runOffers(free).offers.find((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS");
+  assert.deepEqual([fc.canStart, fc.slotsFreeAny, fc.activatable], [false, 1, 2], "a free slot with an activatable card: confirm is not startable yet");
   const g2 = withTraditions(world({ log: [] })); g2._log = []; g2.Game.Notifications.getEndTurnBlockingType = () => 0;
   const r2 = runOffers(g2);
   assert.equal(r2.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS").length, 0, "confirm is offered only while TRADITIONS blocks the turn");
