@@ -945,3 +945,24 @@ def test_confirm_traditions_does_not_confirm_while_the_traditions_notification_s
         with pytest.raises(service.ObserverError) as info:
             reg.perform(gs, action_id=co["actionId"], request_id="ct-x", player=1, mode="singleplayer")
     assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_attribute_purchase_confirms_on_the_node_state_and_consider_on_the_notification_leaving(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "BUY_ATTRIBUTE_TREE_NODE", "arg": 4001, "pre": 2, "typeKey": "NODE_ATTRIBUTE_CULTURAL_01", "tree": "TREE_ATTRIBUTE_CULTURAL", "attribute": "ATTRIBUTE_CULTURAL", "attributeName": "Cultural", "displayName": "Cultural", "description": "+1 culture per...", "cost": 1, "availablePoints": 1, "wildcardPoints": 2, "canStart": True},
+        {"kind": "CONSIDER_ASSIGN_ATTRIBUTE", "arg": 0, "pre": 0, "canStart": True}]}
+    bought = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "BUY_ATTRIBUTE_TREE_NODE", "arg": 4001, "stateBefore": 2, "state": 2, "matches": False}}
+    considered = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CONSIDER_ASSIGN_ATTRIBUTE", "arg": 0, "matches": False}}
+    rb1 = {**RB, "attributeNodes": {"4001": 5}, "blockingNotifications": ["NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL"]}
+    rb2 = {**RB, "attributeNodes": {"4001": 5}, "blockingNotifications": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(bought)), reply(5, json.dumps(rb1)), reply(6, json.dumps(considered)), reply(7, json.dumps(rb2))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        ba = next(o for o in out["offers"] if o["kind"] == "buy_attribute")
+        assert ba["attribute"] == "ATTRIBUTE_CULTURAL" and ba["availablePoints"] == 1 and ba["wildcardPoints"] == 2 and "arg" not in ba
+        res = reg.perform(gs, action_id=ba["actionId"], request_id="ba-1", player=1, mode="singleplayer")
+        assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"attributeNodeState": {"node": 4001, "state": 5}}
+        ca = next(o for o in out["offers"] if o["kind"] == "consider_attributes")
+        res2 = reg.perform(gs, action_id=ca["actionId"], request_id="ca-1", player=1, mode="singleplayer")
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"attributeNotificationCleared": True}

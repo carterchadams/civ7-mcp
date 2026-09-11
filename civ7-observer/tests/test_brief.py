@@ -201,3 +201,16 @@ def test_an_unmapped_blocking_notification_pauses_even_when_the_blocker_value_is
     payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_RELIGION"]}
     b, _, _ = build(tmp_path, payload)
     assert b["pause"]["reason"] == "UNSUPPORTED_DECISION" and "NOTIFICATION_CHOOSE_RELIGION" in b["pause"]["message"]
+
+
+def test_attribute_notification_is_a_supported_attributes_decision(tmp_path):
+    attrs = [{"kind": "BUY_ATTRIBUTE_TREE_NODE", "arg": 4001, "pre": 2, "typeKey": "NODE_ATTRIBUTE_CULTURAL_01", "tree": "TREE_ATTRIBUTE_CULTURAL", "attribute": "ATTRIBUTE_CULTURAL", "attributeName": "Cultural", "displayName": "Cultural", "description": "d", "cost": 1, "availablePoints": 0, "wildcardPoints": 2, "canStart": True},
+             {"kind": "CONSIDER_ASSIGN_ATTRIBUTE", "arg": 0, "pre": 0, "canStart": True}]
+    payload = offers_with(attrs, end_can_start=False, blocking="TRADITIONS")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    kinds = [d["kind"] for d in b["decisions"] if d["required"]]
+    assert kinds == ["policies", "attributes"] or kinds == ["attributes"]
+    attributes = next(d for d in b["decisions"] if d["kind"] == "attributes")
+    assert attributes["options"][0]["wildcardPoints"] == 2 and "wildcard" in attributes["note"]

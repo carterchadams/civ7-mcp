@@ -240,6 +240,28 @@
         offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
       }
     }
+    if (isInt(PlayerOperationTypes.BUY_ATTRIBUTE_TREE_NODE) && player.Identity && typeof player.Identity.getAvailableAttributePoints === "function" && GameInfo.Attributes && typeof GameInfo.Attributes[Symbol.iterator] === "function") {
+      // Attribute points: the shipped attribute-tree screen buys nodes with BUY_ATTRIBUTE_TREE_NODE
+      // {ProgressionTreeNodeType} after canStart and sends CONSIDER_ASSIGN_ATTRIBUTE {} on close.
+      const attrByTree = {}; let wildcard = null;
+      try { wildcard = player.Identity.getWildcardPoints(); } catch (e) { wildcard = null; }
+      for (const a of GameInfo.Attributes) { if (a && typeof a.AttributeType === "string" && typeof a.ProgressionTreeType === "string") attrByTree[a.ProgressionTreeType] = a; }
+      for (const nd of GameInfo.ProgressionTreeNodes) {
+        if (!nd || !isInt(nd.$hash) || typeof nd.ProgressionTree !== "string" || !attrByTree[nd.ProgressionTree]) continue;
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.BUY_ATTRIBUTE_TREE_NODE, { ProgressionTreeNodeType: nd.$hash }, false);
+        if (!check || check.Success !== true) continue;
+        const attr = attrByTree[nd.ProgressionTree];
+        let state = null; try { const ns = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, nd.$hash); state = ns && isInt(ns.state) ? ns.state : null; } catch (e) { state = null; }
+        let points = null; try { points = player.Identity.getAvailableAttributePoints(attr.AttributeType); } catch (e) { points = null; }
+        offers.push({ kind: "BUY_ATTRIBUTE_TREE_NODE", arg: nd.$hash, pre: isInt(state) ? state : -1, typeKey: typeof nd.ProgressionTreeNodeType === "string" ? nd.ProgressionTreeNodeType : null, tree: nd.ProgressionTree,
+          attribute: attr.AttributeType, attributeName: compose(attr.Name), displayName: compose(nd.Name) || compose(attr.Name), description: compose(nd.Description), cost: isInt(nd.Cost) ? nd.Cost : null,
+          availablePoints: isInt(points) ? points : null, wildcardPoints: isInt(wildcard) ? wildcard : null, canStart: true });
+      }
+      if (blocked && blockingNotifications.indexOf("NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL") !== -1 && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_ATTRIBUTE)) {
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_ATTRIBUTE, {}, false);
+        offers.push({ kind: "CONSIDER_ASSIGN_ATTRIBUTE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
+      }
+    }
     if (isInt(PlayerOperationTypes.CHANGE_GOVERNMENT) && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate) && GameInfo.Governments && typeof GameInfo.Governments[Symbol.iterator] === "function") {
       // Government: the shipped chooser lists StartingGovernments while none is held and sends
       // CHANGE_GOVERNMENT {GovernmentType: $index, Action: Activate} after canStart.

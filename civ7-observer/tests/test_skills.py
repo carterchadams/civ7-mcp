@@ -39,6 +39,7 @@ def test_local_friction_card_is_available_and_not_generated():
     (["narrative"], ["civ7-turn-management"]),
     (["pantheon"], ["civ7-turn-management", "civ7-religion-and-great-works"]),
     (["government"], ["civ7-turn-management", "civ7-happiness-and-government"]),
+    (["attributes"], ["civ7-turn-management", "civ7-research-and-civics"]),
     (["end_turn"], ["civ7-turn-management"]),
     ([], ["civ7-turn-management"]),
     (["research", "unit"], ["civ7-turn-management", "civ7-research-and-civics", "civ7-reconnaissance-and-memory"]),

@@ -32,6 +32,7 @@ DECISION_SKILL = {
     "narrative": "civ7-turn-management",
     "pantheon": "civ7-religion-and-great-works",
     "government": "civ7-happiness-and-government",
+    "attributes": "civ7-research-and-civics",
     "end_turn": "civ7-turn-management",
 }
 ALWAYS = "civ7-turn-management"

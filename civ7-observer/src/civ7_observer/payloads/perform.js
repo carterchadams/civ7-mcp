@@ -211,6 +211,32 @@
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
     return JSON.stringify(result);
   }
+  if (KIND === "BUY_ATTRIBUTE_TREE_NODE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "attribute node argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "attribute operation contract unavailable");
+    const nrow = GameInfo.ProgressionTreeNodes.lookup(ARG);
+    if (!nrow || typeof nrow.ProgressionTree !== "string" || nrow.ProgressionTree.indexOf("TREE_ATTRIBUTE") !== 0) return refuse("UNKNOWN_ACTION", "node is not an attribute tree node");
+    let nstate = null; try { const ns = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, ARG); nstate = ns && isInt(ns.state) ? ns.state : -1; } catch (e) { nstate = -1; }
+    if (nstate !== PRE) return refuse("ACTION_EXPIRED", "the node's state changed since the offer was made");
+    const args = { ProgressionTreeNodeType: ARG };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused buying that attribute node");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let after = null; try { const ns = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, ARG); after = ns && isInt(ns.state) ? ns.state : null; } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, stateBefore: PRE, state: after, matches: isInt(after) && after !== PRE && after >= 4 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CONSIDER_ASSIGN_ATTRIBUTE") {
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const args = {};
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused considering attributes");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    result.readback = { kind: KIND, arg: 0, matches: false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CHANGE_GOVERNMENT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "government arguments are not integers");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Activate)) return refuse("API_CONTRACT_MISMATCH", "government operation contract unavailable");

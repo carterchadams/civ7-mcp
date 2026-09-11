@@ -29,6 +29,7 @@ BLOCKER_DECISION = {
     "PANTHEON": "pantheon",
     "CONSIDER_GOVERNMENT_CHANGE": "government",
     "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
+    "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL": "attributes",
     # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
     # notification's type (live: the civic blocker on turn 8 came back as a raw value), so every
     # supported decision is reachable under its notification name too.
@@ -61,6 +62,8 @@ DECISION_OF_KIND = {
     "narrative_choice": "narrative",
     "found_pantheon": "pantheon",
     "change_government": "government",
+    "buy_attribute": "attributes",
+    "consider_attributes": "attributes",
     "end_turn": "end_turn",
 }
 
@@ -70,11 +73,14 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration")
+                 "celebration", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
                  "while a card can still be activated")
+
+ATTRIBUTES_NOTE = ("buy a node whose attribute has a point available (wildcard points count for any attribute), then "
+                   "consider_attributes to close the decision; nodes cost one point each")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn")
@@ -164,6 +170,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = PRODUCTION_NOTE
         if decision == "policies":
             group["note"] = POLICIES_NOTE
+        if decision == "attributes":
+            group["note"] = ATTRIBUTES_NOTE
         group["optionCount"] += 1
         if len(group["options"]) < max_options:
             group["options"].append(_option(offer))

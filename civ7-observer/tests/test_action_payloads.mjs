@@ -790,3 +790,59 @@ test("perform CHANGE_GOVERNMENT checks identity, the current government and canS
     assert.ok(!l.some((e) => e.startsWith("gsendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- attribute points
+function withAttributes(g, { points = { ATTRIBUTE_CULTURAL: 1 }, wildcard = 2, canNodes = [4001], blocked = true } = {}) {
+  const me = g.Players.get(1);
+  const states = { 4001: 2, 4002: 1 };
+  g.GameInfo.Attributes = [{ AttributeType: "ATTRIBUTE_CULTURAL", Name: "LOC_ATTR_C", ProgressionTreeType: "TREE_ATTRIBUTE_CULTURAL" }];
+  const nodes = [{ $hash: 4001, ProgressionTreeNodeType: "NODE_ATTRIBUTE_CULTURAL_01", ProgressionTree: "TREE_ATTRIBUTE_CULTURAL", Name: null, Description: "LOC_N1_D", Cost: 1 }, { $hash: 4002, ProgressionTreeNodeType: "NODE_ATTRIBUTE_CULTURAL_02", ProgressionTree: "TREE_ATTRIBUTE_CULTURAL", Name: null, Description: "LOC_N2_D", Cost: 1 }, ...[701, 702, 801].map((h) => g.GameInfo.ProgressionTreeNodes.lookup(h))];
+  g.GameInfo.ProgressionTreeNodes = table(nodes); g.GameInfo.ProgressionTreeNodes[Symbol.iterator] = function* () { yield* nodes; };
+  g.Game.ProgressionTrees = { getNode: (pid, h) => (states[h] !== undefined ? { state: states[h] } : null) };
+  g.PlayerOperationTypes.BUY_ATTRIBUTE_TREE_NODE = 323351948; g.PlayerOperationTypes.CONSIDER_ASSIGN_ATTRIBUTE = 446393507;
+  me.Identity = { getAvailableAttributePoints: (a) => points[a] ?? 0, getWildcardPoints: () => wildcard };
+  if (blocked) {
+    g.Game.Notifications.getEndTurnBlockingType = () => 777;
+    g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 5, type: 20 }];
+    g.Game.Notifications.find = () => ({ Type: 1, BlocksTurnAdvancement: true });
+    g.Game.Notifications.getTypeName = () => "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL";
+  }
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 323351948 && op !== 446393507) return inner.canStart(pid, op, args, show); g._log.push(`acanStart(${pid},${op},${JSON.stringify(args)},${show})`); return { Success: op === 446393507 ? true : canNodes.includes(args.ProgressionTreeNodeType) }; },
+    sendRequest: (pid, op, args) => { if (op !== 323351948 && op !== 446393507) return inner.sendRequest(pid, op, args); g._log.push(`asendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === 323351948) states[args.ProgressionTreeNodeType] = 5; },
+  };
+  return g;
+}
+
+test("attribute offers list purchasable nodes with attribute, points and description, and the consider only under the notification", () => {
+  const log = [];
+  const g = withAttributes(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const buys = r.offers.filter((o) => o.kind === "BUY_ATTRIBUTE_TREE_NODE");
+  assert.deepEqual(buys.map((o) => [o.arg, o.pre, o.typeKey, o.attribute, o.attributeName, o.description, o.cost, o.availablePoints, o.wildcardPoints, o.canStart]), [[4001, 2, "NODE_ATTRIBUTE_CULTURAL_01", "ATTRIBUTE_CULTURAL", "LOC_ATTR_C", "LOC_N1_D", 1, 1, 2, true]]);
+  assert.equal(r.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_ATTRIBUTE").length, 1);
+  assert.equal(r.offers.find((o) => o.kind === "END_TURN").blockingType, "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL");
+  const h = withAttributes(world({ log: [] }), { blocked: false }); h._log = [];
+  assert.equal(runOffers(h).offers.filter((o) => o.kind === "CONSIDER_ASSIGN_ATTRIBUTE").length, 0);
+});
+
+test("perform BUY_ATTRIBUTE_TREE_NODE checks the tree, the node state and canStart, sends, and reads back the unlocked state", () => {
+  const log = [];
+  const g = withAttributes(world({ log })); g._log = log;
+  const r = runPerform(g, "BUY_ATTRIBUTE_TREE_NODE", 4001, { pre: 2 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "BUY_ATTRIBUTE_TREE_NODE", arg: 4001, stateBefore: 2, state: 5, matches: true });
+  for (const [label, mk, hash, pre] of [
+    ["not an attribute node", () => withAttributes(world({ log: [] })), 701, 2],
+    ["state changed", () => withAttributes(world({ log: [] })), 4001, 5],
+    ["canStart false", () => withAttributes(world({ log: [] }), { canNodes: [] }), 4001, 2],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerform(h, "BUY_ATTRIBUTE_TREE_NODE", hash, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("asendRequest")), `${label}: must not send`);
+  }
+  const c = runPerform(g, "CONSIDER_ASSIGN_ATTRIBUTE", 0, { pre: 0 });
+  assert.equal(c.outcome, "sent");
+});

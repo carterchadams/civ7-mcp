@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -338,6 +338,10 @@ class ActionRegistry:
                 for k in ("cityId", "cityName", "constructibleKey", "constructibleClass", "plotIndex", "placement", "terrainKey", "featureKey", "river", "yields", "queue", "queueLength"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "BUY_ATTRIBUTE_TREE_NODE":
+                for k in ("attribute", "attributeName", "description", "availablePoints", "wildcardPoints"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "CHANGE_GOVERNMENT":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "government offer without a type hash")
@@ -489,6 +493,15 @@ class ActionRegistry:
                     plots = rb.get("expandPlots")
                     if isinstance(plots, dict) and isinstance(plots.get(str(offer["arg"])), list) and offer["pre"] not in plots[str(offer["arg"])]:
                         effect = {"populationPlaced": {"cityId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "plotIndex": offer["pre"]}}
+                elif kind == "BUY_ATTRIBUTE_TREE_NODE":
+                    nodes = rb.get("attributeNodes")
+                    st = nodes.get(str(offer["arg"])) if isinstance(nodes, dict) else None
+                    if isinstance(st, int) and not isinstance(st, bool) and st != offer["pre"] and st >= 4:
+                        effect = {"attributeNodeState": {"node": offer["arg"], "state": st}}
+                elif kind == "CONSIDER_ASSIGN_ATTRIBUTE":
+                    notes = rb.get("blockingNotifications")
+                    if isinstance(notes, list) and "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL" not in notes:
+                        effect = {"attributeNotificationCleared": True}
                 elif kind == "CHANGE_GOVERNMENT":
                     gov = rb.get("governmentType")
                     if isinstance(gov, int) and not isinstance(gov, bool) and gov in (offer["arg2"], offer["arg"]):
