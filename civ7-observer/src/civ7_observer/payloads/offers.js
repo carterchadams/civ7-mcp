@@ -231,6 +231,17 @@
         offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
       }
     }
+    if (isInt(PlayerOperationTypes.FOUND_PANTHEON) && player.Religion && typeof player.Religion.getNumPantheons === "function" && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {
+      // Pantheon: the shipped chooser lists every BELIEF_CLASS_PANTHEON belief and gates each on
+      // canStart(FOUND_PANTHEON, {BeliefType}); only the ones the game accepts are offered.
+      const npre = player.Religion.getNumPantheons();
+      for (const b of GameInfo.Beliefs) {
+        if (!b || !isInt(b.$hash) || b.BeliefClassType !== "BELIEF_CLASS_PANTHEON") continue;
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.FOUND_PANTHEON, { BeliefType: b.$hash }, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "FOUND_PANTHEON", arg: b.$hash, pre: isInt(npre) ? npre : 0, typeKey: typeof b.BeliefType === "string" ? b.BeliefType : null, displayName: compose(b.Name), description: compose(b.Description), canStart: true });
+      }
+    }
     if (isInt(PlayerOperationTypes.CHOOSE_NARRATIVE_STORY_DIRECTION) && player.Stories && typeof StoryTextTypes !== "undefined" && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate)) {
       // Narrative events: the shipped screen shows the first pending story, one button per eligible
       // link (or a single CLOSE when the story has none), and sends CHOOSE_NARRATIVE_STORY_DIRECTION

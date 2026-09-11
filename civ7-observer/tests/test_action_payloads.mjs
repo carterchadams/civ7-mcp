@@ -688,3 +688,48 @@ test("a city with a queue offers production as an append: precondition is the qu
   const stale = runPerformArgs(g, "PRODUCE_UNIT", 65536, 99, 0, { pre: 1 });
   assert.equal(stale.refused.code, "ACTION_EXPIRED", "a second append with the old queue length must be refused");
 });
+
+// ---- pantheon
+function withPantheon(g, { allowed = [3001], have = [] } = {}) {
+  const me = g.Players.get(1);
+  let pantheons = have.slice();
+  const rows = [{ $hash: 3001, BeliefType: "PANTHEON_BONUS_1", BeliefClassType: "BELIEF_CLASS_PANTHEON", Name: "LOC_P1", Description: "LOC_P1_D" }, { $hash: 3002, BeliefType: "PANTHEON_BONUS_2", BeliefClassType: "BELIEF_CLASS_PANTHEON", Name: "LOC_P2", Description: "LOC_P2_D" }, { $hash: 3100, BeliefType: "BELIEF_FOUNDER_X", BeliefClassType: "BELIEF_CLASS_FOUNDER", Name: "LOC_F", Description: "LOC_F_D" }];
+  g.GameInfo.Beliefs = table(rows); g.GameInfo.Beliefs[Symbol.iterator] = function* () { yield* rows; };
+  g.PlayerOperationTypes.FOUND_PANTHEON = -1770928175;
+  me.Religion = { getNumPantheons: () => pantheons.length, getPantheons: () => pantheons.slice() };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== -1770928175) return inner.canStart(pid, op, args, show); g._log.push(`pcanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: allowed.includes(args.BeliefType) && !pantheons.includes(args.BeliefType) }; },
+    sendRequest: (pid, op, args) => { if (op !== -1770928175) return inner.sendRequest(pid, op, args); g._log.push(`psendRequest(${pid},${JSON.stringify(args)})`); pantheons.push(args.BeliefType); },
+  };
+  return g;
+}
+
+test("pantheon offers list only the pantheon beliefs the native FOUND_PANTHEON canStart accepts, with text", () => {
+  const log = [];
+  const g = withPantheon(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const p = r.offers.filter((o) => o.kind === "FOUND_PANTHEON");
+  assert.deepEqual(p.map((o) => [o.arg, o.pre, o.typeKey, o.displayName, o.description, o.canStart]), [[3001, 0, "PANTHEON_BONUS_1", "LOC_P1", "LOC_P1_D", true]]);
+  assert.equal(log.filter((e) => e.startsWith("pcanStart(")).length, 2, "founder beliefs are never queried");
+  assert.ok(!log.some((e) => e.startsWith("psendRequest")));
+});
+
+test("perform FOUND_PANTHEON checks the belief class, the pantheon count and canStart, sends, and reads back", () => {
+  const log = [];
+  const g = withPantheon(world({ log })); g._log = log;
+  const r = runPerform(g, "FOUND_PANTHEON", 3001, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "FOUND_PANTHEON", arg: 3001, founded: true, matches: true });
+  assert.ok(log.find((e) => e.startsWith("psendRequest(1,") && e.includes('"BeliefType":3001')));
+  for (const [label, mk, hash, pre] of [
+    ["not a pantheon belief", () => withPantheon(world({ log: [] })), 3100, 0],
+    ["count changed", () => withPantheon(world({ log: [] })), 3001, 1],
+    ["canStart false", () => withPantheon(world({ log: [] }), { allowed: [] }), 3001, 0],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerform(h, "FOUND_PANTHEON", hash, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("psendRequest")), `${label}: must not send`);
+  }
+});

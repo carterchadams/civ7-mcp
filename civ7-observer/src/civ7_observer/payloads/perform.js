@@ -211,6 +211,21 @@
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
     return JSON.stringify(result);
   }
+  if (KIND === "FOUND_PANTHEON") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "belief argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Religion || typeof player.Religion.getNumPantheons !== "function") return refuse("API_CONTRACT_MISMATCH", "pantheon operation contract unavailable");
+    const brow = GameInfo.Beliefs.lookup(ARG);
+    if (!brow || brow.BeliefClassType !== "BELIEF_CLASS_PANTHEON") return refuse("UNKNOWN_ACTION", "belief is not a pantheon belief");
+    if (player.Religion.getNumPantheons() !== PRE) return refuse("ACTION_EXPIRED", "the number of pantheons changed since the offer was made");
+    const args = { BeliefType: ARG };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused founding that pantheon");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let has = null; try { const list = player.Religion.getPantheons(); has = Array.isArray(list) ? list.indexOf(ARG) !== -1 : null; } catch (e) { has = null; }
+    result.readback = { kind: KIND, arg: ARG, founded: has, matches: has === true };
+    return JSON.stringify(result);
+  }
   if (KIND === "CHOOSE_NARRATIVE_STORY_DIRECTION") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "narrative arguments are not integers");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Stories || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Activate)) return refuse("API_CONTRACT_MISMATCH", "narrative operation contract unavailable");

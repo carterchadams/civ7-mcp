@@ -60,9 +60,9 @@ def test_brief_marks_the_required_decision_from_the_native_blocker(tmp_path):
 
 
 def test_unsupported_blocker_becomes_a_named_pause_with_no_invented_options(tmp_path):
-    b, _, _ = build(tmp_path, offers_with(RESEARCH, end_can_start=False, blocking="PANTHEON"))
-    assert b["pause"] == {"reason": "UNSUPPORTED_DECISION", "blocking": "PANTHEON",
-                          "message": "the game requires a PANTHEON decision, which this catalog cannot make; a human must take the seat and resolve it"}
+    b, _, _ = build(tmp_path, offers_with(RESEARCH, end_can_start=False, blocking="RELIGION"))
+    assert b["pause"] == {"reason": "UNSUPPORTED_DECISION", "blocking": "RELIGION",
+                          "message": "the game requires a RELIGION decision, which this catalog cannot make; a human must take the seat and resolve it"}
     assert all(not d["required"] for d in b["decisions"])
     assert b["endTurn"]["supported"] is False
 
@@ -159,3 +159,11 @@ def test_a_notification_named_blocker_for_a_discovery_story_is_a_supported_narra
     assert [d["kind"] for d in required] == ["narrative"]
     o = required[0]["options"][0]
     assert (o["kind"], o["title"], o["option"], o["reward"], o["answerKey"], o["affordable"]) == ("narrative_choice", "Merciless Mercenaries", "Hire them", "+50 gold", "DISCOVERY_X_A", True)
+
+
+def test_pantheon_blocker_is_a_supported_decision(tmp_path):
+    pantheon = [{"kind": "FOUND_PANTHEON", "arg": 3001, "pre": 0, "typeKey": "PANTHEON_BONUS_1", "displayName": "City Patron Goddess", "description": "+2 Influence", "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(pantheon, end_can_start=False, blocking="PANTHEON"))
+    required = [d for d in b["decisions"] if d["required"]]
+    assert [d["kind"] for d in required] == ["pantheon"] and b["pause"] is None
+    assert required[0]["options"][0]["description"] == "+2 Influence"

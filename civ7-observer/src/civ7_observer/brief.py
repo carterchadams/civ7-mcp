@@ -26,6 +26,7 @@ BLOCKER_DECISION = {
     "STACKED_UNITS": "unit",
     "NEW_POPULATION": "population",
     "TRADITIONS": "policies",
+    "PANTHEON": "pantheon",
     # data-driven blockers are named after the blocking notification's type
     "NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION": "narrative",
     "NOTIFICATION_CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative",
@@ -47,6 +48,7 @@ DECISION_OF_KIND = {
     "activate_tradition": "policies",
     "confirm_traditions": "policies",
     "narrative_choice": "narrative",
+    "found_pantheon": "pantheon",
     "end_turn": "end_turn",
 }
 
