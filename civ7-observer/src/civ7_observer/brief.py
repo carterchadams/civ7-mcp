@@ -65,6 +65,14 @@ BLOCKER_DECISION = {
 }
 
 # Public action kinds grouped into the decision a player actually faces.
+# Options whose whole job is to clear a turn blocker rather than to choose anything. They must never
+# be the ones dropped when a group is bounded: live on turn 45 a seat had six resource assignments and
+# this single confirm, the confirm was the option omitted, and the seat could not end its turn at all.
+RESOLVING_KINDS = frozenset({
+    "consider_resources", "confirm_traditions", "consider_attributes",
+    "finish_legacy_deck", "finish_age_transition",
+})
+
 DECISION_OF_KIND = {
     "research": "research",
     "civic": "civic",
@@ -295,15 +303,25 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         # Round-robin across entities: a settler whose own moves sat behind six other units' options
         # was invisible to the seat (live friction, turn 33), so every entity is represented first.
         buckets = [list(v) for v in group.pop("_buckets", {}).values()]
+        # A blocker-clearing option keeps a reserved slot: it is taken out of the competition for room
+        # and put back at the end, so it is never the one dropped and still reads after the choices.
+        resolvers: list[dict[str, Any]] = []
+        for b in list(buckets):
+            for offer in [o for o in b if o["kind"] in RESOLVING_KINDS]:
+                b.remove(offer)
+                resolvers.append(offer)
+            if not b:
+                buckets.remove(b)
+        room = max(max_options - len(resolvers), 0)
         chosen: list[dict[str, Any]] = []
-        while buckets and len(chosen) < max_options:
+        while buckets and len(chosen) < room:
             for b in list(buckets):
-                if len(chosen) >= max_options:
+                if len(chosen) >= room:
                     break
                 chosen.append(b.pop(0))
                 if not b:
                     buckets.remove(b)
-        group["options"] = [_option(o) for o in chosen]
+        group["options"] = [_option(o) for o in chosen + resolvers]
         group["omitted"] = group["optionCount"] - len(group["options"])
         entity_count = len(group.pop("_seen"))
         if group["entities"]:

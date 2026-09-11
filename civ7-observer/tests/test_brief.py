@@ -235,6 +235,23 @@ def test_new_resources_notification_is_a_supported_resources_decision(tmp_path):
     assert d["required"] is True and d["options"][0]["cityCap"] == 1 and "capacity" in d["note"]
 
 
+def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
+    """Live, turn 45: six resource assignments and one confirm; the confirm was the option dropped and
+    the seat could not end its turn at all, with nothing left to assign."""
+    res = [{"kind": "ASSIGN_RESOURCE", "arg": 1600 + i, "arg2": 131073 + i, "pre": 0, "plotIndex": 1600 + i,
+            "resourceKey": f"RESOURCE_{i}", "displayName": f"Res {i}", "cityId": 131073 + i, "cityName": f"City {i}",
+            "cityCap": 1, "cityAssigned": 0, "toAssign": 0, "canStart": True} for i in range(6)]
+    confirm = [{"kind": "CONSIDER_ASSIGN_RESOURCE", "arg": 0, "pre": 0, "canStart": True}]
+    payload = offers_with(res + confirm, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_ASSIGN_NEW_RESOURCES"]}
+    b, _, _ = build(tmp_path, payload)
+    d = next(d for d in b["decisions"] if d["kind"] == "resources")
+    kinds = [o["kind"] for o in d["options"]]
+    assert "consider_resources" in kinds, "the only option that clears the blocker was dropped"
+    assert kinds[-1] == "consider_resources", "it reads after the choices, not before them"
+    assert len(d["options"]) <= 6 and d["omitted"] == d["optionCount"] - len(d["options"])
+
+
 def test_unit_promotion_notification_is_a_supported_promotion_decision(tmp_path):
     promo = [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "movesRemaining": 2, "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionsEarned": 0, "promotionPoints": 1, "unitLevel": 2, "canStart": True}]
     payload = offers_with(promo, end_can_start=False, blocking="UNIT_PROMOTION")
