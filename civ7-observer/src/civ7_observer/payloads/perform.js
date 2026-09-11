@@ -338,6 +338,7 @@
     let wcity = null;
     try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { wcity = c; break; } } } catch (e) { wcity = null; }
     if (!wcity || !wcity.Workers) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    if (!(wcity.Growth && wcity.Growth.isReadyToPlacePopulation === true)) return refuse("ACTION_EXPIRED", "the settlement has no population point to place");
     let placements = null; try { placements = wcity.Workers.GetAllPlacementInfo(); } catch (e) { placements = null; }
     if (!Array.isArray(placements)) return refuse("API_CONTRACT_MISMATCH", "the settlement's worker placement info is unavailable");
     let slot = null;
@@ -372,6 +373,38 @@
     let gone = null;
     try { gone = player.Units.getUnits().every((u) => !u || !u.id || u.id.id !== ARG); } catch (e) { gone = null; }
     result.readback = { kind: KIND, arg: ARG, unitsBefore: PRE, gone: gone, matches: gone === true };
+    return JSON.stringify(result);
+  }
+  if (KIND === "FOUND_RELIGION") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "religion argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const rrow = GameInfo.Religions.lookup(ARG);
+    if (!rrow || typeof rrow.ReligionType !== "string") return refuse("UNKNOWN_ACTION", "not a religion definition");
+    let heldBefore = null; try { heldBefore = player.Religion.getReligionType(); } catch (e) { heldBefore = null; }
+    if (heldBefore !== PRE) return refuse("ACTION_EXPIRED", "this seat's religion changed since the offer was made");
+    const relArgs = { ReligionType: ARG };
+    const rcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], relArgs, false);
+    if (!rcheck || rcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused founding that religion");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], relArgs);
+    result.outcome = "sent";
+    let heldAfter = null; try { heldAfter = player.Religion.getReligionType(); } catch (e) { heldAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, religion: isInt(heldAfter) ? heldAfter : null, matches: heldAfter === ARG };
+    return JSON.stringify(result);
+  }
+  if (KIND === "ADD_BELIEF") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "belief argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const brow = GameInfo.Beliefs.lookup(ARG);
+    if (!brow || typeof brow.BeliefType !== "string") return refuse("UNKNOWN_ACTION", "not a belief definition");
+    let heldBefore = null; try { const v = player.Religion.getBeliefs(); heldBefore = Array.isArray(v) ? v.length : null; } catch (e) { heldBefore = null; }
+    if (heldBefore !== PRE) return refuse("ACTION_EXPIRED", "this seat's beliefs changed since the offer was made");
+    const belArgs = { BeliefType: ARG };
+    const bcheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], belArgs, false);
+    if (!bcheck2 || bcheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that belief");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], belArgs);
+    result.outcome = "sent";
+    let heldNow = null; try { const v = player.Religion.getBeliefs(); heldNow = Array.isArray(v) ? v : null; } catch (e) { heldNow = null; }
+    result.readback = { kind: KIND, arg: ARG, beliefsBefore: PRE, held: heldNow, matches: Array.isArray(heldNow) && heldNow.indexOf(ARG) !== -1 };
     return JSON.stringify(result);
   }
   if (KIND === "START_DIPLOMATIC_ACTION") {

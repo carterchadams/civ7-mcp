@@ -1233,6 +1233,29 @@ def test_answering_a_proposal_confirms_once_it_is_no_longer_pending(tmp_path):
     assert res["confirmedBy"]["effect"] == {"proposalAnswered": {"eventId": 16, "response": 926305338}}
 
 
+def test_founding_a_religion_confirms_on_the_religion_held_and_a_belief_on_the_count_rising(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "FOUND_RELIGION", "arg": 35560851, "pre": -1, "typeKey": "RELIGION_BUDDHISM", "displayName": "Buddhism", "canStart": True},
+        {"kind": "ADD_BELIEF", "arg": 777, "pre": 0, "typeKey": "BELIEF_BONUS_1", "beliefClass": "ENHANCER", "displayName": "Bonus", "description": "+1", "canStart": True}]}
+    performed_r = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "FOUND_RELIGION", "arg": 35560851, "religion": -1, "matches": False}}
+    performed_b = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ADD_BELIEF", "arg": 777, "beliefsBefore": 0, "held": [], "matches": False}}
+    rb_r = {**RB, "religionType": 35560851}
+    rb_b = {**RB, "beliefsHeld": [777]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed_r)), reply(5, json.dumps(rb_r)),
+                                reply(6, json.dumps(performed_b)), reply(7, json.dumps(rb_b))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        r = next(o for o in out["offers"] if o["kind"] == "found_religion")
+        assert r["displayName"] == "Buddhism" and "arg" not in r
+        res = reg.perform(gs, action_id=r["actionId"], request_id="rel-1", player=1, mode="singleplayer")
+        assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"religionFounded": {"religion": 35560851}}
+        b = next(o for o in out["offers"] if o["kind"] == "add_belief")
+        assert b["beliefClass"] == "ENHANCER"
+        res2 = reg.perform(gs, action_id=b["actionId"], request_id="bel-1", player=1, mode="singleplayer")
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"beliefAdded": {"belief": 777, "beliefs": 1}}
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

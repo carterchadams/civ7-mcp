@@ -47,6 +47,10 @@ BLOCKER_DECISION = {
     "NOTIFICATION_CHOOSE_CIVILIZATION": "age_transition",
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
+    "NOTIFICATION_CHOOSE_RELIGION": "religion",
+    "NOTIFICATION_CHOOSE_BELIEF": "religion",
+    "CHOOSE_BELIEF": "religion",
+    "CHOOSE_RELIGION": "religion",
     "DIPLOMATIC_RESPOSE_REQUIRED": "diplomatic_response",
     "DIPLOMATIC_RESPONSE_REQUIRED": "diplomatic_response",
     "NOTIFICATION_DIPLOMATIC_RESPONSE_REQUIRED": "diplomatic_response",
@@ -113,6 +117,8 @@ DECISION_OF_KIND = {
     "confirm_traditions": "policies",
     "narrative_choice": "narrative",
     "found_pantheon": "pantheon",
+    "found_religion": "religion",
+    "add_belief": "religion",
     "change_government": "government",
     "buy_attribute": "attributes",
     "consider_attributes": "attributes",
@@ -142,7 +148,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "armyId", "isCommander", "ranged", "attacksRemaining", "strength", "rangedStrength", "damage", "maxDamage", "defender", "startsWar",
                  "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
-                 "eventId", "answer", "proposerPlayerId", "proposerName",
+                 "eventId", "answer", "proposerPlayerId", "proposerName", "beliefClass",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -185,6 +191,9 @@ DIPLOMATIC_RESPONSE_NOTE = ("another civilization has proposed something to this
                             "answered: each pending proposal is offered twice, once to accept and once to reject "
                             "(`answer`), with who proposed it (`proposerName`) and what it does (`description`). "
                             "Treaties and endeavors help both sides; accept them unless the proposer is an enemy.")
+RELIGION_NOTE = ("found a religion: pick any of the named ones still open (the engine refuses those another civilization "
+                 "holds), then add beliefs one at a time as `add_belief` options appear, each with its `beliefClass`. "
+                 "The turn cannot end until the religion is founded.")
 DIPLOMACY_NOTE = ("influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
                   "option names the civilization it is aimed at (`targetName`) and its kind (`group`): TREATY and "
                   "ENDEAVOR help both sides, SANCTION and ESPIONAGE work against the target. Influence otherwise "
@@ -313,6 +322,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = DIPLOMACY_NOTE
         if decision == "diplomatic_response":
             group["note"] = DIPLOMATIC_RESPONSE_NOTE
+        if decision == "religion":
+            group["note"] = RELIGION_NOTE
         if decision == "resources":
             group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1

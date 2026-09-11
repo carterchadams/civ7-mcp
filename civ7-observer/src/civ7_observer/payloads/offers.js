@@ -386,6 +386,10 @@
     if (isInt(PlayerOperationTypes.ASSIGN_WORKER)) {
       for (const c of player.Cities.getCities()) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || !c.Workers) continue;
+        // A specialist is a population point being placed. Without one pending the engine's check
+        // still says yes and then drops the request (live: nothing landed, outcome unknown), so the
+        // offer follows the same readiness flag the population placement itself does.
+        if (!(c.Growth && c.Growth.isReadyToPlacePopulation === true)) continue;
         let info = null; try { info = c.Workers.GetAllPlacementInfo(); } catch (e) { info = null; }
         if (!Array.isArray(info)) continue;
         let cityCap = null, cityWorkers = null;
@@ -537,6 +541,38 @@
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
             canStart: true });
           offered++;
+        }
+      }
+    }
+    // Founding a religion and adding its beliefs. The shipped belief picker sends FOUND_RELIGION with
+    // the religion's hash and then ADD_BELIEF once per chosen belief; the notification blocks the turn
+    // until the religion exists. A religion another civilization already holds is refused by the
+    // engine's own check, so only the ones still open are offered.
+    if (isInt(PlayerOperationTypes.FOUND_RELIGION) && player.Religion && GameInfo.Religions && typeof GameInfo.Religions[Symbol.iterator] === "function") {
+      let held = null; try { held = player.Religion.getReligionType(); } catch (e) { held = null; }
+      if (isInt(held) && held === -1) {
+        for (const row of GameInfo.Religions) {
+          if (!row || !isInt(row.$hash) || typeof row.ReligionType !== "string") continue;
+          if (row.RequiresCustomName === true) continue;   // a custom religion needs a name typed in; the named ones are enough
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.FOUND_RELIGION, { ReligionType: row.$hash }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "FOUND_RELIGION", arg: row.$hash, pre: -1, typeKey: row.ReligionType,
+            displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
+        }
+      }
+    }
+    if (isInt(PlayerOperationTypes.ADD_BELIEF) && player.Religion && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {
+      let heldBeliefs = null; try { const v = player.Religion.getBeliefs(); heldBeliefs = Array.isArray(v) ? v.length : null; } catch (e) { heldBeliefs = null; }
+      let religion = null; try { religion = player.Religion.getReligionType(); } catch (e) { religion = null; }
+      if (isInt(heldBeliefs) && isInt(religion) && religion !== -1) {
+        for (const row of GameInfo.Beliefs) {
+          if (!row || !isInt(row.$hash) || typeof row.BeliefType !== "string") continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADD_BELIEF, { BeliefType: row.$hash }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "ADD_BELIEF", arg: row.$hash, pre: heldBeliefs, typeKey: row.BeliefType,
+            beliefClass: typeof row.BeliefClassType === "string" ? row.BeliefClassType.replace("BELIEF_CLASS_", "") : null,
+            displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+            description: typeof row.Description === "string" ? compose(row.Description) : null, canStart: true });
         }
       }
     }
