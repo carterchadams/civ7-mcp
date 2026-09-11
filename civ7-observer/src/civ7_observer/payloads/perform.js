@@ -7,6 +7,8 @@
   const ALLOWED = ALLOWED_MODE;
   const KIND = OP_KIND;
   const ARG = OP_ARG;
+  const ARG2 = OP_ARG2;
+  const ARG3 = OP_ARG3;
   const result = { payloadVersion: 1, refused: null, context: null, outcome: null, readback: null };
   const refuse = (code, message, extra) => { result.refused = Object.assign({ code: code, message: message }, extra || {}); return JSON.stringify(result); };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
@@ -58,6 +60,29 @@
     result.outcome = "sent";
     const ready = unit.isReadyToMove === true;
     result.readback = { kind: KIND, arg: ARG, isReadyToMove: ready, matches: !ready };
+    return JSON.stringify(result);
+  }
+  if (KIND === "MOVE_UNIT") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "move arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.MOVE_TO)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.MOVE_TO unavailable");
+    if (typeof RevealedStates === "undefined" || !isInt(RevealedStates.HIDDEN)) return refuse("API_CONTRACT_MISMATCH", "RevealedStates unavailable");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    if (unit.isOnMap !== true || !unit.location || !isInt(unit.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
+    let adjacent = false;
+    for (let d = 0; d < 6; d++) { const loc = GameplayMap.getAdjacentPlotLocation(unit.location, d); if (loc && loc.x === ARG2 && loc.y === ARG3) { adjacent = true; break; } }
+    if (!adjacent) return refuse("ACTION_NOT_STARTABLE", "target plot is not adjacent to the unit");
+    const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, ARG2, ARG3);
+    if (!isInt(state) || state === RevealedStates.HIDDEN) return refuse("ACTION_NOT_STARTABLE", "target plot is unknown to the bound player");
+    const unitId = unit.id;
+    const moveArgs = { X: ARG2, Y: ARG3, Modifiers: 0 };
+    const mcheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
+    if (!mcheck || mcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the move");
+    Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, moveArgs);
+    result.outcome = "sent";
+    const loc = unit.location && isInt(unit.location.x) ? { x: unit.location.x, y: unit.location.y } : null;
+    result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");

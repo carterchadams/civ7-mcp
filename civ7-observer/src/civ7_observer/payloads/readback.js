@@ -10,6 +10,7 @@
     civicResearching: player ? t(() => player.Culture.getResearching().type) : null,
     hasSentTurnComplete: t(() => GameContext.hasSentTurnComplete()),
     unitsReadyToMove: player ? t(() => player.Units.getUnits().filter((u) => u.isReadyToMove === true).map((u) => u.id.id)) : null,
+    unitLocations: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.location) m[String(u.id.id)] = [u.location.x, u.location.y]; } return m; }) : null,
     curtainDisplayed: t(() => typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null)
   });
 })()

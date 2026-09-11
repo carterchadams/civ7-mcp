@@ -39,7 +39,8 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
   };
 }
 const renderOffers = (id, mode) => offersRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
-const renderPerform = (id, mode, kind, arg, turn, age) => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age));
+const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0) => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age));
+const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242 } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3), vm.createContext({ ...g }), { timeout: 2000 }));
 const runOffers = (g, id = 1, mode = "singleplayer") => JSON.parse(vm.runInContext(renderOffers(id, mode), vm.createContext({ ...g }), { timeout: 2000 }));
 const runPerform = (g, kind, arg, { id = 1, mode = "singleplayer", turn = 10, age = 4242 } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age), vm.createContext({ ...g }), { timeout: 2000 }));
 
@@ -136,7 +137,7 @@ function withUnits(g, units, { skipOk = true } = {}) {
   };
   return g;
 }
-const unit = (id, extra) => ({ id: { owner: 1, id, type: 26 }, type: 99, isReadyToMove: true, isReadyToSelect: true, activityType: 1797587246, Movement: { movementMovesRemaining: 2, maxMoves: 2 }, ...extra });
+const unit = (id, extra) => ({ id: { owner: 1, id, type: 26 }, type: 99, isOnMap: true, isReadyToMove: true, isReadyToSelect: true, activityType: 1797587246, Movement: { movementMovesRemaining: 2, maxMoves: 2 }, ...extra });
 
 test("offers include one skip offer per owned unit with canStart from the native query", () => {
   const log = [];
@@ -171,4 +172,66 @@ test("perform SKIP_UNIT refuses an id that is not in the bound roster and never 
   assert.equal(r.refused.code, "UNKNOWN_ACTION");
   assert.ok(!log.some((e) => e.startsWith("Units.")));
   assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+// ---- unit move (adjacent, known plots only, never an attack)
+function withMap(g, { hiddenAt = [], moveOk = true } = {}) {
+  g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), SKIP_TURN: 745019656, MOVE_TO: 1477390184 };
+  g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
+  g.RevealedStates = { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 };
+  g.DirectionTypes = { NO_DIRECTION: -1, DIRECTION_NORTHEAST: 0, DIRECTION_EAST: 1, DIRECTION_SOUTHEAST: 2, DIRECTION_SOUTHWEST: 3, DIRECTION_WEST: 4, DIRECTION_NORTHWEST: 5, NUM_DIRECTION_TYPES: 6 };
+  const neighbours = (loc, d) => [{ x: loc.x, y: loc.y + 1 }, { x: loc.x + 1, y: loc.y }, { x: loc.x, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y }, { x: loc.x - 1, y: loc.y + 1 }][d];
+  g.GameplayMap = { getAdjacentPlotLocation: (loc, d) => { g._log.push(`adj(${loc.x},${loc.y},${d})`); return neighbours(loc, d); }, getRevealedState: (pid, x, y) => { g._log.push(`vis(${pid},${x},${y})`); return hiddenAt.some(([hx, hy]) => hx === x && hy === y) ? 0 : 2; }, getTerrainType: () => 1 };
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
+  const prev = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => { g._log.push(`ucanStart(${JSON.stringify(uid)},${op},${JSON.stringify(args)},${show})`); if (op === 1477390184) return { Success: moveOk && uid.owner === 1 }; return prev ? prev.canStart(uid, op, args, show) : { Success: true }; },
+    sendRequest: (uid, op, args) => { g._log.push(`usendRequest(${JSON.stringify(uid)},${op},${JSON.stringify(args)})`); if (op === 1477390184) { const u = g.Players.get(1).Units.getUnits().find((x) => x.id.id === uid.id); if (u) u.location = { x: args.X, y: args.Y }; } else if (prev) prev.sendRequest(uid, op, args); },
+  };
+  return g;
+}
+
+test("move offers cover adjacent known plots only, with canStart(MOVE_TO) and Modifiers NONE", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]] }); g._log = log;
+  const r = runOffers(g);
+  const moves = r.offers.filter((o) => o.kind === "MOVE_UNIT");
+  assert.equal(moves.length, 5, "six neighbours minus one hidden");
+  assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.direction >= 0 && o.terrainKey === "TERRAIN_FLAT"));
+  assert.ok(!moves.some((o) => o.x === 11 && o.y === 10), "hidden plot must not be offered");
+  const moveChecks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1477390184"));
+  assert.equal(moveChecks.length, 5);
+  assert.ok(moveChecks.every((e) => e.includes('"Modifiers":0')));
+  // visibility is read before canStart for each plot
+  for (const o of moves) {
+    const vi = log.indexOf(`vis(1,${o.x},${o.y})`);
+    const ci = log.findIndex((e) => e.startsWith("ucanStart(") && e.includes(`"X":${o.x},"Y":${o.y}`));
+    assert.ok(vi !== -1 && ci > vi);
+  }
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+test("perform MOVE_UNIT sends only for an adjacent known plot after canStart, and reads back the location", () => {
+  const log = [];
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const r = runPerformArgs(g, "MOVE_UNIT", 5, 11, 10);
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "MOVE_UNIT", arg: 5, target: { x: 11, y: 10 }, location: { x: 11, y: 10 }, matches: true });
+  const send = log.find((e) => e.startsWith("usendRequest(") && e.includes("1477390184"));
+  assert.ok(send && send.includes('"X":11,"Y":10,"Modifiers":0'));
+});
+
+test("perform MOVE_UNIT refuses non-adjacent, hidden, unknown-unit and canStart-false targets without sending", () => {
+  for (const [label, mk, uid, x, y] of [
+    ["non-adjacent", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 5, 13, 13],
+    ["hidden", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]] }), 5, 11, 10],
+    ["unknown unit", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 9, 11, 10],
+    ["canStart false", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { moveOk: false }), 5, 11, 10],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "MOVE_UNIT", uid, x, y);
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("usendRequest")), `${label}: must not send`);
+  }
 });

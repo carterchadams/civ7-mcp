@@ -174,3 +174,18 @@ def test_skip_offers_map_to_public_kind_and_perform_confirms_on_readback(tmp_pat
     assert res["status"] == "confirmed"
     sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
     assert '"SKIP_UNIT"' in sent and "OP_ARG" not in sent
+
+
+def test_move_offers_expose_target_and_perform_passes_coordinates(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "MOVE_UNIT", "arg": 5, "x": 11, "y": 10, "direction": 1, "unitTypeKey": "UNIT_SCOUT", "terrainKey": "TERRAIN_FLAT", "movesRemaining": 2, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MOVE_UNIT", "arg": 5, "target": {"x": 11, "y": 10}, "location": {"x": 11, "y": 10}, "matches": True}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), ctx_reply(5)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        mv = next(o for o in out["offers"] if o["kind"] == "move_unit")
+        assert mv["to"] == {"x": 11, "y": 10} and mv["direction"] == 1 and mv["terrainKey"] == "TERRAIN_FLAT" and "arg" not in mv and "x" not in mv
+        res = reg.perform(gs, action_id=mv["actionId"], request_id="mv-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"MOVE_UNIT"' in sent and "const ARG2 = 11;" in sent and "const ARG3 = 10;" in sent and "OP_ARG" not in sent

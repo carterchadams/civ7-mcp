@@ -36,8 +36,10 @@ MUTATION_ALLOWLIST = (
     "GameContext.sendTurnComplete()",
     'Game.UnitOperations.canStart(unitId, UnitOperationTypes.SKIP_TURN, {}, false)',
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.SKIP_TURN, {})',
+    'Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false)',
+    'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, moveArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b)[A-Z_]+|UnitCommands|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
 
 
@@ -116,3 +118,9 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
         stripped = stripped.replace(a, "")
     leftovers = [v for v in violations(stripped) if "mutating or revealing calls" not in v]
     assert leftovers == []
+
+
+def test_move_payload_never_sets_attack_or_unexplored_modifiers():
+    src = (PAYLOAD_DIR / "perform.js").read_text(encoding="utf-8")
+    assert "Modifiers: 0" in src
+    assert not re.search(r"UnitOperationMoveModifiers\.(ATTACK|DECLARE_WAR|MOVE_IGNORE_UNEXPLORED_DESTINATION|ROUTE_ALLOW_UNEXPLORED)", src)

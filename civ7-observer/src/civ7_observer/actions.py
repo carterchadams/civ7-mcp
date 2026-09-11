@@ -15,7 +15,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -131,9 +131,19 @@ class ActionRegistry:
             if kind not in PUBLIC_KIND or not isinstance(o.get("arg"), int) or not isinstance(o.get("canStart"), bool):
                 raise ObserverError("API_CONTRACT_MISMATCH", "offer entry malformed")
             action_id = secrets.token_urlsafe(18)
-            self._offers[action_id] = {"kind": kind, "arg": o["arg"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
-                                       "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
+            rec = {"kind": kind, "arg": o["arg"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
+                   "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
+            if kind == "MOVE_UNIT":
+                if not isinstance(o.get("x"), int) or not isinstance(o.get("y"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "move offer without coordinates")
+                rec["arg2"], rec["arg3"] = o["x"], o["y"]
+                entry["to"] = {"x": o["x"], "y": o["y"]}
+                if isinstance(o.get("direction"), int):
+                    entry["direction"] = o["direction"]
+                if "terrainKey" in o:
+                    entry["terrainKey"] = o["terrainKey"]
+            self._offers[action_id] = rec
             for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent", "unitTypeKey", "movesRemaining", "location"):
                 if k in o:
                     entry[k] = o[k]
@@ -169,7 +179,7 @@ class ActionRegistry:
         base = {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"], "seat": player, "turn": offer["turn"], "age": offer["age"]}
         self._journal({**base, "status": "pending", "at": _now()})
         self._pending.add(request_id)
-        expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"])
+        expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"], arg2=offer.get("arg2", 0), arg3=offer.get("arg3", 0))
         try:
             data = _load(gs, expression)
         except ObserverError as exc:
@@ -207,6 +217,10 @@ class ActionRegistry:
             elif offer["kind"] == "SKIP_UNIT":
                 ready = rb.get("unitsReadyToMove")
                 if isinstance(ready, list) and offer["arg"] not in ready:
+                    return True
+            elif offer["kind"] == "MOVE_UNIT":
+                locs = rb.get("unitLocations")
+                if isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]:
                     return True
             else:
                 key = "techResearching" if offer["kind"] == "SET_TECH_TREE_NODE" else "civicResearching"

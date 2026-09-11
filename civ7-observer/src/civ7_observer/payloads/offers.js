@@ -69,6 +69,25 @@
           canStart: !!(check && check.Success === true) });
       }
     }
+    if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.MOVE_TO) && typeof RevealedStates !== "undefined" && isInt(RevealedStates.HIDDEN)) {
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || u.location.x < 0) continue;
+        if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
+        const unitId = u.id;
+        for (let d = 0; d < 6; d++) {
+          const loc = GameplayMap.getAdjacentPlotLocation(u.location, d);
+          if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0 || loc.y < 0) continue;
+          const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, loc.x, loc.y);
+          if (!isInt(state) || state === RevealedStates.HIDDEN) continue;   // never offer unknown land
+          const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
+          const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
+          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
+            movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
+        }
+      }
+    }
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
     const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
