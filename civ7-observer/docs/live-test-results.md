@@ -270,3 +270,23 @@ the `UIDebugger 0` relaunch, and the blank DLC/mod/version fields in the environ
 | `get_status` honesty | server bound to player 0 (hotseat): `ready false`, `WRONG_PLAYER`; bound to player 1 (hotseat): `ready true`, eligibility `{mode: local-hotseat, isTurnActive: true}`; bound to player 1 with `--mode singleplayer`: `ready false`, `UNSUPPORTED_GAME_MODE` |
 | demo runner boundary (run 3, `runs/demo-3.txt` + `.transcript.jsonl`) | client init reported `tools: ["mcp__civ7-observer__get_observation"]`, one MCP server connected; exactly one tool call made (`get_observation`); report grounded (Tokyo id 65536 at (21, 38), pop 3, producing a Scout; two scouts by id and coordinate) |
 | runner failure path | with a stub `claude` exiting 17: "demo FAILED: claude exited 17", exit 17, no report file |
+
+## Hotseat matrix, persistent MCP servers (`demo/hotseat-watch.py`, raw rows `docs/hotseat-mcp-matrix.jsonl`)
+
+Two bound servers (player 0, player 1) stayed alive across every handoff; each row calls `get_status` then `get_observation` on both.
+
+| row | seat | result |
+|---|---|---|
+| r6-p0-t6 | player 0, turn 6 | server p0: ready, 1 settlement(s), 2 unit(s), 70 visible, session `800e4e32`, 233 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r7-p1-t6 | player 1, turn 6 | server p1: ready, 1 settlement(s), 2 unit(s), 52 visible, session `6df1d048`, 247 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r8-p0-t7 | player 0, turn 7 | server p0: ready, 1 settlement(s), 2 unit(s), 68 visible, session `800e4e32`, 227 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r9-p1-t7 | player 1, turn 7 | server p1: ready, 1 settlement(s), 2 unit(s), 57 visible, session `6df1d048`, 238 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r10-p0-t8 | player 0, turn 8 | server p0: ready, 1 settlement(s), 3 unit(s), 93 visible, session `800e4e32`, 260 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+
+**Honest round count so far:** CLI rows covered turns 1-5 on both seats (5 full rounds);
+persistent-server rows cover turns 6 and 7 on both seats and turn 8 on player 0
+(2.5 full rounds). Total **7.5 full rounds / 15 seat captures**, each intended-seat
+capture succeeded with a fresh observation id and 0 warnings, each other-seat attempt
+refused. Session ids per persistent server were stable (`800e4e32` for player 0,
+`6df1d048` for player 1) across all handoffs. Turns 8 (player 1), 9 and 10 (both seats)
+remain to reach ten full rounds.
