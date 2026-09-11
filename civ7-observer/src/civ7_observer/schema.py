@@ -15,6 +15,10 @@ MAX_SAFE_INT = 2**53 - 1
 MODES = ("singleplayer", "local-hotseat")
 LOCATION_STATUSES = ("tile", "off-map", "invalid")
 PRODUCTION_KINDS = ("unit", "constructible", "project")
+MAX_NODES = 500
+MAX_TREES = 20
+NODE_STATES = {0: "NODE_STATE_INVALID", 1: "NODE_STATE_CLOSED", 2: "NODE_STATE_OPEN", 3: "NODE_STATE_IN_PROGRESS", 4: "NODE_STATE_UNLOCKED", 5: "NODE_STATE_FULLY_UNLOCKED"}
+COMPLETED_STATES = (4, 5)
 OMITTED_FEATURES = [
     "resources", "foreign-units", "foreign-settlements", "diplomacy", "notifications",
     "yields", "map-tiles", "hidden-tiles", "game-seed", "other-players",
@@ -195,14 +199,87 @@ def _warning(v: Any, path: str) -> dict[str, Any]:
     return w
 
 
+def _tree_ref(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("type", "typeKey"))
+    return {"type": _int(o["type"], path + ".type"), "typeKey": _opt(_str, o["typeKey"], path + ".typeKey")}
+
+
+def _node_state(state: Any, name: Any, path: str) -> tuple[int, str]:
+    st = _int(state, path + ".state")
+    if st not in NODE_STATES:
+        _fail(path + ".state", f"unknown node state {st}")
+    nm = _str(name, path + ".stateName")
+    if nm != NODE_STATES[st]:
+        _fail(path + ".stateName", f"does not match state {st}")
+    return st, nm
+
+
+def _node_common(o: dict[str, Any], path: str) -> dict[str, Any]:
+    rec = {
+        "type": _int(o["type"], path + ".type"),
+        "typeKey": _opt(_str, o["typeKey"], path + ".typeKey"),
+        "displayName": _opt(_str, o["displayName"], path + ".displayName"),
+        "tree": _opt(_str, o["tree"], path + ".tree"),
+        "depthUnlocked": _int(o["depthUnlocked"], path + ".depthUnlocked", minimum=0),
+        "maxDepth": _int(o["maxDepth"], path + ".maxDepth", minimum=0),
+    }
+    rec["state"], rec["stateName"] = _node_state(o["state"], o["stateName"], path)
+    if rec["depthUnlocked"] > rec["maxDepth"]:
+        _fail(path, "depthUnlocked exceeds maxDepth")
+    return rec
+
+
+def _current_node(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "progress", "cost", "turnsLeft", "depthUnlocked", "maxDepth"))
+    rec = _node_common(o, path)
+    rec["progress"] = _int(o["progress"], path + ".progress", minimum=0)
+    rec["cost"] = _int(o["cost"], path + ".cost", minimum=0)
+    rec["turnsLeft"] = _opt(_int, o["turnsLeft"], path + ".turnsLeft", minimum=0)
+    return rec
+
+
+def _completed_node(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "depthUnlocked", "maxDepth"))
+    rec = _node_common(o, path)
+    if rec["state"] not in COMPLETED_STATES:
+        _fail(path + ".state", "completed nodes must be UNLOCKED or FULLY_UNLOCKED")
+    return rec
+
+
+def _progression(v: Any, path: str, *, civics: bool) -> dict[str, Any]:
+    keys = ("status", "current", "queuedTarget", "completed") + (("trees",) if civics else ("tree",))
+    o = _obj(v, path, keys)
+    if o["status"] != "supported":
+        _fail(path + ".status", "core progression must be supported")
+    if not isinstance(o["completed"], list) or len(o["completed"]) > MAX_NODES:
+        _fail(path + ".completed", f"expected a list of at most {MAX_NODES}")
+    out = {
+        "status": "supported",
+        "current": _opt(_current_node, o["current"], path + ".current"),
+        "queuedTarget": _opt(_tree_ref, o["queuedTarget"], path + ".queuedTarget"),
+        "completed": [_completed_node(n, f"{path}.completed[{i}]") for i, n in enumerate(o["completed"])],
+    }
+    if civics:
+        t = _obj(o["trees"], path + ".trees", ("active", "available"))
+        if not isinstance(t["available"], list) or not t["available"] or len(t["available"]) > MAX_TREES:
+            _fail(path + ".trees.available", f"expected 1..{MAX_TREES} trees")
+        out["trees"] = {"active": _opt(_tree_ref, t["active"], path + ".trees.active"),
+                        "available": [_tree_ref(x, f"{path}.trees.available[{i}]") for i, x in enumerate(t["available"])]}
+    else:
+        out["tree"] = _opt(_tree_ref, o["tree"], path + ".tree")
+    return out
+
+
 def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[str, Any]:
     """Validate the raw observe.js result. Raises PayloadRefused for typed refusals."""
-    o = _obj(data, "payload", ("payloadVersion", "refused", "context", "settlements", "units", "warnings"))
-    if o["payloadVersion"] != PAYLOAD_VERSION:
+    if not isinstance(data, dict):
+        _fail("payload", "expected object")
+    if data.get("payloadVersion") != PAYLOAD_VERSION:
         _fail("payload.payloadVersion", f"expected {PAYLOAD_VERSION}")
-    if o["refused"] is not None:
-        r = _obj(o["refused"], "payload.refused", ("code", "message"))
+    if data.get("refused") is not None:
+        r = _obj(data["refused"], "payload.refused", ("code", "message"))
         raise PayloadRefused(_str(r["code"], "payload.refused.code"), _str(r["message"], "payload.refused.message"))
+    o = _obj(data, "payload", ("payloadVersion", "refused", "context", "settlements", "units", "technology", "civics", "warnings"))
     ctx = _context(o["context"], "payload.context", bound_player_id)
     bound = ctx["playerId"]
     for name, limit in (("settlements", MAX_SETTLEMENTS), ("units", MAX_UNITS), ("warnings", MAX_WARNINGS)):
@@ -213,11 +290,12 @@ def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[s
     settlements = [_settlement(s, f"payload.settlements[{i}]", bound) for i, s in enumerate(o["settlements"])]
     units = [_unit(u, f"payload.units[{i}]", bound) for i, u in enumerate(o["units"])]
     warnings = [_warning(w, f"payload.warnings[{i}]") for i, w in enumerate(o["warnings"])]
-    return {"context": ctx, "settlements": settlements, "units": units, "warnings": warnings}
+    technology = _progression(o["technology"], "payload.technology", civics=False)
+    civics = _progression(o["civics"], "payload.civics", civics=True)
+    return {"context": ctx, "settlements": settlements, "units": units, "technology": technology, "civics": civics, "warnings": warnings}
 
 
 def build_observation(validated: dict[str, Any], *, session_id: str, observation_id: str, captured_at: str) -> dict[str, Any]:
-    unsupported = {"status": "unsupported", "reason": "not implemented until Change 4"}
     return {
         "schemaVersion": SCHEMA_VERSION,
         "sessionId": session_id,
@@ -226,8 +304,8 @@ def build_observation(validated: dict[str, Any], *, session_id: str, observation
         "context": validated["context"],
         "settlements": validated["settlements"],
         "units": validated["units"],
-        "technology": dict(unsupported),
-        "civics": dict(unsupported),
+        "technology": validated["technology"],
+        "civics": validated["civics"],
         "map": {"status": "unsupported", "reason": "not implemented until Change 5"},
         "omittedFeatures": list(OMITTED_FEATURES),
         "warnings": validated["warnings"],

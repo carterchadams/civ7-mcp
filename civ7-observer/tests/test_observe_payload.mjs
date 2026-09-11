@@ -28,6 +28,8 @@ function game({ log = [], flags = SP, local = 1, turnActive = true, units, citie
   const turns = turnSeq ? [...turnSeq] : null;
   const me = {
     id: local, isTurnActive: turnActive, isAlive: true, isHuman: true,
+    Techs: { getTreeType: () => 500, getResearching: () => ({ type: -1, state: 0, progress: 0, depth: 0, maxDepth: 0 }), getResearched: () => [], getTargetNode: () => -1, getTurnsLeft: () => -1, getNodeCost: () => 0 },
+    Culture: { getActiveTree: () => 600, getAvailableTrees: () => [600], getResearching: () => ({ type: -1, state: 0, progress: 0, depth: 0, maxDepth: 0 }), getResearched: () => [], getTargetNode: () => -1, getTurnsLeft: () => -1, getNodeCost: () => 0 },
     Cities: { getCities: () => cities ?? [
       { id: { owner: local, id: 65536, type: 1 }, owner: local, name: "LOC_MADRID", location: { x: 63, y: 15 }, isTown: false, isCapital: true, population: 6, ruralPopulation: 4, urbanPopulation: 2, BuildQueue: { currentProductionTypeHash: -1563767818, isEmpty: false } },
       { id: { owner: local, id: 131073, type: 1 }, owner: local, name: "LOC_SEVILLA", location: { x: 60, y: 14 }, isTown: true, isCapital: false, population: 2, ruralPopulation: 1, urbanPopulation: 1, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true } },
@@ -39,12 +41,13 @@ function game({ log = [], flags = SP, local = 1, turnActive = true, units, citie
   const other = new Proxy({}, { get(_, k) { log.push(`other.${String(k)}`); return undefined; } });
   return {
     UI: { isInGame: () => true, isMultiplayer: () => flags.isAnyMultiplayer },
-    Game: { get turn() { if (turns && turns.length > 1) return turns.shift(); return turns ? turns[0] : 15; }, age: 4242 },
+    Game: { get turn() { if (turns && turns.length > 1) return turns.shift(); return turns ? turns[0] : 15; }, age: 4242, ProgressionTrees: { getNode: () => null } },
+    ProgressionTreeNodeState: { NODE_STATE_INVALID: 0, NODE_STATE_CLOSED: 1, NODE_STATE_OPEN: 2, NODE_STATE_IN_PROGRESS: 3, NODE_STATE_UNLOCKED: 4, NODE_STATE_FULLY_UNLOCKED: 5 },
     GameContext: { localPlayerID: local, localObserverID: local },
     Players: { get: (id) => { log.push(`Players.get(${id})`); return id === local ? me : other; } },
     Configuration: { getGame: () => new Proxy({ ...flags, humanPlayerIDs: [0, 1], gameSeed: 1 }, { get(t, k) { log.push(`cfg.${String(k)}`); return t[k]; } }) },
     GameplayMap: new Proxy({}, { get(_, k) { log.push(`map.${String(k)}`); return () => 0; } }),
-    GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }, { $hash: -1563767818, UnitType: "UNIT_HOPLITE" }]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]) },
+    GameInfo: { Units: table([{ $hash: 99, UnitType: "UNIT_SCOUT" }, { $hash: -1563767818, UnitType: "UNIT_HOPLITE" }]), Constructibles: table([]), Projects: table([]), Ages: table([{ $hash: 4242, AgeType: "AGE_ANTIQUITY" }]), ProgressionTrees: table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }]), ProgressionTreeNodes: table([]) },
     Locale: { compose: (k) => ({ LOC_MADRID: "Madrid", LOC_SEVILLA: "Sevilla" })[k] ?? k },
   };
 }
@@ -54,6 +57,9 @@ test("serializes the bound player's settlements and units with stable ids", () =
   assert.equal(r.refused, null);
   assert.equal(r.payloadVersion, 1);
   assert.deepEqual(r.context, { turn: 15, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true });
+  assert.equal(r.technology.status, "supported");
+  assert.equal(r.technology.current, null);
+  assert.equal(r.civics.status, "supported");
   assert.equal(r.settlements.length, 2);
   const [madrid, sevilla] = r.settlements;
   assert.deepEqual(madrid.id, { owner: 1, id: 65536, type: 1 });

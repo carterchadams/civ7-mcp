@@ -126,7 +126,7 @@ Same record shapes and state semantics as Techs, plus:
 
 | field | receiver | kind | shape / sentinel | source | live |
 |---|---|---|---|---|---|
-| active tree | `Culture.getActiveTree()` | M | hash; null/0 possible before any choice | `model-culture-tree.js:82`, `culture-chooser.js:78,128` | `TREE_CIVICS_AQ_MAIN` |
+| active tree | `Culture.getActiveTree()` | M | hash; **switches to the tree of the node currently being researched** (Greek tree while Ekklesia is in progress) | `model-culture-tree.js:82`, `culture-chooser.js:78,128` | `TREE_CIVICS_AQ_MAIN`, then `TREE_CIVICS_AQ_GREECE` on turn 16 |
 | available trees | `Culture.getAvailableTrees()` | M | array of hashes; civ-specific trees appear here | `culture-chooser.js:120` | turn 1: `[TREE_CIVICS_AQ_MAIN]`; turn 14 seat 1: `[TREE_CIVICS_AQ_MAIN, TREE_CIVICS_AQ_GREECE]` |
 | current | `Culture.getResearching()` | M | as Techs; `progress` live 10 with cost 60 | `panel-sub-system-dock.js:399` | Chiefdom |
 | current node (dock path) | `Game.ProgressionTrees.getTree(BOUND, activeTree).nodes[activeNodeIndex]` then `getNode` | M | `activeNodeIndex -1` = none | `panel-sub-system-dock.js:376-384` | |
@@ -166,7 +166,7 @@ FULLY_UNLOCKED node.
 | `getResearched()` entry, completed all depths | 5 | 5 | completed |
 | `getResearched()` entry, open | 2 | 2 | available |
 | `getResearched()` entry, in progress | 3 | 3 | current |
-| not observed yet | 4 | 4 | unlocked with mastery remaining |
+| `getResearched()` entry for Discipline on turn 16 (`depthUnlocked 1 / maxDepth 2`) | 4 | 4 | unlocked with mastery remaining (**observed live**) |
 
 ## Acceptance status
 
@@ -175,8 +175,8 @@ FULLY_UNLOCKED node.
 | context, mode, seat identity | verified (SP + both hotseat seats) |
 | settlement id/name/location/isTown/isCapital/population | verified incl. rural/urban split and a town (`isTown true`) |
 | unit id/type/name/location/isOnMap/movement/health | verified incl. damage, embarkation, commander/army and a packed (`isOnMap false`) unit |
-| tech current/completed/target/turns | verified incl. sentinel and state decoding |
-| civic current/completed/tree/turns | verified incl. completed node, civ-specific tree, node→tree mapping |
+| tech current/completed/target/turns | verified incl. sentinel, state decoding, selection change read-back (Pottery → Masonry), and a `maxDepth 2` node in progress |
+| civic current/completed/tree/turns | verified incl. completed node, partial mastery (state 4), civ-specific node in progress with the active tree switched, node→tree mapping |
 | visibility + tile keys + adjacency | verified |
 
 ## How each row was obtained

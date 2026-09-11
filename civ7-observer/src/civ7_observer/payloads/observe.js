@@ -6,7 +6,7 @@
 (() => {
   const ALLOWED = ALLOWED_MODE;
   const warnings = [];
-  const result = { payloadVersion: 1, refused: null, context: null, settlements: null, units: null, warnings: warnings };
+  const result = { payloadVersion: 1, refused: null, context: null, settlements: null, units: null, technology: null, civics: null, warnings: warnings };
   const refuse = (code, message) => {
     result.refused = { code: code, message: message };
     return JSON.stringify(result);
@@ -188,7 +188,80 @@
     return refuse("API_CONTRACT_MISMATCH", "unit roster read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
   }
 
-  // ---- 4. context after
+  // ---- 4. technology and civics
+  // Node state is read from Game.ProgressionTrees.getNode (the shipped dock/tree-grid path),
+  // never from the getResearching() record, whose state field is unreliable.
+  let nodeDefMissing = 0;
+  const progression = (label, comp, extraTrees) => {
+    need(comp !== undefined && comp !== null, label + " component is missing");
+    need(typeof ProgressionTreeNodeState !== "undefined" && ProgressionTreeNodeState && Number.isInteger(ProgressionTreeNodeState.NODE_STATE_FULLY_UNLOCKED), "ProgressionTreeNodeState enum unavailable");
+    const S = ProgressionTreeNodeState;
+    const stateName = (v) => { for (const k of Object.keys(S)) if (S[k] === v) return k; return null; };
+    const treeRef = (hash) => {
+      if (hash === undefined || hash === null || hash === -1 || hash === 0) return null;
+      need(isInt(hash), label + " tree hash is not an integer");
+      return { type: hash, typeKey: lookupKey(GameInfo.ProgressionTrees, hash, "ProgressionTreeType") };
+    };
+    const nodeDef = (hash) => {
+      const row = GameInfo.ProgressionTreeNodes && typeof GameInfo.ProgressionTreeNodes.lookup === "function" ? GameInfo.ProgressionTreeNodes.lookup(hash) : null;
+      if (!row) { nodeDefMissing++; return { typeKey: null, displayName: null, tree: null }; }
+      return {
+        typeKey: typeof row.ProgressionTreeNodeType === "string" ? row.ProgressionTreeNodeType : null,
+        displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+        tree: typeof row.ProgressionTree === "string" ? row.ProgressionTree : null
+      };
+    };
+    const liveNode = (hash) => {
+      const n = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, hash);
+      need(n && isInt(n.state) && isInt(n.depthUnlocked) && isInt(n.maxDepth) && isInt(n.progress), label + " getNode(" + hash + ") returned an unusable node");
+      return n;
+    };
+    const rec = comp.getResearching();
+    need(rec && typeof rec === "object" && isInt(rec.type), label + ".getResearching() returned no record");
+    let current = null;
+    if (rec.type !== -1) {
+      const n = liveNode(rec.type);
+      const d = nodeDef(rec.type);
+      const cost = comp.getNodeCost(rec.type);
+      const turns = comp.getTurnsLeft();
+      need(isInt(cost) && isInt(turns), label + " cost/turns are not integers");
+      current = { type: rec.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state),
+        progress: n.progress, cost: cost, turnsLeft: turns < 0 ? null : turns, depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth };
+    }
+    const researched = comp.getResearched();
+    need(Array.isArray(researched), label + ".getResearched() did not return an array");
+    const completed = [];
+    for (const r of researched) {
+      need(r && isInt(r.type), label + ".getResearched() entry is malformed");
+      const n = liveNode(r.type);
+      if (n.state !== S.NODE_STATE_UNLOCKED && n.state !== S.NODE_STATE_FULLY_UNLOCKED) continue;
+      const d = nodeDef(r.type);
+      completed.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state), depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth });
+    }
+    const target = comp.getTargetNode();
+    need(isInt(target), label + ".getTargetNode() is not an integer");
+    const queuedTarget = target === -1 ? null : { type: target, typeKey: nodeDef(target).typeKey };
+    const out = { status: "supported", current: current, queuedTarget: queuedTarget, completed: completed };
+    Object.assign(out, extraTrees(treeRef));
+    return out;
+  };
+  try {
+    result.technology = progression("Techs", player.Techs, (treeRef) => ({ tree: treeRef(player.Techs.getTreeType()) }));
+  } catch (e) {
+    return refuse("API_CONTRACT_MISMATCH", "technology read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
+  }
+  try {
+    result.civics = progression("Culture", player.Culture, (treeRef) => {
+      const avail = player.Culture.getAvailableTrees();
+      need(Array.isArray(avail), "Culture.getAvailableTrees() did not return an array");
+      return { trees: { active: treeRef(player.Culture.getActiveTree()), available: avail.map(treeRef).filter((t) => t !== null) } };
+    });
+  } catch (e) {
+    return refuse("API_CONTRACT_MISMATCH", "civics read failed: " + String(e && e.message ? e.message : e).slice(0, 160));
+  }
+  if (nodeDefMissing) warnings.push({ code: "NODE_DEFINITION_MISSING", message: "some progression nodes have no GameInfo definition; hash kept, keys null", count: nodeDefMissing });
+
+  // ---- 5. context after
   let turnAfter, lpAfter, loAfter;
   try { turnAfter = Game.turn; lpAfter = GameContext.localPlayerID; loAfter = GameContext.localObserverID; } catch (e) { return refuse("CONTEXT_CHANGED", "context unreadable after extraction"); }
   if (turnAfter !== turnBefore || lpAfter !== localPlayerId || loAfter !== localObserverId) {

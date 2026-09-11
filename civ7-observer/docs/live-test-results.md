@@ -158,3 +158,19 @@ exported; only presence of the API will be noted). Swap seats and re-run `probe`
 | roster changes since turn 14 | scouts now 3/3 movement, damaged scout healed to 22/100, embarked scout still `isOnMap true` |
 | packed-unit read-back, while packed | PASS: `snapshot` still lists 6 units; hoplite 458757 `locationStatus off-map`, `location null`, `armyId {owner:1,id:65536,type:29}`, movement 1/2; commander 393220 unchanged at (66, 37) with the same army id; raw `location` was `{-9999,-9999}` and `isOnMap false`, `isValid true` |
 | packed-unit read-back, after unpacking | PASS: hoplite 458757 `locationStatus tile` at (65, 37), `armyId null`, movement 0/2; commander 393220 unchanged with its army id; same ComponentID across all three captures; roster count 6 throughout |
+
+## Change 4: technology and civics (seat 2 = player 1 Alexander, turn 16)
+
+The human changed research (Pottery → Masonry) and civics (Discipline → the Greek civic
+Ekklesia) between the turn-14 probe and this capture.
+
+| test | result |
+|---|---|
+| `snapshot --mode local-hotseat` | PASS: turn 16, player 1, 0 warnings; technology and civics `supported` |
+| current tech | `NODE_TECH_AQ_MASONRY` IN_PROGRESS 18/83, 7 turns, depth 0 of 2; matches raw `getResearching().type` + `getNode` |
+| completed techs | Agriculture, Pottery, Animal Husbandry, Sailing all FULLY_UNLOCKED 1/1; Writing and Irrigation (OPEN) correctly excluded |
+| queued target | null (raw `getTargetNode` -1) |
+| current civic | `NODE_CIVIC_AQ_GREECE_EKKLESIA` on `TREE_CIVICS_AQ_GREECE`, IN_PROGRESS 16/100, 7 turns |
+| completed civics | Chiefdom FULLY_UNLOCKED 1/1; **Discipline UNLOCKED 1 of 2 (state 4, partial mastery)**; Mysticism, Tactics, Agoge (OPEN) excluded |
+| trees | active `TREE_CIVICS_AQ_GREECE`, available main + Greece |
+| state source | payload state equals `getNode().state` for every node; the `getResearching()` record still reported state 0 |

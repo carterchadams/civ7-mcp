@@ -20,6 +20,20 @@ GOOD = {
          "locationStatus": "tile", "location": {"x": 59, "y": 35}, "isEmbarked": False, "movement": {"remaining": 2, "max": 2},
          "health": {"damage": 32, "maxDamage": 100}, "isCommander": False, "armyId": None},
     ],
+    "technology": {
+        "status": "supported",
+        "tree": {"type": 500, "typeKey": "TREE_TECHS_AQ"},
+        "current": {"type": 701, "typeKey": "NODE_TECH_AQ_POTTERY", "displayName": "Pottery", "tree": "TREE_TECHS_AQ", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 45, "cost": 60, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 1},
+        "queuedTarget": {"type": 702, "typeKey": "NODE_TECH_AQ_WRITING"},
+        "completed": [{"type": 700, "typeKey": "NODE_TECH_AQ_AGRICULTURE", "displayName": "Agriculture", "tree": "TREE_TECHS_AQ", "state": 5, "stateName": "NODE_STATE_FULLY_UNLOCKED", "depthUnlocked": 1, "maxDepth": 1}],
+    },
+    "civics": {
+        "status": "supported",
+        "trees": {"active": {"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, "available": [{"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, {"type": 601, "typeKey": "TREE_CIVICS_AQ_GREECE"}]},
+        "current": {"type": 801, "typeKey": "NODE_CIVIC_AQ_MAIN_DISCIPLINE", "displayName": "Discipline", "tree": "TREE_CIVICS_AQ_MAIN", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 72, "cost": 125, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 2},
+        "queuedTarget": None,
+        "completed": [],
+    },
     "warnings": [],
 }
 
@@ -64,6 +78,17 @@ def mutate(path, value):
     (["units", 0, "armyId"], {"owner": 1}),
     (["warnings"], [{"code": "X"}]),
     (["payloadVersion"], 2),
+    (["technology"], schema.DELETE),
+    (["technology", "status"], "unsupported"),
+    (["technology", "current", "state"], 9),
+    (["technology", "current", "stateName"], "NODE_STATE_OPEN"),
+    (["technology", "current", "progress"], -1),
+    (["technology", "completed", 0, "state"], 2),
+    (["technology", "completed", 0, "extra"], 1),
+    (["technology", "queuedTarget"], {"type": 702}),
+    (["civics", "trees", "active"], 600),
+    (["civics", "trees", "available"], []),
+    (["civics", "current", "depthUnlocked"], 3),
 ])
 def test_invalid_payloads_are_rejected(path, value):
     with pytest.raises(schema.InvalidObservation):
@@ -104,8 +129,19 @@ def test_build_observation_wraps_with_ids_and_markers():
     obs = schema.build_observation(schema.validate_payload(GOOD), session_id="s", observation_id="o", captured_at="2026-09-10T00:00:00Z")
     assert obs["schemaVersion"] == 1
     assert obs["sessionId"] == "s" and obs["observationId"] == "o"
-    assert obs["technology"] == {"status": "unsupported", "reason": "not implemented until Change 4"}
-    assert obs["civics"]["status"] == "unsupported"
+    assert obs["technology"]["status"] == "supported" and obs["technology"]["current"]["typeKey"] == "NODE_TECH_AQ_POTTERY"
+    assert obs["civics"]["status"] == "supported" and obs["civics"]["completed"] == []
     assert obs["map"]["status"] == "unsupported"
     assert "resources" in obs["omittedFeatures"] and "foreign-units" in obs["omittedFeatures"]
     json.dumps(obs)
+
+
+def test_progression_current_may_be_null_and_active_tree_may_be_null():
+    d = mutate(["technology", "current"], None)
+    d["civics"]["trees"]["active"] = None
+    schema.validate_payload(d)
+
+
+def test_completed_allows_unlocked_with_mastery_remaining():
+    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "NODE_TECH_AQ_SAILING", "displayName": "Sailing", "tree": "TREE_TECHS_AQ", "state": 4, "stateName": "NODE_STATE_UNLOCKED", "depthUnlocked": 1, "maxDepth": 2})
+    schema.validate_payload(d)

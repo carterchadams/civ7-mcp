@@ -5,9 +5,9 @@ game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
 
 Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
 **connection doctor**), Change 2 (the developer **capability probe** and the runtime
-contract in `docs/runtime-contract.md`), and Change 3 (**snapshot** of owned settlements
-and units). Technology, civics, and the map are reported as `unsupported` until
-Changes 4 and 5. `serve` is registered but not implemented.
+contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
+and units), and Change 4 (technology and civics in the same snapshot). The map is
+reported as `unsupported` until Change 5. `serve` is registered but not implemented.
 
 ## Install (Linux, this repo)
 
