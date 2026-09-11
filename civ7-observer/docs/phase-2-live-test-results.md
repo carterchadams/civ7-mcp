@@ -61,3 +61,23 @@ mildly confusing. Candidate fixes, deferred: (a) accept and document; (b) a tiny
 auto-dismisses a curtain whose seat has already ended its turn; (c) investigate whether
 sending `ACKNOWLEDGE_TURN_START` for the agent seat before acting changes the behaviour
 (untested; it is a player operation and would need the allowlist extended).
+
+## Gate stage 2: movement, input and takeover under the curtain (player 1, turn 12)
+
+Human watched and listened throughout, and deliberately clicked around and pressed keys
+while the agent acted.
+
+| item | result |
+|---|---|
+| `move_unit` scout 131072 → (19, 42) under the curtain | `confirmed` via read-back poll; the human saw **no camera movement, no map** — only the curtain |
+| `skip_unit` × 3 | `confirmed` |
+| `end_turn` | offer `canStart false`, blocker `PRODUCTION` (Athênai had no build); host refused the perform with `ACTION_NOT_STARTABLE` before anything was sent |
+| human input during automation | clicks and key presses had no visible effect; the only change was the music becoming more noticeable (curtain audio context); no sound effects, no popups |
+| takeover | the human dismissed the curtain, chose production and ended the turn manually: the named-pause path works with the stock UI and no companion code |
+| popups / diplomacy during an agent turn | none occurred yet; to be logged when the game produces one |
+| pause / disconnect mid-turn | pending (companion killed between actions at a later handoff) |
+
+Gate stage 2 decision so far: concealment holds for research, skip, move and end turn; the
+unsupported-decision path degrades to a human takeover with no leak beyond the human's own
+choice to dismiss the curtain. Production selection is the next catalog item the declared
+scenario needs.
