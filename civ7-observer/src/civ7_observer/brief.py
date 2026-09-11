@@ -24,6 +24,7 @@ BLOCKER_DECISION = {
     "UNITS": "unit",
     "UNIT_NEEDS_ORDERS": "unit",
     "STACKED_UNITS": "unit",
+    "NEW_POPULATION": "population",
 }
 
 # Public action kinds grouped into the decision a player actually faces.
@@ -36,12 +37,16 @@ DECISION_OF_KIND = {
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
+    "expand_city": "population",
     "end_turn": "end_turn",
 }
 
 OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "turns",
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
-                 "cityId", "cityName")
+                 "cityId", "cityName", "improvementKey", "featureKey", "river", "yields")
+
+BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
+                        "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")
 
 
 def _option(offer: dict[str, Any]) -> dict[str, Any]:
@@ -90,14 +95,26 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             "message": f"the game requires a {blocking} decision, which this catalog cannot make; a human must take the seat and resolve it"}}
 
     groups: dict[str, dict[str, Any]] = {}
+
+    def group_for(decision: str) -> dict[str, Any]:
+        return groups.setdefault(decision, {"kind": decision, "required": decision == required_decision,
+                                            "optionCount": 0, "options": [], "entities": [], "_seen": set()})
+
     for offer in offers:
         if not offer.get("canStart"):
+            # A settler the game will not let found where it stands is still a fact the seat needs:
+            # it appears as an entity with no option, so the seat moves it instead of waiting.
+            if offer["kind"] == "found_city" and "unitId" in offer:
+                group = group_for("settle")
+                if offer["unitId"] not in group["_seen"]:
+                    group["_seen"].add(offer["unitId"])
+                    group["entities"].append({**_entity(offer), "canFoundHere": False, "terrainKey": offer.get("terrainKey")})
+                    group["note"] = BLOCKED_SETTLER_NOTE
             continue
         decision = DECISION_OF_KIND.get(offer["kind"])
         if decision is None:
             continue
-        group = groups.setdefault(decision, {"kind": decision, "required": decision == required_decision,
-                                             "optionCount": 0, "options": [], "entities": [], "_seen": set()})
+        group = group_for(decision)
         group["optionCount"] += 1
         if len(group["options"]) < max_options:
             group["options"].append(_option(offer))

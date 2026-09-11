@@ -114,6 +114,27 @@
     result.readback = { kind: KIND, arg: ARG, at: { x: ARG2, y: ARG3 }, matches: founded };
     return JSON.stringify(result);
   }
+  if (KIND === "EXPAND_CITY") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "expand arguments are not integers");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.EXPAND)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.EXPAND unavailable");
+    let city = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { city = c; break; } } } catch (e) { city = null; }
+    if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    if (GameplayMap.getIndexFromXY(ARG2, ARG3) !== PRE) return refuse("ACTION_EXPIRED", "plot identity differs from the offer");
+    const cityId = city.id;
+    const listing = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, {}, false);
+    const eplots = listing && Array.isArray(listing.Plots) ? listing.Plots : [];
+    if (eplots.indexOf(PRE) === -1) return refuse("ACTION_EXPIRED", "the plot is no longer offered for this city's growth");
+    const expandArgs = { X: ARG2, Y: ARG3 };
+    const echeck = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, expandArgs, false);
+    if (!echeck || echeck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused placing population on that plot");
+    Game.CityCommands.sendRequest(cityId, CityCommandTypes.EXPAND, expandArgs);
+    result.outcome = "sent";
+    let still = null;
+    try { const after = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, {}, false); still = after && Array.isArray(after.Plots) ? after.Plots.indexOf(PRE) !== -1 : null; } catch (e) { still = null; }
+    result.readback = { kind: KIND, arg: ARG, plot: { x: ARG2, y: ARG3, index: PRE }, stillOffered: still, matches: still === false };
+    return JSON.stringify(result);
+  }
   if (KIND === "PRODUCE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
     if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");

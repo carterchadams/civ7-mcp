@@ -341,9 +341,84 @@ test("found offers exist only for units the native FOUND_CITY canStart accepts, 
   assert.deepEqual(found.map((o) => [o.arg, o.x, o.y, o.pre, o.unitId, o.unitTypeKey, o.terrainKey, o.movesRemaining, o.canStart]), [[5, 15, 27, 2715, 5, "UNIT_FOUNDER", "TERRAIN_FLAT", 3, true]]);
   assert.deepEqual(found[0].from, { x: 15, y: 27 });
   const checks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1463004268"));
-  assert.equal(checks.length, 2, "one native check per owned unit on the map");
-  assert.ok(checks.every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1') && e.endsWith(",false)")));
+  assert.equal(checks.length, 3, "an existence check per owned unit, then a legality check for the settler only");
+  assert.ok(checks.every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')));
+  assert.deepEqual(checks.map((e) => e.endsWith(",true)")), [true, false, true]);
+  assert.equal(found[0].reason, null);
   assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+test("a settler that cannot found where it stands is still offered, canStart false with a reason, so the seat moves it", () => {
+  const log = [];
+  const g = withFounder(world({ log }), [founder(5)], { foundOk: false }); g._log = log;
+  g.Game.UnitOperations.canStart = ((inner) => (uid, op, args, show) => op === 1463004268 && show === true ? { Success: uid.id === 5 } : inner(uid, op, args, show))(g.Game.UnitOperations.canStart);
+  const r = runOffers(g);
+  const found = r.offers.filter((o) => o.kind === "FOUND_CITY");
+  assert.equal(found.length, 1);
+  assert.equal(found[0].canStart, false);
+  assert.match(found[0].reason, /refuses founding/);
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+// ---- expand city (new population placement onto a claimable plot)
+function withExpand(g, { plots = [[16, 28], [16, 27]], types = [4, 5], claimOk = true, removeAfter = true } = {}) {
+  const city = { id: { owner: 1, id: 65536, type: 1 }, owner: 1, name: "LOC_C", location: { x: 15, y: 27 }, isTown: false, Growth: { isReadyToPlacePopulation: true }, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true } };
+  g.Players.get(1).Cities = { getCities: () => [city] };
+  let offered = plots.map(([x, y]) => y * 100 + x);
+  g.CityCommandTypes = { EXPAND: 7771, PURCHASE: 7772 };
+  g.GameInfo.Constructibles = table([{ $hash: 4, ConstructibleType: "IMPROVEMENT_FARM" }, { $hash: 5, ConstructibleType: "IMPROVEMENT_MINE" }]);
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
+  g.GameInfo.Features = table([]);
+  g.GameInfo.Yields = [{ $hash: 619730924, YieldType: "YIELD_FOOD" }, { $hash: -1155936758, YieldType: "YIELD_PRODUCTION" }];
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getTerrainType: () => 1, getFeatureType: () => -1, isRiver: (x) => x === 16, getYield: (x, y, h) => (h === 619730924 ? 2 : 1) };
+  g.Game.CityCommands = {
+    canStart: (cid, op, args, show) => { g._log.push(`kcanStart(${JSON.stringify(cid)},${op},${JSON.stringify(args)},${show})`); if (op !== 7771 || cid.owner !== 1) return { Success: false }; if (args.X === undefined) return { Success: true, Plots: offered.slice(), ConstructibleTypes: offered.map((pi) => types[plots.findIndex(([x, y]) => y * 100 + x === pi)] ?? 4) }; return { Success: claimOk && offered.includes(args.Y * 100 + args.X) }; },
+    sendRequest: (cid, op, args) => { g._log.push(`ksendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); if (removeAfter) offered = offered.filter((pi) => pi !== args.Y * 100 + args.X); },
+  };
+  return g;
+}
+
+test("expand offers list every claimable plot the native EXPAND query returns, with improvement, terrain and yields", () => {
+  const log = [];
+  const g = withExpand(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  const ex = r.offers.filter((o) => o.kind === "EXPAND_CITY");
+  assert.deepEqual(ex.map((o) => [o.arg, o.x, o.y, o.pre, o.cityId, o.cityName, o.improvementKey, o.terrainKey, o.river, o.growthReady, o.canStart]),
+    [[65536, 16, 28, 2816, 65536, "Cordoba", "IMPROVEMENT_FARM", "TERRAIN_FLAT", true, true, true], [65536, 16, 27, 2716, 65536, "Cordoba", "IMPROVEMENT_MINE", "TERRAIN_FLAT", true, true, true]]);
+  assert.deepEqual(ex[0].yields, { food: 2, production: 1 });
+  assert.ok(log.filter((e) => e.startsWith("kcanStart(")).every((e) => e.includes('"owner":1') && e.includes(",7771,") && e.endsWith(",false)")));
+  assert.ok(!log.some((e) => e.startsWith("ksendRequest")));
+});
+
+test("perform EXPAND_CITY re-checks the plot is still offered and canStart, sends EXPAND {X, Y}, and reads back its disappearance", () => {
+  const log = [];
+  const g = withExpand(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "EXPAND_CITY", 65536, 16, 28, { pre: 2816 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "EXPAND_CITY", arg: 65536, plot: { x: 16, y: 28, index: 2816 }, stillOffered: false, matches: true });
+  const i = log.findIndex((e) => e.startsWith("kcanStart(") && e.includes('"X":16,"Y":28'));
+  const j = log.findIndex((e) => e.startsWith("ksendRequest(") && e.includes('"X":16,"Y":28'));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+});
+
+test("perform EXPAND_CITY refuses an unknown city, a plot no longer offered, a stale plot index and a canStart refusal without sending", () => {
+  for (const [label, mk, cid, x, y, pre] of [
+    ["unknown city", () => withExpand(withUnits(world({ log: [] }), [])), 7, 16, 28, 2816],
+    ["plot not offered", () => withExpand(withUnits(world({ log: [] }), [])), 65536, 17, 28, 2817],
+    ["stale index", () => withExpand(withUnits(world({ log: [] }), [])), 65536, 16, 28, 1],
+    ["canStart false", () => withExpand(withUnits(world({ log: [] }), []), { claimOk: false }), 65536, 16, 28, 2816],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "EXPAND_CITY", cid, x, y, { pre });
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("ksendRequest")), `${label}: must not send`);
+  }
+  const log = [];
+  const g = withExpand(withUnits(world({ log }), []), { removeAfter: false }); g._log = log;
+  const r = runPerformArgs(g, "EXPAND_CITY", 65536, 16, 28, { pre: 2816 });
+  assert.equal(r.outcome, "sent");
+  assert.equal(r.readback.matches, false);
 });
 
 test("perform FOUND_CITY re-checks the unit's plot and canStart, sends with no target plot, and reads back the new settlement", () => {

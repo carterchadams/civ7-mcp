@@ -105,3 +105,23 @@ def test_found_city_offers_form_their_own_settle_decision_alongside_the_required
     assert settle["options"] == [{"actionId": settle["options"][0]["actionId"], "kind": "found_city", "unitTypeKey": "UNIT_FOUNDER", "unitId": 5, "from": {"x": 10, "y": 10}, "terrainKey": "TERRAIN_FLAT"}]
     assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 10, "y": 10}, "movesRemaining": 3}]
     assert b["pause"] is None
+
+
+def test_new_population_blocker_makes_the_population_decision_required_with_plot_detail(tmp_path):
+    expand = [{"kind": "EXPAND_CITY", "arg": 65536, "x": 16, "y": 28, "pre": 2816, "cityId": 65536, "cityName": "Pārsa", "plotIndex": 2816, "growthReady": True, "improvementKey": "IMPROVEMENT_FARM", "terrainKey": "TERRAIN_FLAT", "featureKey": None, "river": True, "yields": {"food": 2}, "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(RESEARCH + expand, end_can_start=False, blocking="NEW_POPULATION"))
+    assert b["pause"] is None and b["endTurn"]["supported"] is True
+    required = [d for d in b["decisions"] if d["required"]]
+    assert [d["kind"] for d in required] == ["population"]
+    option = required[0]["options"][0]
+    assert option["kind"] == "expand_city" and option["to"] == {"x": 16, "y": 28} and option["improvementKey"] == "IMPROVEMENT_FARM"
+    assert option["yields"] == {"food": 2} and option["river"] is True and option["cityName"] == "Pārsa"
+
+
+def test_a_settler_that_cannot_found_here_is_shown_as_an_entity_with_a_note_not_an_option(tmp_path):
+    blocked = [{"kind": "FOUND_CITY", "arg": 5, "x": 49, "y": 5, "pre": 549, "unitId": 5, "from": {"x": 49, "y": 5}, "unitTypeKey": "UNIT_FOUNDER", "terrainKey": "TERRAIN_NAVIGABLE_RIVER", "movesRemaining": 2, "canStart": False, "reason": "the game refuses founding on this unit's current plot"}]
+    b, _, _ = build(tmp_path, offers_with(UNITS + blocked, end_can_start=False, blocking="UNITS"))
+    settle = next(d for d in b["decisions"] if d["kind"] == "settle")
+    assert settle["options"] == [] and settle["optionCount"] == 0 and settle["required"] is False
+    assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 49, "y": 5}, "movesRemaining": 2, "canFoundHere": False, "terrainKey": "TERRAIN_NAVIGABLE_RIVER"}]
+    assert "refused" in settle["note"] and "Move it" in settle["note"]

@@ -211,7 +211,10 @@ def build_server(
 
     @mcp.tool(name="list_actions", description=LIST_DESCRIPTION, annotations=READ_ONLY)
     def list_actions() -> dict[str, Any]:
-        return _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
+        listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
+        if "error" not in listing and isinstance(listing.get("attachment"), dict):
+            last["attachment"] = listing["attachment"]
+        return listing
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
     def perform_action(action_id: str, request_id: str) -> dict[str, Any]:

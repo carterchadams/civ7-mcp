@@ -109,11 +109,43 @@
         if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || !isInt(u.location.y) || u.location.x < 0) continue;
         const unitId = u.id;
         const foundArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+        // Same two-step query as the shipped unit panel: `true` asks whether the button exists at all
+        // for this unit (settler-class), `false` whether founding is legal on its current plot. A
+        // settler that cannot found here is still listed, canStart false, so the seat learns to move it.
+        const exists = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, true);
+        if (!exists || exists.Success !== true) continue;
         const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false);
-        if (!check || check.Success !== true) continue;   // only units that can found here are offered
+        const ok = !!(check && check.Success === true);
         offers.push({ kind: "FOUND_CITY", arg: u.id.id, x: u.location.x, y: u.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y },
           unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(u.location.x, u.location.y), "TerrainType"),
-          movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null, canStart: true });
+          movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null, canStart: ok,
+          reason: ok ? null : "the game refuses founding on this unit's current plot (the engine gives no detail; typical causes are water or navigable-river tiles, and plots too close to another settlement); move the unit first" });
+      }
+    }
+    if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.EXPAND)) {
+      // New population placement: the shipped acquire-tile mode asks canStart(EXPAND, {}) for the
+      // claimable plots and the improvement each would receive, then sends EXPAND {X, Y}.
+      const yieldRows = []; for (const y of GameInfo.Yields) { if (y && isInt(y.$hash) && typeof y.YieldType === "string") yieldRows.push(y); }
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
+        const cityId = c.id;
+        const ready = !!(c.Growth && c.Growth.isReadyToPlacePopulation === true);
+        const res = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, {}, false);
+        const plots = res && Array.isArray(res.Plots) ? res.Plots : [];
+        const types = res && Array.isArray(res.ConstructibleTypes) ? res.ConstructibleTypes : [];
+        for (let i = 0; i < plots.length; i++) {
+          const pi = plots[i];
+          if (!isInt(pi)) continue;
+          const loc = GameplayMap.getLocationFromIndex(pi);
+          if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0) continue;
+          const expandArgs = { X: loc.x, Y: loc.y };
+          const check = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, expandArgs, false);
+          const yields = {}; for (const y of yieldRows) { const v = GameplayMap.getYield(loc.x, loc.y, y.$hash, BOUND_PLAYER_ID); if (typeof v === "number") yields[y.YieldType.replace("YIELD_", "").toLowerCase()] = v; }
+          offers.push({ kind: "EXPAND_CITY", arg: c.id.id, x: loc.x, y: loc.y, pre: pi, cityId: c.id.id, cityName: compose(c.name), plotIndex: pi, growthReady: ready,
+            improvementKey: isInt(types[i]) ? lookupKey(GameInfo.Constructibles, types[i], "ConstructibleType") : null,
+            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"),
+            river: GameplayMap.isRiver(loc.x, loc.y) === true, yields: yields, canStart: !!(check && check.Success === true) });
+        }
       }
     }
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {

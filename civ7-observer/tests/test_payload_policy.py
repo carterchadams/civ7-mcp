@@ -23,7 +23,7 @@ FORBIDDEN_PATTERNS = {
     "raw visibility dump": r"\bgetRevealedStates\s*\(",
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
-    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations\.(?!canStart\b)\w+|CityOperations\.(?!canStart\b)\w+|CityCommands|setResearch|purchasePlot|destroy)\b",
+    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations\.(?!canStart\b)\w+|CityOperations\.(?!canStart\b)\w+|CityCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
 }
@@ -42,9 +42,12 @@ MUTATION_ALLOWLIST = (
     'Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs)',
     'Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false)',
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, foundArgs)',
+    'Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, {}, false)',
+    'Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, expandArgs, false)',
+    'Game.CityCommands.sendRequest(cityId, CityCommandTypes.EXPAND, expandArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|UnitCommands|CityCommands|PURCHASE|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
-ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b)[A-Z_]+|UnitCommands|PURCHASE|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
 
 
 def violations(source: str) -> list[str]:

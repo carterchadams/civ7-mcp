@@ -797,3 +797,35 @@ def test_found_city_poll_needs_a_settlement_on_the_offered_plot(tmp_path):
         with pytest.raises(service.ObserverError) as info:
             reg.perform(gs, action_id=fc["actionId"], request_id="fc-2", player=1, mode="singleplayer")
     assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_expand_offers_expose_plot_detail_and_perform_confirms_when_the_plot_leaves_the_native_listing(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "EXPAND_CITY", "arg": 65536, "x": 16, "y": 28, "pre": 2816, "cityId": 65536, "cityName": "Pārsa", "plotIndex": 2816, "growthReady": True, "improvementKey": "IMPROVEMENT_FARM", "terrainKey": "TERRAIN_FLAT", "featureKey": None, "river": False, "yields": {"food": 2, "production": 1}, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "EXPAND_CITY", "arg": 65536, "plot": {"x": 16, "y": 28, "index": 2816}, "stillOffered": True, "matches": False}}
+    rb = {**RB, "expandPlots": {"65536": [2716]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        ex = next(o for o in out["offers"] if o["kind"] == "expand_city")
+        assert ex["to"] == {"x": 16, "y": 28} and ex["cityName"] == "Pārsa" and ex["improvementKey"] == "IMPROVEMENT_FARM" and ex["yields"] == {"food": 2, "production": 1}
+        assert "arg" not in ex and "x" not in ex and "pre" not in ex
+        res = reg.perform(gs, action_id=ex["actionId"], request_id="ex-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"populationPlaced": {"cityId": 65536, "x": 16, "y": 28, "plotIndex": 2816}}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"EXPAND_CITY"' in sent and "const ARG = 65536;" in sent and "const ARG2 = 16;" in sent and "const ARG3 = 28;" in sent and "const PRE = 2816;" in sent
+
+
+def test_expand_poll_does_not_confirm_while_the_plot_is_still_offered(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "EXPAND_CITY", "arg": 65536, "x": 16, "y": 28, "pre": 2816, "cityId": 65536, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "EXPAND_CITY", "arg": 65536, "plot": {"x": 16, "y": 28, "index": 2816}, "stillOffered": True, "matches": False}}
+    rb = {**RB, "expandPlots": {"65536": [2816, 2716]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        ex = next(o for o in out["offers"] if o["kind"] == "expand_city")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=ex["actionId"], request_id="ex-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"

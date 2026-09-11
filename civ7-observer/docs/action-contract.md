@@ -13,10 +13,12 @@ engine-call allowlist by `tests/test_payload_policy.py`. Offers come from `paylo
 | `move_unit` | `Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, {X, Y, Modifiers: 0})` after `canStart(...)` | the unit's `id.id` plus a target plot that is **adjacent** (via `getAdjacentPlotLocation`) and **currently VISIBLE** to the bound player; `Modifiers` is pinned to NONE so a move can never become an attack, a war declaration, or a step into unexplored land (the shipped UI uses `ATTACK + MOVE_IGNORE_UNEXPLORED_DESTINATION` for human clicks) | `canStart` immediately before send; adjacency and visibility re-checked inside the payload; **`Units.getPathTo(unitId, {x, y})` must return a non-empty path whose last `turns` entry is 1** | unit location equals the target (asynchronous) |
 | `produce_unit` | `Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, {UnitType: hash})` after `canStart(...)` `Success` | the city's `id.id` (must be in the bound player's `Cities.getCities()`) and a unit definition hash; offers enumerate `GameInfo.Units` per city and keep only `canStart` successes | `canStart` immediately before send; purchases (`CityCommands`) and constructibles/projects (which need plot placement) are not offered | `BuildQueue.currentProductionTypeHash === hash` (asynchronous) |
 | `found_city` | `Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, {X: -9999, Y: -9999, UnitAbilityType: -1})` after `canStart(...)` `Success` (the shipped unit panel sends no target plot for this operation; the settlement is founded where the unit stands) | the unit's `id.id` (must be in the bound player's `Units.getUnits()`); offers enumerate every owned on-map unit and keep only `canStart` successes, binding the offer to the unit's current plot (`from`, plot index as precondition) | `canStart` immediately before send; the unit must still stand on the offered plot | a city owned by the bound player at the offered plot (`cityLocations` in the read-back poll; asynchronous, observed within 0.2–0.4 s live 2026-09-11 turn 1) |
+| `expand_city` | `Game.CityCommands.sendRequest(cityId, CityCommandTypes.EXPAND, {X, Y})` after `canStart(cityId, EXPAND, {X, Y}, false)` `Success` (new-population placement, as the shipped acquire-tile mode does for a rural claim; specialists via `ASSIGN_WORKER` are not offered yet) | the city's `id.id` and a plot from `canStart(cityId, EXPAND, {}, false).Plots` (the shipped place-population model's query), with the improvement the plot would receive (`ConstructibleTypes`), terrain, feature, river flag and the plot's current yields (`GameplayMap.getYield(x, y, yieldHash, pid)`) | `canStart` immediately before send; the plot must still be in the city's native `Plots` list (precondition = plot index) | the plot index disappears from that city's `Plots` list (`expandPlots` in the read-back poll; asynchronous) |
 | `end_turn` | `GameContext.sendTurnComplete()` | none | `Game.Notifications.getEndTurnBlockingType(pid) === EndTurnBlockingTypes.NONE (0)` and `!GameContext.hasSentTurnComplete()` | `hasSentTurnComplete() true`, then the seat/turn moves on |
 
 Blocking types observed: `UNITS` (23669119) while any unit has moves and no order,
-`RESEARCH` (-286188551) while no research is selected. `Game.Notifications.getTypeName`
+`RESEARCH` (-286188551) while no research is selected, `PRODUCTION` while a city has no build,
+`NEW_POPULATION` (442844772) while a city has grown and the new population is unplaced. `Game.Notifications.getTypeName`
 does not name blocking types; the `EndTurnBlockingTypes` key does.
 
 ## Binding, identity and outcome rules (`actions.ActionRegistry`)
@@ -30,7 +32,8 @@ does not name blocking types; the `EndTurnBlockingTypes` key does.
 - **Preconditions** (`pre`): research/civic = the current researching node at offer time;
   `skip_unit` = the unit's movement remaining; `move_unit` = the unit's plot index;
   `produce_unit` = the city's current production hash; `found_city` = the unit's plot index (and
-  the offer carries the plot's x, y, re-checked at execution); `end_turn` = 0. A stale offer cannot
+  the offer carries the plot's x, y, re-checked at execution); `expand_city` = the plot index, which must
+  still be offered by the native query at execution; `end_turn` = 0. A stale offer cannot
   overwrite a newer decision.
 - **Serialization (game-wide)**: one interprocess `flock` on `<state>/game.lock`, where `<state>`
   is `$CIV7_OBSERVER_STATE_DIR` or `~/.local/state/civ7-observer`, covers reload + check +
@@ -107,3 +110,12 @@ the game gives us (`campaignSetupGUID` survives a reload of the same campaign, v
 same-turn or forward reload is undetectable, so the host provides an explicit
 `act rebind --note "..."`, which bumps the generation and kills every outstanding offer for that
 match. After any load, rebind before resuming.
+
+## Lesson: `canStart(FOUND_CITY)` says only yes or no
+
+Live (agent game, seat 2, turn 2): a founder moved onto a navigable-river tile could not found
+there; `canStart(..., false)` returned `{Success: false}` with no reason field, so no offer
+appeared and the seat skipped the unit, waiting for an action that would never come. Settler-class
+units (those whose `canStart(..., true)` existence check succeeds, exactly the shipped panel's
+button test) are now listed even when founding is refused, `canStart: false` with a generic reason,
+and the brief shows them as entities with `canFoundHere: false` so the seat moves them.
