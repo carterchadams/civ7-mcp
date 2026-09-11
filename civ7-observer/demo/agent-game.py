@@ -214,19 +214,19 @@ def main() -> int:
     RUNS.mkdir(parents=True, exist_ok=True)
     log = RUNS / "log.jsonl"
     seats = list(args.seats)
-    if args.from_current:
+    # Follow whoever the game has seated rather than a fixed rotation: a civilization can be
+    # eliminated mid-game (live: the Russian Empire on turn 69) and the game then skips its seat.
+    planned = args.rounds * len(seats)
+    played: dict[int, int] = {}
+    for _ in range(planned):
         live = context()["localPlayerId"]
-        if live in seats:
-            i = seats.index(live)
-            seats = seats[i:] + seats[:i]
-            print(f"starting at the live seat {live}: {seats}", flush=True)
-        else:
-            print(f"the live seat is {live}, which is not in {seats}; nothing to play", flush=True)
+        if live not in seats:
+            print(f"the live seat is {live}, which is not in {seats}; stopping", flush=True)
             return 1
-
-    for round_no in range(args.rounds):
-        for seat in seats:
+        seat = live
+        if True:
             res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout, raise_curtain=args.raise_curtain)
+            played[seat] = played.get(seat, 0) + 1
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
             cur = res.get("curtain") or {}
@@ -244,6 +244,7 @@ def main() -> int:
             if (nxt["localPlayerId"], nxt["turn"]) == (seat, res["turn"]):
                 print(f"    seat did not change after the confirmed end turn: {nxt}")
                 return 1
+    print(f"played {sum(played.values())} seat turns: {dict(sorted(played.items()))}", flush=True)
     return 0
 
 
