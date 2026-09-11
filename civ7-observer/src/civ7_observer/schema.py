@@ -206,6 +206,12 @@ def _tree_ref(v: Any, path: str) -> dict[str, Any]:
     return {"type": _int(o["type"], path + ".type"), "typeKey": _opt(_str, o["typeKey"], path + ".typeKey")}
 
 
+def _node_ref(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree"))
+    return {"type": _int(o["type"], path + ".type"), "typeKey": _opt(_str, o["typeKey"], path + ".typeKey"),
+            "displayName": _opt(_str, o["displayName"], path + ".displayName"), "tree": _opt(_str, o["tree"], path + ".tree")}
+
+
 def _node_state(state: Any, name: Any, path: str) -> tuple[int, str]:
     st = _int(state, path + ".state")
     if st not in NODE_STATES:
@@ -289,7 +295,7 @@ def _progression(v: Any, path: str, *, civics: bool) -> dict[str, Any]:
     out = {
         "status": "supported",
         "current": _opt(_current_node, o["current"], path + ".current"),
-        "queuedTarget": _opt(_tree_ref, o["queuedTarget"], path + ".queuedTarget"),
+        "queuedTarget": _opt(_node_ref, o["queuedTarget"], path + ".queuedTarget"),
         "inProgress": [_in_progress_node(n, f"{path}.inProgress[{i}]") for i, n in enumerate(o["inProgress"])],
         "completed": [_completed_node(n, f"{path}.completed[{i}]") for i, n in enumerate(o["completed"])],
     }

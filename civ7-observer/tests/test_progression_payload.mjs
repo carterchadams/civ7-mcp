@@ -78,7 +78,7 @@ test("technology: current, completed with depth, queued target, tree", () => {
   assert.equal(t.status, "supported");
   assert.deepEqual(t.tree, { type: 500, typeKey: "TREE_TECHS_AQ" });
   assert.deepEqual(t.current, { type: 701, typeKey: "NODE_TECH_AQ_POTTERY", displayName: "Pottery", tree: "TREE_TECHS_AQ", state: 3, stateName: "NODE_STATE_IN_PROGRESS", progress: 45, cost: 60, turnsLeft: 1, depthUnlocked: 0, maxDepth: 1, repeatedDepth: 0 });
-  assert.deepEqual(t.queuedTarget, { type: 702, typeKey: "NODE_TECH_AQ_WRITING" });
+  assert.deepEqual(t.queuedTarget, { type: 702, typeKey: "NODE_TECH_AQ_WRITING", displayName: "Writing", tree: "TREE_TECHS_AQ" });
   assert.deepEqual(t.completed.map((n) => [n.typeKey, n.stateName, n.depthUnlocked, n.maxDepth]), [
     ["NODE_TECH_AQ_AGRICULTURE", "NODE_STATE_FULLY_UNLOCKED", 1, 1],
     ["NODE_TECH_AQ_SAILING", "NODE_STATE_UNLOCKED", 1, 2],

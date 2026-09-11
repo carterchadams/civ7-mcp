@@ -198,3 +198,13 @@ Ekklesia) between the turn-14 probe and this capture.
 | queued target (non-null) | PASS: target `NODE_TECH_AQ_WHEEL` (raw node state CLOSED, not in `getResearched()`), and the game switched `current` to `NODE_TECH_AQ_IRRIGATION` (state OPEN, 0/83, 9 turns) on the path to it |
 | UI comparison of an advancing value | PASS for turns: the panel showed 7 turns for Masonry, matching `turnsLeft 7`; the UI exposes no numeric progress/cost, only a bar, so 18/83 is corroborated by the dock's `1 − progress/cost` formula rather than a displayed number |
 | banked progress on a deselected node | Masonry kept `progress 18` with state IN_PROGRESS after Irrigation became current; the observation now lists it under `technology.inProgress` (18/83) and Ekklesia under `civics.inProgress` (16/100) |
+
+## Change 6: MCP serve and model demonstration (seat 2 = player 1 Alexander, turn 16)
+
+| test | result |
+|---|---|
+| stdio server via MCP client (`serve --player 1 --mode local-hotseat`) | PASS: `initialize` ok, exactly two tools both `readOnlyHint true`; `get_status` `IN_GAME`, `ready true`, context turn 16 / age / seat 1; `get_observation` 44,849 bytes in 118 ms, 1 settlement, 6 units, 112 tiles, 0 warnings |
+| wrong-seat server (`--player 0`) | PASS: `get_status` `ready false` reason `WRONG_PLAYER`; `get_observation` returns `{"error": {"code": "WRONG_PLAYER", ...}}`; no other seat data |
+| isolated model demonstration, run 1 | PASS: `claude -p` with only `mcp__civ7-observer__get_observation` allowed and `--strict-mcp-config`; report cites observation id `c2839732…`, turn 16, every settlement/unit by id and coordinate, current/banked/completed research and civics correctly, describes visible terrain by coordinate, lists the omitted features, and states that absence of enemies in the data is not evidence of absence (`runs/demo-1.txt`) |
+| grounding spot-checks on run 1 | population 5 (4 rural + 1 urban), 6 units with ids/locations/moves/damage, Irrigation 0/83 with Wheel queued, Masonry banked 18/83, Discipline depth 2 current with depth 1 completed, Ekklesia banked 16/100, 112 visible tiles, ocean at (0, 36) via horizontal wrap: all match the observation |
+| demonstration, run 2 after a human change | pending |

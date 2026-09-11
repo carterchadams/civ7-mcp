@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "civ7-observer": {
+      "type": "stdio",
+      "command": "/home/redcartel/code/civ/.venv/bin/python",
+      "args": ["-m", "civ7_observer", "serve", "--player", "1", "--mode", "local-hotseat"]
+    }
+  }
+}

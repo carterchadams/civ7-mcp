@@ -151,6 +151,7 @@ FULLY_UNLOCKED node.
 | adjacency | `getAdjacentPlotLocation({x,y}, DirectionTypes)` | M | `{x, y}`; **the `(x, y, dir)` form returns undefined** | | 6 neighbours of {63,15}: {64,16},{64,15},{64,14},{63,14},{62,15},{63,16} |
 | yields (optional) | `getYields(x, y, playerId)` | M | returned `[]`; signature unconfirmed | | deferred |
 | resources | `getResourceType` | M | **excluded in v0.1** (policy) | | |
+| horizontal wrap | the 74-wide map **wraps in x**: a galley at (72, 36) revealed (0, 36) (ocean), so x 73 and x 0 are neighbours; any future adjacency must use `getAdjacentPlotLocation`, never `x ± 1` | | observed turn 16 |
 | full-grid scan | visibility-first loop over 3404 plots | | ~10 ms in-game; 19-33 visible tiles ≈ 0.7 KB early; seat 1 turn 14: 84 visible / 87 revealed / 3233 hidden while the camera was parked over unknown terrain (camera position has no effect) | | no chunking needed |
 
 ## Static tables (`GameInfo.*`, each has `.length`, `.lookup(hash)`, rows carry `$hash`)
@@ -168,6 +169,7 @@ FULLY_UNLOCKED node.
 | `depthUnlocked` / `maxDepth` | depths already earned / total depths (mastery = depth 2) | `getNode()` |
 | `repeatedDepth` | repeat count for repeatable nodes (depth resets to 0) | `getNode().repeatedDepth`; `tree-grid.js:342` |
 | `inProgress[]` | nodes that are neither current nor earned but hold banked points (state IN_PROGRESS); the game keeps a deselected node's progress (Masonry kept 18/83 after Irrigation became current) | `getNode().progress` on `getResearched()` entries |
+| `queuedTarget` | `{type, typeKey, displayName, tree}` of the node queued via `getTargetNode()`; may be a CLOSED node absent from `getResearched()` | `getTargetNode`, node definition |
 | `completed[]` | every node with an **earned depth** (`depthUnlocked > 0` or `repeatedDepth > 0`), regardless of whether its next depth is currently being researched; `state` is the node's real state (3 while the next depth is in progress, 4 with mastery remaining, 5 fully unlocked) | `tree-grid.js:294-296` computes completed levels from `depthUnlocked` independently of the current research |
 
 Consistency rules enforced in the payload and the schema: FULLY_UNLOCKED requires

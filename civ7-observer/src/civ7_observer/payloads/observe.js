@@ -265,7 +265,11 @@
     }
     const target = comp.getTargetNode();
     need(isInt(target), label + ".getTargetNode() is not an integer");
-    const queuedTarget = target === -1 ? null : { type: target, typeKey: nodeDef(target).typeKey };
+    let queuedTarget = null;
+    if (target !== -1) {
+      const d = nodeDef(target);
+      queuedTarget = { type: target, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree };
+    }
     const out = { status: "supported", current: current, queuedTarget: queuedTarget, inProgress: inProgress, completed: completed };
     Object.assign(out, extraTrees(treeRef));
     return out;

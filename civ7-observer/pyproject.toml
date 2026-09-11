@@ -9,6 +9,7 @@ description = "Read-only local observer for one Civilization VII player via the 
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.7,<2",
+    "mcp>=1.0,<2",
 ]
 
 [project.optional-dependencies]

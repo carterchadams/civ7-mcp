@@ -45,12 +45,6 @@ def test_target_id_flag(monkeypatch, capsys):
     assert seen["target_id"] == "abc"
 
 
-@pytest.mark.parametrize("cmd", ["serve"])
-def test_stub_commands_exit_2(cmd, capsys):
-    code = cli.main([cmd])
-    _, err = capsys.readouterr()
-    assert code == 2
-    assert "not implemented" in err.lower()
 
 
 def test_module_entrypoint_runs_from_outside_repo(tmp_path):
@@ -133,3 +127,12 @@ def test_probe_json_reports_transport_failures_as_structured_errors(monkeypatch,
     out, _ = capsys.readouterr()
     assert code == 1
     assert json.loads(out)["error"]["code"] == "DEBUGGER_UNAVAILABLE"
+
+
+def test_serve_requires_player_and_mode(capsys):
+    with pytest.raises(SystemExit):
+        cli.main(["serve"])
+    with pytest.raises(SystemExit):
+        cli.main(["serve", "--player", "1"])
+    with pytest.raises(SystemExit):
+        cli.main(["serve", "--mode", "singleplayer"])

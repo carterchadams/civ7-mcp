@@ -6,9 +6,9 @@ game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
 Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
 **connection doctor**), Change 2 (the developer **capability probe** and the runtime
 contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
-and units), Change 4 (technology and civics), and Change 5 (the currently visible map with
-visibility-first filtering and anti-leak fixtures). `serve` is registered but not
-implemented.
+and units), Change 4 (technology and civics), Change 5 (the currently visible map with
+visibility-first filtering and anti-leak fixtures), and Change 6 (the narrow stdio MCP
+server and the isolated model demonstration).
 
 ## Install (Linux, this repo)
 
@@ -103,6 +103,49 @@ right now (`coverage: "currently-visible-only"`); fogged and hidden tiles, resou
 yields, and foreign objects are listed under `omittedFeatures`. Each observation carries a fresh
 `observationId`; the `sessionId` is fixed for the process, so restart the service after
 loading another save. `omittedFeatures` lists what is deliberately not exported.
+
+## Serve the observation to a model (MCP)
+
+```bash
+.venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
+```
+
+`--player` and `--mode` are required and fixed for the server's lifetime. The server
+exposes exactly two tools, both annotated read-only and taking no arguments:
+
+| tool | returns |
+|---|---|
+| `get_observation` | the same validated Observation `snapshot` writes, or `{"error": {"code", "message"}}` |
+| `get_status` | connectivity/readiness for the bound seat (never another seat's state) |
+
+Logs go to stderr; stdout is the MCP transport. Each call opens a fresh, verified
+session to the in-game realm and closes it, so a seat swap, reload, or shutdown between
+calls yields a typed error rather than stale data. Restart the server after loading a
+different save (the `sessionId` is per process).
+
+Register with a client using absolute paths:
+
+```bash
+claude mcp add --transport stdio civ7-observer -- \
+  /home/redcartel/code/civ/.venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
+codex mcp add civ7-observer -- \
+  /home/redcartel/code/civ/.venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
+```
+
+### Isolated demonstration
+
+`demo/run-demo.sh` runs the plan's demonstration prompt in a separate, non-interactive
+Claude Code session that is given only `mcp__civ7-observer__get_observation` (all other
+tools disallowed, `--strict-mcp-config` so no other MCP servers load). It does not modify
+any global Claude configuration. Run it from the package directory with paths relative
+to it:
+
+```bash
+civ7-observer/demo/run-demo.sh demo/mcp-hotseat-player1.json runs/demo-1.txt
+```
+
+A coding assistant with shell access is not isolated merely because this server is
+narrow; keep the gameplay session separate from development sessions.
 
 ## Seat-binding rule (enforced by tests)
 

@@ -18,7 +18,7 @@ from civ7_observer.snapshot import run_snapshot
 
 DEFAULT_PORT = 9444
 DEFAULT_TIMEOUT = 5.0
-_STUBS = ("serve",)
+_STUBS: tuple[str, ...] = ()
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -51,6 +51,14 @@ def _build_parser() -> argparse.ArgumentParser:
     sn.add_argument("--out", type=Path, default=Path("runs/observation.json"))
     sn.add_argument("--json", action="store_true")
     sn.add_argument("-v", "--verbose", action="store_true")
+
+    sv = sub.add_parser("serve", help="run the stdio MCP server (get_observation, get_status) for one bound player")
+    sv.add_argument("--player", type=int, required=True, help="engine player id to bind for the whole server lifetime")
+    sv.add_argument("--mode", choices=MODES, required=True, help="session type captures are allowed in")
+    sv.add_argument("--port", type=int, default=DEFAULT_PORT)
+    sv.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    sv.add_argument("--target-id", default=None)
+    sv.add_argument("-v", "--verbose", action="store_true")
 
     for name in _STUBS:
         s = sub.add_parser(name, help=f"{name} (not implemented in Change 1)")
@@ -122,6 +130,9 @@ def main(argv: list[str] | None = None) -> int:
         return _run_probe(args)
     if args.command == "snapshot":
         return _run_snapshot(args)
+    if args.command == "serve":
+        from civ7_observer.server import serve
+        return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id)
     result = run_doctor(port=args.port, timeout=args.timeout, target_id=args.target_id)
     if args.json:
         print(result.to_json())

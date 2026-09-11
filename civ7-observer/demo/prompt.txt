@@ -1,0 +1,6 @@
+Call get_observation once. Report the observation ID and turn. List my
+settlements and units, then summarize my current and completed technology
+and civic research. Describe the currently visible terrain. Cite IDs or
+coordinates for factual claims. Clearly identify unsupported and omitted
+information. Do not take actions, infer unseen enemies, or use any other
+tool, file, screenshot, or debugger connection.
