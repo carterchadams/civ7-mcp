@@ -11,6 +11,7 @@ from civ7_observer.cdp import CdpError
 BOUND_TOKEN = "BOUND_PLAYER_ID"
 MODE_TOKEN = "ALLOWED_MODE"
 GUARDS_TOKEN = "GUARDS_ONLY"
+ACTION_KINDS = ("SET_TECH_TREE_NODE", "SET_CULTURE_TREE_NODE", "END_TURN")
 ALLOWED_MODES = ("singleplayer", "local-hotseat")
 
 
@@ -25,6 +26,22 @@ def load_payload(name: str) -> str:
         return resource.read_text(encoding="utf-8")
     except (FileNotFoundError, OSError) as exc:
         raise PayloadMissing(f"packaged payload {name!r} not found") from exc
+
+
+def _int_token(value: object, what: str) -> str:
+    if isinstance(value, bool) or not isinstance(value, int):
+        raise ValueError(f"{what} must be an integer, got {value!r}")
+    return str(value)
+
+
+def render_action_payload(*, bound_player_id: int, allowed_mode: str, kind: str, arg: int, expected_turn: int, expected_age: int) -> str:
+    """Render perform.js. Every token is validated here; no caller-supplied text reaches the game."""
+    if kind not in ACTION_KINDS:
+        raise ValueError(f"kind must be one of {ACTION_KINDS}, got {kind!r}")
+    text = render_payload("perform.js", bound_player_id=bound_player_id, allowed_mode=allowed_mode)
+    text = text.replace("OP_KIND", json.dumps(kind)).replace("OP_ARG", _int_token(arg, "arg"))
+    text = text.replace("EXPECTED_TURN", _int_token(expected_turn, "expected_turn")).replace("EXPECTED_AGE", _int_token(expected_age, "expected_age"))
+    return text
 
 
 def render_payload(name: str, *, bound_player_id: int, allowed_mode: str | None = None, guards_only: bool = False) -> str:

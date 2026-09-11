@@ -3,7 +3,8 @@
 Live finding (docs/runtime-contract.md, hotseat): the debug API is omniscient across
 seats. Seat binding is therefore enforced here, in code, not by the game. Any payload
 that names another player, enumerates the player roster, or reads tile detail without
-a visibility check must fail before it can ship.
+a visibility check must fail before it can ship. The single mutation payload is held to
+an explicit allowlist of engine calls instead.
 """
 
 import re
@@ -22,10 +23,20 @@ FORBIDDEN_PATTERNS = {
     "raw visibility dump": r"\bgetRevealedStates\s*\(",
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
-    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|PlayerOperations|UnitOperations|setResearch|purchasePlot|destroy)\b",
+    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|PlayerOperations\.(?!canStart\b)\w+|UnitOperations|setResearch|purchasePlot|destroy)\b",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
 }
+
+MUTATION_PAYLOADS = {"perform.js"}
+# The only engine calls a mutation payload may contain, as exact substrings.
+MUTATION_ALLOWLIST = (
+    "Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND]",
+    "Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND]",
+    "GameContext.sendTurnComplete()",
+)
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperations|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+ENGINE_CALL = re.compile(r"(Game\.PlayerOperations\.(?:canStart|sendRequest)\([^)]*|GameContext\.sendTurnComplete\(\))")
 
 
 def violations(source: str) -> list[str]:
@@ -38,7 +49,11 @@ def violations(source: str) -> list[str]:
 
 
 def packaged_payloads():
-    return sorted(p for p in PAYLOAD_DIR.iterdir() if p.name.endswith(".js"))
+    return sorted(p for p in PAYLOAD_DIR.iterdir() if p.name.endswith(".js") and p.name not in MUTATION_PAYLOADS)
+
+
+def mutation_payloads():
+    return sorted(p for p in PAYLOAD_DIR.iterdir() if p.name in MUTATION_PAYLOADS)
 
 
 def test_at_least_one_payload_is_packaged():
@@ -59,6 +74,7 @@ BAD_SAMPLES = {
     "reveal": "Game.ProgressionTrees.revealTree(1)",
     "resource": "GameplayMap.getResourceType(x, y)",
     "timer": "setTimeout(() => {}, 0)",
+    "operation in a read-only payload": "Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, 1, {})",
 }
 
 
@@ -77,3 +93,24 @@ GOOD_SAMPLES = [
 @pytest.mark.parametrize("sample", GOOD_SAMPLES)
 def test_policy_allows_bound_player_reads(sample):
     assert violations(sample) == []
+
+
+def test_mutation_payload_exists_and_is_not_scanned_as_read_only():
+    assert [p.name for p in mutation_payloads()] == ["perform.js"]
+    assert "perform.js" not in [p.name for p in packaged_payloads()]
+
+
+@pytest.mark.parametrize("payload", mutation_payloads(), ids=lambda p: p.name)
+def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
+    src = payload.read_text(encoding="utf-8")
+    calls = [m.group(0) for m in ENGINE_CALL.finditer(src)]
+    assert calls, "mutation payload must contain the allowlisted calls"
+    for call in calls:
+        assert any(call.startswith(a) for a in MUTATION_ALLOWLIST), f"non-allowlisted engine call: {call!r}"
+    assert not re.search(MUTATION_FORBIDDEN, src), "mutation payload references a forbidden surface"
+    assert "PlayerOperationTypes[OP_KIND]" in src and "PlayerOperationTypes." not in src
+    stripped = src
+    for a in MUTATION_ALLOWLIST:
+        stripped = stripped.replace(a, "")
+    leftovers = [v for v in violations(stripped) if "mutating or revealing calls" not in v]
+    assert leftovers == []

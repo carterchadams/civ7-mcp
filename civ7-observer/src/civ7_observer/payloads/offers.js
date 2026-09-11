@@ -1,0 +1,70 @@
+// Read-only enumeration of the bound player's legal choices for the supported action kinds.
+// Uses the native canStart query exactly as the shipped choosers do (hover path). Never mutates.
+(() => {
+  const ALLOWED = ALLOWED_MODE;
+  const result = { payloadVersion: 1, refused: null, context: null, offers: null };
+  const refuse = (code, message) => { result.refused = { code: code, message: message }; return JSON.stringify(result); };
+  const isInt = (v) => typeof v === "number" && Number.isInteger(v);
+  const isBool = (v) => typeof v === "boolean";
+  const lookupKey = (table, hash, field) => {
+    if (!isInt(hash) || hash === -1) return null;
+    const row = table && typeof table.lookup === "function" ? table.lookup(hash) : null;
+    return row && typeof row[field] === "string" ? row[field] : null;
+  };
+  const compose = (key) => { if (typeof key !== "string") return null; try { const s = Locale.compose(key); return typeof s === "string" ? s : key; } catch (e) { return key; } };
+  const curtain = () => { try { return typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null; } catch (e) { return null; } };
+
+  // ---- guards (same as observe.js)
+  let turn, age, lp, lo, flags, inGame;
+  try { inGame = typeof UI !== "undefined" && typeof UI.isInGame === "function" ? UI.isInGame() : undefined; turn = Game.turn; age = Game.age; lp = GameContext.localPlayerID; lo = GameContext.localObserverID; flags = Configuration.getGame(); }
+  catch (e) { return refuse("NOT_IN_GAME", "game context unavailable"); }
+  if (inGame !== true) return refuse("NOT_IN_GAME", "UI.isInGame() is not true");
+  if (!isInt(turn) || !isInt(age) || !isInt(lp) || !isInt(lo)) return refuse("NOT_IN_GAME", "turn, age or seat identity missing");
+  if (lp !== BOUND_PLAYER_ID || lo !== BOUND_PLAYER_ID) return refuse("WRONG_PLAYER", "bound player " + BOUND_PLAYER_ID + " is not the local seat (localPlayerId=" + lp + ", localObserverId=" + lo + ")");
+  for (const k of ["isHotseat", "isLocalMultiplayer", "isNetworkMultiplayer", "isInternetMultiplayer", "isLANMultiplayer", "isAnyMultiplayer", "isPlayByCloud"]) {
+    if (!isBool(flags[k])) return refuse("UNSUPPORTED_GAME_MODE", "game mode flag " + k + " is not a boolean");
+  }
+  const networked = flags.isNetworkMultiplayer || flags.isInternetMultiplayer || flags.isLANMultiplayer || flags.isPlayByCloud;
+  const mode = (!flags.isAnyMultiplayer && !networked) ? "singleplayer" : (flags.isHotseat && flags.isLocalMultiplayer && !networked) ? "local-hotseat" : "unsupported";
+  if (mode !== ALLOWED) return refuse("UNSUPPORTED_GAME_MODE", "game is " + mode + " but the service allows only " + ALLOWED);
+  let player; try { player = Players.get(BOUND_PLAYER_ID); } catch (e) { player = null; }
+  if (!player || player.isValid === false) return refuse("WRONG_PLAYER", "bound player object is invalid");
+  if (player.isTurnActive !== true) return refuse("TURN_NOT_READY", "bound player's turn is not active");
+  result.context = { turn: turn, age: age, playerId: BOUND_PLAYER_ID, localPlayerId: lp, localObserverId: lo, mode: mode, isTurnActive: true, curtainDisplayed: curtain() };
+
+  // ---- offers
+  const offers = [];
+  try {
+    const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
+    for (const [kind, comp] of kinds) {
+      if (!comp || typeof comp.getAllAvailableNodeTypes !== "function") throw new Error(kind + " component unavailable");
+      const opType = PlayerOperationTypes[kind];
+      if (!isInt(opType)) throw new Error("PlayerOperationTypes." + kind + " missing");
+      const avail = comp.getAllAvailableNodeTypes();
+      if (!Array.isArray(avail)) throw new Error(kind + " getAllAvailableNodeTypes() is not an array");
+      for (const hash of avail) {
+        if (!isInt(hash)) throw new Error(kind + " node hash is not an integer");
+        const row = GameInfo.ProgressionTreeNodes.lookup(hash);
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, opType, { ProgressionTreeNodeType: hash }, false);
+        offers.push({
+          kind: kind, arg: hash,
+          typeKey: row && typeof row.ProgressionTreeNodeType === "string" ? row.ProgressionTreeNodeType : null,
+          displayName: row && typeof row.Name === "string" ? compose(row.Name) : null,
+          tree: row && typeof row.ProgressionTree === "string" ? row.ProgressionTree : null,
+          cost: comp.getNodeCost(hash), turns: comp.getTurnsForNode(hash),
+          canStart: !!(check && check.Success === true)
+        });
+      }
+    }
+    const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
+    const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
+    if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
+    const blocked = blockingType !== none;
+    const alreadySent = GameContext.hasSentTurnComplete() === true;
+    offers.push({ kind: "END_TURN", arg: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? (Game.Notifications.getTypeName(blockingType) || String(blockingType)) : null, alreadySent: alreadySent });
+  } catch (e) {
+    return refuse("API_CONTRACT_MISMATCH", "offer enumeration failed: " + String(e && e.message ? e.message : e).slice(0, 160));
+  }
+  result.offers = offers;
+  return JSON.stringify(result);
+})()

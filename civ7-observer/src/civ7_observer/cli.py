@@ -13,7 +13,8 @@ from civ7_observer import __version__, cdp
 from civ7_observer.doctor import run_doctor
 from civ7_observer.probe import run_probe
 from civ7_observer.schema import MODES
-from civ7_observer.service import ObserverError
+from civ7_observer.actions import ActionRegistry
+from civ7_observer.service import ObserverError, open_game_session
 from civ7_observer.snapshot import run_snapshot
 
 DEFAULT_PORT = 9444
@@ -59,6 +60,21 @@ def _build_parser() -> argparse.ArgumentParser:
     sv.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
     sv.add_argument("--target-id", default=None)
     sv.add_argument("-v", "--verbose", action="store_true")
+
+    act = sub.add_parser("act", help="constrained actions for one bound seat (research/civic selection, end turn)")
+    act.add_argument("verb", choices=["list", "perform", "result", "reconcile"])
+    act.add_argument("--player", type=int, required=True)
+    act.add_argument("--mode", choices=MODES, required=True)
+    act.add_argument("--port", type=int, default=DEFAULT_PORT)
+    act.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    act.add_argument("--target-id", default=None)
+    act.add_argument("--journal", type=Path, default=Path("runs/actions.jsonl"))
+    act.add_argument("--action-id", default=None)
+    act.add_argument("--request-id", default=None)
+    act.add_argument("--status", choices=["confirmed", "rejected"], default=None, help="reconcile: the human-verified outcome")
+    act.add_argument("--note", default="", help="reconcile: how the outcome was verified")
+    act.add_argument("--json", action="store_true")
+    act.add_argument("-v", "--verbose", action="store_true")
 
     for name in _STUBS:
         s = sub.add_parser(name, help=f"{name} (not implemented in Change 1)")
@@ -119,6 +135,40 @@ def _run_snapshot(args) -> int:
     return 0
 
 
+def _emit(args, payload: dict, code: int) -> int:
+    if args.json:
+        print(json.dumps(payload, indent=2))
+    else:
+        print(json.dumps(payload, indent=2) if code == 0 else f"failed: {payload.get('error', {}).get('code')}: {payload.get('error', {}).get('message')}")
+    return code
+
+
+def _run_act(args) -> int:
+    reg = ActionRegistry(journal_path=args.journal)
+    try:
+        if args.verb == "result":
+            if not args.request_id:
+                raise SystemExit("act result requires --request-id")
+            res = reg.get_result(args.request_id)
+            return _emit(args, {"ok": res is not None, "result": res}, 0 if res else 1)
+        if args.verb == "reconcile":
+            if not (args.request_id and args.status):
+                raise SystemExit("act reconcile requires --request-id and --status")
+            reg.reconcile(args.request_id, args.status, note=args.note)
+            return _emit(args, {"ok": True, "result": reg.get_result(args.request_id)}, 0)
+        if args.verb == "perform" and not (args.action_id and args.request_id):
+            raise SystemExit("act perform requires --action-id and --request-id")
+        with open_game_session(port=args.port, timeout=args.timeout, target_id=args.target_id) as gs:
+            if args.verb == "list":
+                return _emit(args, {"ok": True, **reg.list_offers(gs, player=args.player, mode=args.mode)}, 0)
+            res = reg.perform(gs, action_id=args.action_id, request_id=args.request_id, player=args.player, mode=args.mode)
+            return _emit(args, {"ok": res["status"] == "confirmed", "result": res}, 0 if res["status"] == "confirmed" else 1)
+    except (ObserverError, cdp.CdpError) as exc:
+        return _emit(args, {"ok": False, "error": exc.to_dict()}, 1)
+    except ValueError as exc:
+        return _emit(args, {"ok": False, "error": {"code": "INVALID_ARGUMENT", "message": str(exc)}}, 1)
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     if args.command in _STUBS:
@@ -130,6 +180,8 @@ def main(argv: list[str] | None = None) -> int:
         return _run_probe(args)
     if args.command == "snapshot":
         return _run_snapshot(args)
+    if args.command == "act":
+        return _run_act(args)
     if args.command == "serve":
         from civ7_observer.server import serve
         return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id)

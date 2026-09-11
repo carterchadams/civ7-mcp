@@ -136,3 +136,55 @@ def test_serve_requires_player_and_mode(capsys):
         cli.main(["serve", "--player", "1"])
     with pytest.raises(SystemExit):
         cli.main(["serve", "--mode", "singleplayer"])
+
+
+def test_act_list_prints_offers(monkeypatch, capsys, tmp_path):
+    from civ7_observer import actions as actions_mod
+
+    class FakeReg:
+        def __init__(self, journal_path):
+            self.journal_path = journal_path
+
+        def list_offers(self, gs, *, player, mode):
+            return {"context": {"turn": 3, "playerId": player, "curtainDisplayed": False}, "offers": [{"actionId": "a" * 24, "kind": "research", "typeKey": "NODE_TECH_AQ_POTTERY", "canStart": True}], "reconciliationRequired": []}
+
+    class FakeGS:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr(cli, "ActionRegistry", FakeReg)
+    monkeypatch.setattr(cli, "open_game_session", lambda **kw: FakeGS())
+    code = cli.main(["act", "list", "--player", "1", "--mode", "local-hotseat", "--journal", str(tmp_path / "j.jsonl"), "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 0
+    doc = json.loads(out)
+    assert doc["offers"][0]["typeKey"] == "NODE_TECH_AQ_POTTERY"
+
+
+def test_act_perform_requires_ids_and_reports_errors(monkeypatch, capsys, tmp_path):
+    from civ7_observer import service as service_mod
+
+    class FakeReg:
+        def __init__(self, journal_path):
+            pass
+
+        def perform(self, gs, *, action_id, request_id, player, mode):
+            raise service_mod.ObserverError("ACTION_EXPIRED", "stale")
+
+    class FakeGS:
+        def __enter__(self):
+            return self
+
+        def __exit__(self, *a):
+            pass
+
+    monkeypatch.setattr(cli, "ActionRegistry", FakeReg)
+    monkeypatch.setattr(cli, "open_game_session", lambda **kw: FakeGS())
+    with pytest.raises(SystemExit):
+        cli.main(["act", "perform", "--player", "1", "--mode", "local-hotseat"])
+    code = cli.main(["act", "perform", "--player", "1", "--mode", "local-hotseat", "--action-id", "a" * 24, "--request-id", "r1", "--json"])
+    out, _ = capsys.readouterr()
+    assert code == 1 and json.loads(out)["error"]["code"] == "ACTION_EXPIRED"
