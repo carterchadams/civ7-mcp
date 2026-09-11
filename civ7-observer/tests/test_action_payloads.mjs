@@ -742,6 +742,10 @@ function withGovernment(g, { current = -1, starting = ["GOVERNMENT_DESPOTISM", "
   const rows = [{ $index: 0, $hash: 809918684, GovernmentType: "GOVERNMENT_CLASSICAL_REPUBLIC", Name: "LOC_G0", Description: "LOC_G0_D", CelebrationName: "LOC_G0_C" }, { $index: 1, $hash: -87192893, GovernmentType: "GOVERNMENT_DESPOTISM", Name: "LOC_G1", Description: "LOC_G1_D", CelebrationName: "LOC_G1_C" }, { $index: 2, $hash: -1635089126, GovernmentType: "GOVERNMENT_OLIGARCHY", Name: "LOC_G2", Description: "LOC_G2_D", CelebrationName: "LOC_G2_C" }];
   g.GameInfo.Governments = table(rows); g.GameInfo.Governments[Symbol.iterator] = function* () { yield* rows; };
   g.GameInfo.StartingGovernments = starting.map((t) => ({ GovernmentType: t }));
+  g.GameInfo.GovernmentModifiers = [{ GovernmentType: "GOVERNMENT_DESPOTISM", ModifierId: "MOD_DESP" }];
+  g.GameInfo.ModifierStrings = [{ ModifierId: "MOD_DESP", Context: "Description", Text: "LOC_DESP_FX" }, { ModifierId: "MOD_OTHER", Context: "Description", Text: "LOC_X" }];
+  g.GameInfo.ProgressionTreeNodeUnlocks = [{ RequiredGovernmentType: "GOVERNMENT_DESPOTISM", TargetType: 9001 }];
+  g.GameInfo.Traditions = g.GameInfo.Traditions || table([{ $hash: 9001, $index: 11, TraditionType: "TRADITION_A", Name: "LOC_TA" }]);
   g.PlayerOperationParameters = g.PlayerOperationParameters || { Activate: -1326475004, Deactivate: 1318334332 };
   g.PlayerOperationTypes.CHANGE_GOVERNMENT = 1553605243;
   cu.getGovernmentType = () => gov;
@@ -758,6 +762,7 @@ test("government offers list the starting governments while none is held, with t
   const g = withGovernment(world({ log })); g._log = log;
   const govs = runOffers(g).offers.filter((o) => o.kind === "CHANGE_GOVERNMENT");
   assert.deepEqual(govs.map((o) => [o.arg, o.arg2, o.pre, o.typeKey, o.displayName, o.celebration, o.canStart]), [[1, -87192893, -1, "GOVERNMENT_DESPOTISM", "LOC_G1", "LOC_G1_C", true], [2, -1635089126, -1, "GOVERNMENT_OLIGARCHY", "LOC_G2", "LOC_G2_C", true]]);
+  assert.deepEqual([govs[0].effects, govs[0].unlocksTraditions, govs[1].effects, govs[1].unlocksTraditions], [["LOC_DESP_FX"], ["LOC_TA"], [], []]);
   assert.ok(log.filter((e) => e.startsWith("gcanStart(")).every((e) => e.includes('"Action":-1326475004') && e.endsWith(",false)")));
   assert.ok(!log.some((e) => e.startsWith("gsendRequest")));
 });

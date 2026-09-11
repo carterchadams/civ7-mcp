@@ -346,7 +346,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "government offer without a type hash")
                 rec["arg2"] = o["arg2"]
-                for k in ("description", "celebration"):
+                for k in ("description", "celebration", "effects", "unlocksTraditions"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "FOUND_PANTHEON" and "description" in o:

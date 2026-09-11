@@ -73,7 +73,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "

@@ -275,7 +275,13 @@
         const gargs = { GovernmentType: g.$index, Action: PlayerOperationParameters.Activate };
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_GOVERNMENT, gargs, false);
         if (!check || check.Success !== true) continue;
-        offers.push({ kind: "CHANGE_GOVERNMENT", arg: g.$index, arg2: g.$hash, pre: gpre, typeKey: g.GovernmentType, displayName: compose(g.Name), description: compose(g.Description), celebration: compose(g.CelebrationName), canStart: true });
+        // the Description column is boilerplate (live friction); the real effects are the government's
+        // modifier strings and the traditions it unlocks, exactly what the shipped chooser shows
+        const effects = []; const unlocks = [];
+        try { const mods = GameInfo.GovernmentModifiers.filter((m) => m && m.GovernmentType === g.GovernmentType).map((m) => m.ModifierId);
+          for (const ms of GameInfo.ModifierStrings) { if (ms && mods.indexOf(ms.ModifierId) !== -1 && typeof ms.Text === "string") { const txt = compose(ms.Text); if (txt && effects.indexOf(txt) === -1) effects.push(txt); } } } catch (e) { /* no effect text available */ }
+        try { for (const o of GameInfo.ProgressionTreeNodeUnlocks) { if (o && o.RequiredGovernmentType === g.GovernmentType) { const tr = GameInfo.Traditions.lookup(o.TargetType); const nm = tr ? compose(tr.Name) : null; if (nm && unlocks.indexOf(nm) === -1) unlocks.push(nm); } } } catch (e) { /* none */ }
+        offers.push({ kind: "CHANGE_GOVERNMENT", arg: g.$index, arg2: g.$hash, pre: gpre, typeKey: g.GovernmentType, displayName: compose(g.Name), description: compose(g.Description), celebration: compose(g.CelebrationName), effects: effects, unlocksTraditions: unlocks, canStart: true });
       }
     }
     if (isInt(PlayerOperationTypes.FOUND_PANTHEON) && player.Religion && typeof player.Religion.getNumPantheons === "function" && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {
