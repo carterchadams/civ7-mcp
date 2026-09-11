@@ -70,6 +70,7 @@ DECISION_OF_KIND = {
     "purchase_unit": "production",
     "skip_unit": "unit",
     "move_unit": "unit",
+    "make_trade_route": "unit",
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
@@ -103,7 +104,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
-                 "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "

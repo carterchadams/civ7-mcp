@@ -57,8 +57,10 @@ MUTATION_ALLOWLIST = (
     'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id })',
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false)',
     'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs)',
+    'Game.UnitCommands.canStart(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs, false)',
+    'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 

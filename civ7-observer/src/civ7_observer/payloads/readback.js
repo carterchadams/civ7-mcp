@@ -21,6 +21,7 @@
     governmentType: player ? t(() => player.Culture.getGovernmentType()) : null,
     pantheons: player ? t(() => player.Religion.getPantheons()) : null,
     activeTraditions: player ? t(() => { const out = []; for (const k of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) { const st = CultureSlotTypes[k]; if (Number.isInteger(st)) for (const h of player.Culture.getActiveTraditions(st)) out.push(h); } return out; }) : null,
+    tradeRoutes: player ? t(() => player.Trade.countPlayerTradeRoutes()) : null,
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
     unitPromotions: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.Experience) m[String(u.id.id)] = Number.isInteger(u.Experience.getNumPromotions) ? u.Experience.getNumPromotions : null; } return m; }) : null,

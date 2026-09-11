@@ -31,6 +31,7 @@ engine-call allowlist by `tests/test_payload_policy.py`. Offers come from `paylo
 | `finish_age_transition` | `Game.PlayerOperations.sendRequest(pid, SET_AGE_TRANSITION_DATA, {Finished: true})` after `canStart` | none; **not startable until a concrete civilization is selected** (never RANDOM); precondition = the selected civilization's hash | `canStart` immediately before send; the selection unchanged | like an end turn: the choose-civilization notification gone on the same seat, or the age, turn or seat moving on. **One-way**: once every seat has finished, the next age begins. Mementos (`AgeTransitionPlayerMemento*`) are left untouched |
 | `pick_legacy_card` | `ADVANCED_START_MODIFY_DECK {Type: "ADD", ID: cardId}` then `ADVANCED_START_USE_EFFECT {ID: effectId}` once per `amount` for each of that card's effects, all after `canStart` | `AdvancedStart.getAvailableCards()` minus the deck, with name, description, cost and the seat's legacy points; a card with a placement effect is listed but not startable. A deck entry wraps its card (`{id: instance, info: card}`); ids are strings, so `Database.makeHash(id)` is the integer handle. Precondition = deck size | `canStart` immediately before each send; the card must still be available and not already in the deck | the card's hash appears in the deck (`legacyDeck` in the read-back poll). **Taking a card takes its reward**: the engine never reports an effect as spent, so this is the only point at which each lands exactly once |
 | `finish_legacy_deck` | `ADVANCED_START_MARK_COMPLETED {}` after `canStart` | none; precondition = deck size. Finishing forfeits unspent legacy points | `canStart` immediately before send | `NOTIFICATION_AGE_TRANSITION` leaves the live blocking list || `promote_unit` | `Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, {PromotionType: hash, PromotionDisciplineType: hash})` after `canStart(...)` `Success` (the shipped promotion panel) | a (discipline, promotion) pair from `GameInfo.UnitPromotionDisciplineDetails` that `Experience.canEarnPromotion(disciplineType, promotionType, false)` accepts, for a unit whose `Experience.canPromote` is true; both hashes are passed as integers (`row.$hash` equals `Database.makeHash(type)` on this build, verified live), with the discipline and promotion names, the description, the commendation flag, stored promotion and commendation points and the unit's level. Precondition = the unit's `getNumPromotions` | `canStart` immediately before send; the pair must still belong to the same discipline, still be earnable, and the promotion count unchanged | the unit's promotion count rises above the offer's (`unitPromotions` in the read-back poll) |
+| `make_trade_route` | `Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, {X, Y})` for the destination settlement's plot, after `canStart` (the shipped trade route chooser) | the seat's **own** `Trade.projectPossibleTradeRoutes()` entries whose status is `TradeRouteStatus.SUCCESS`, paired with each unit whose `canStart(MAKE_TRADE_ROUTE, …, true)` existence check passes (merchants). The target settlement is resolved only for the plot the command needs and its composed name; nothing about its owner is exposed. The offers context also reports `tradeRoutes: {possible, merchants, active}` so a seat with an idle merchant learns that the game currently projects no route. Precondition = the unit's plot | the destination must still be projected as a successful route and the unit still on its plot; `canStart` immediately before send | the seat's active route count rises (`tradeRoutes` in the read-back poll) |
 | `consider_attributes` | `Game.PlayerOperations.sendRequest(pid, CONSIDER_ASSIGN_ATTRIBUTE, {})` after `canStart` (the screen sends it on close) | none; offered only while `NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL` blocks the turn | `canStart` immediately before send | that notification is gone from the blocking list |
 | `end_turn` | `GameContext.sendTurnComplete()` | none | `Game.Notifications.getEndTurnBlockingType(pid) === EndTurnBlockingTypes.NONE (0)` and `!GameContext.hasSentTurnComplete()` | `hasSentTurnComplete() true`, then the seat/turn moves on |
 
@@ -228,7 +229,7 @@ there is no observable "already spent" signal and applying is folded into the pi
 `BlocksTurnAdvancement` true after the finish while `Game.Notifications.getBlocksTurnAdvancement(id)`
 said false: that per-id query is the live verdict and is what every blocking check uses now.
 
-## Not implemented yet, with the contract established
+## Not exercised live, with the contract established
 
 **Attack.** `canStart(MOVE_TO, {Modifiers: ATTACK})` accepts every empty adjacent plot and
 `Game.Combat.testAttackInto` returned `-1` even for a plot holding a foreign unit, so neither is the
@@ -236,9 +237,12 @@ target test; `Game.Combat.getBestDefender({x, y}, unitId)` is (it names the owne
 offers use only its boolean). The positive shape of an attack preview has not been observed, so no
 attack action exists and moves into occupied plots are withheld instead.
 
-**Trade routes.** Merchants have been idle since the Exploration age began and two seats have asked
-for this. First contact has now happened (Exploration turn 13), so the query should start returning
-routes and this can be built from live data. The source is the seat's own component: `Trade.projectPossibleTradeRoutes()` returns
+**Trade routes are implemented but have never had a live route to take.** Four seats asked for this
+across the Exploration age. Even after first contact (turn 13), with trade capacity available and the
+other civilization met, `projectPossibleTradeRoutes()` returns an empty list for every seat: no met
+civilization's settlement is in range, and the query omits out-of-range candidates rather than
+returning them with a DISTANCE status. The action is enumerated and gated from that same query, so it
+appears the moment a route exists; **its send path has not been exercised live**. The source is the seat's own component: `Trade.projectPossibleTradeRoutes()` returns
 entries with `targetCityId`, `status` and `domain`, and the shipped chooser sends
 `Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, {X, Y})` for the target
 city's plot after `canStart`. `TradeRouteStatus` on this build: INVALID 0, SUCCESS -327245337,

@@ -1431,3 +1431,58 @@ test("perform the greeting only after re-deriving the player from the still-bloc
     assert.ok(!l.some((e) => e.startsWith("msendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- trade routes (the seat's own component projects where it may trade)
+function withTrade(g, { routes = [[{ owner: 2, id: 5, type: 1 }, "SUCCESS"]], merchant = true, allow = true, active = 0 } = {}) {
+  const units = [unit(5, { location: { x: 10, y: 10 } })];
+  withUnits(g, units);
+  g.UnitCommandTypes = { MAKE_TRADE_ROUTE: 472083904, PROMOTE: -1259482049 };
+  g.TradeRouteStatus = { INVALID: 0, SUCCESS: -327245337, DISTANCE: -1224148699 };
+  const cities = { 5: { id: { owner: 2, id: 5, type: 1 }, name: "LOC_FAR", location: { x: 30, y: 30 } } };
+  g.Cities = { get: (cid) => cities[cid.id] ?? null };
+  g.GameplayMap = g.GameplayMap || {}; g.GameplayMap.getIndexFromXY = (x, y) => y * 100 + x;
+  g.Players.get(1).Trade = { projectPossibleTradeRoutes: () => routes.map(([cid, st]) => ({ targetCityId: cid, status: [g.TradeRouteStatus[st]], domain: 1 })), countPlayerTradeRoutes: () => active };
+  g.Game.UnitCommands = {
+    canStart: (uid, cmd, args, show) => { g._log.push(`tcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`); if (cmd !== 472083904) return { Success: false }; if (show === true) return { Success: merchant }; return { Success: allow && args.X === 30 && args.Y === 30 }; },
+    sendRequest: (uid, cmd, args) => { g._log.push(`tsendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`); },
+  };
+  return g;
+}
+
+test("trade route offers pair a merchant with every destination the seat's own component projects as successful", () => {
+  const log = [];
+  const g = withTrade(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const tr = r.offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE");
+  assert.deepEqual(tr.map((o) => [o.arg, o.arg2, o.arg3, o.unitId, o.cityName, o.activeRoutes, o.canStart]), [[5, 30, 30, 5, "LOC_FAR", 0, true]]);
+  assert.deepEqual(tr[0].to, { x: 30, y: 30 });
+  assert.deepEqual(r.context.tradeRoutes, { possible: 1, merchants: 1, active: 0 });
+  assert.ok(!log.some((e) => e.startsWith("tsendRequest")));
+  const far = withTrade(world({ log: [] }), { routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }); far._log = [];
+  const fr = runOffers(far);
+  assert.equal(fr.offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE").length, 0, "only successful routes are offered");
+  assert.deepEqual(fr.context.tradeRoutes, { possible: 1, merchants: 1, active: 0 }, "the seat still learns a route was projected but rejected");
+  const none = withTrade(world({ log: [] }), { merchant: false }); none._log = [];
+  assert.equal(runOffers(none).offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE").length, 0, "a unit that cannot trade is never paired");
+});
+
+test("perform MAKE_TRADE_ROUTE re-checks the projection and the unit's plot, then sends the destination", () => {
+  const log = [];
+  const g = withTrade(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "MAKE_TRADE_ROUTE", 5, 30, 30, { pre: 1010 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.ok(log.find((e) => e.startsWith("tsendRequest(") && e.includes('"X":30,"Y":30')));
+  for (const [label, mk, uid, x, y, pre] of [
+    ["unknown unit", () => withTrade(world({ log: [] })), 9, 30, 30, 1010],
+    ["unit moved", () => withTrade(world({ log: [] })), 5, 30, 30, 7],
+    ["destination not projected", () => withTrade(world({ log: [] })), 5, 31, 31, 1010],
+    ["route now out of range", () => withTrade(world({ log: [] }), { routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }), 5, 30, 30, 1010],
+    ["canStart false", () => withTrade(world({ log: [] }), { allow: false }), 5, 30, 30, 1010],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "MAKE_TRADE_ROUTE", uid, x, y, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
+  }
+});

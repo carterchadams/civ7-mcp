@@ -250,6 +250,39 @@
         }
       }
     }
+    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.MAKE_TRADE_ROUTE) && player.Trade && typeof player.Trade.projectPossibleTradeRoutes === "function" && typeof TradeRouteStatus !== "undefined") {
+      // Trade routes: the seat's own Trade component projects where it may trade. Each entry names a
+      // target city, which is resolved only for the plot the command needs; nothing about its owner is
+      // exposed. The shipped chooser sends MAKE_TRADE_ROUTE with that city's plot.
+      let routes = null; try { routes = player.Trade.projectPossibleTradeRoutes(); } catch (e) { routes = null; }
+      let capacity = null; try { capacity = player.Trade.countPlayerTradeRoutes(); } catch (e) { capacity = null; }
+      const merchants = [];
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID || u.isOnMap !== true) continue;
+        if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
+        const probe = Game.UnitCommands.canStart(u.id, UnitCommandTypes.MAKE_TRADE_ROUTE, { X: -9999, Y: -9999 }, true);
+        if (probe && probe.Success === true) merchants.push(u);
+      }
+      result.context.tradeRoutes = { possible: Array.isArray(routes) ? routes.length : null, merchants: merchants.length, active: capacity };
+      if (Array.isArray(routes)) {
+        for (const u of merchants) {
+          const unitId = u.id;
+          for (const r of routes) {
+            if (!r || !r.targetCityId) continue;
+            const status = Array.isArray(r.status) ? r.status[0] : r.status;
+            if (status !== TradeRouteStatus.SUCCESS) continue;
+            let city = null; try { city = Cities.get(r.targetCityId); } catch (e) { city = null; }
+            if (!city || !city.location || !isInt(city.location.x) || city.location.x < 0) continue;
+            const tradeArgs = { X: city.location.x, Y: city.location.y };
+            const check = Game.UnitCommands.canStart(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs, false);
+            if (!check || check.Success !== true) continue;
+            offers.push({ kind: "MAKE_TRADE_ROUTE", arg: u.id.id, arg2: city.location.x, arg3: city.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y),
+              unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+              to: { x: city.location.x, y: city.location.y }, cityName: compose(city.name), activeRoutes: capacity, canStart: true });
+          }
+        }
+      }
+    }
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {
       const cities = player.Cities.getCities();
       if (!Array.isArray(cities)) throw new Error("getCities() is not an array");

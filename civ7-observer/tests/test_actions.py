@@ -1121,3 +1121,18 @@ def test_first_meet_greeting_confirms_when_the_met_notification_stops_blocking(t
         assert gr["greeting"] == "FRIENDLY" and gr["influenceCost"] == 13 and gr["otherPlayer"] == 1 and "arg" not in gr
         res = reg.perform(gs, action_id=gr["actionId"], request_id="fm-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"firstMeetAnswered": 1}
+
+
+def test_trade_route_offer_and_confirmation_on_the_seats_route_count(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "MAKE_TRADE_ROUTE", "arg": 5, "arg2": 30, "arg3": 30, "pre": 1010, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_MERCHANT", "to": {"x": 30, "y": 30}, "cityName": "Baghdād", "activeRoutes": 0, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MAKE_TRADE_ROUTE", "arg": 5, "to": {"x": 30, "y": 30}, "activeRoutes": 0, "matches": False}}
+    rb = {**RB, "tradeRoutes": 1}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        tr = next(o for o in out["offers"] if o["kind"] == "make_trade_route")
+        assert tr["cityName"] == "Baghdād" and tr["to"] == {"x": 30, "y": 30} and tr["unitId"] == 5 and "arg" not in tr
+        res = reg.perform(gs, action_id=tr["actionId"], request_id="tr-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"tradeRouteStarted": {"unitId": 5, "x": 30, "y": 30, "routes": 1}}

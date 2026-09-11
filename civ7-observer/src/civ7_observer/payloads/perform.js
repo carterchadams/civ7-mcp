@@ -96,6 +96,36 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
+  if (KIND === "MAKE_TRADE_ROUTE") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "trade route arguments are not integers");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.MAKE_TRADE_ROUTE) || !player.Trade || typeof TradeRouteStatus === "undefined") return refuse("API_CONTRACT_MISMATCH", "trade route contract unavailable");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    if (unit.isOnMap !== true || !unit.location || !isInt(unit.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
+    if (GameplayMap.getIndexFromXY(unit.location.x, unit.location.y) !== PRE) return refuse("ACTION_EXPIRED", "unit is no longer where it was when the route was offered");
+    // the destination must still be one the seat's own component projects as a successful route
+    let ok = false;
+    try {
+      for (const r of (player.Trade.projectPossibleTradeRoutes() || [])) {
+        if (!r || !r.targetCityId) continue;
+        const status = Array.isArray(r.status) ? r.status[0] : r.status;
+        if (status !== TradeRouteStatus.SUCCESS) continue;
+        const c = Cities.get(r.targetCityId);
+        if (c && c.location && c.location.x === ARG2 && c.location.y === ARG3) { ok = true; break; }
+      }
+    } catch (e) { ok = false; }
+    if (!ok) return refuse("ACTION_EXPIRED", "that trade route is no longer projected for this seat");
+    const unitId = unit.id;
+    const tradeArgs = { X: ARG2, Y: ARG3 };
+    const tcheck = Game.UnitCommands.canStart(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs, false);
+    if (!tcheck || tcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the trade route");
+    Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs);
+    result.outcome = "sent";
+    let active = null; try { active = player.Trade.countPlayerTradeRoutes(); } catch (e) { active = null; }
+    result.readback = { kind: KIND, arg: ARG, to: { x: ARG2, y: ARG3 }, activeRoutes: active, matches: false };
+    return JSON.stringify(result);
+  }
   if (KIND === "PROMOTE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "promotion arguments are not integers");
     if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.PROMOTE)) return refuse("API_CONTRACT_MISMATCH", "UnitCommandTypes.PROMOTE unavailable");
