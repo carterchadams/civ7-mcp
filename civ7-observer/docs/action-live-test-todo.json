@@ -103,7 +103,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 516,
+          "confirmed": 517,
           "rejected": 4,
           "unknown": 0
         }
@@ -127,7 +127,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2022,
+          "confirmed": 2033,
           "rejected": 8,
           "unknown": 0
         }
@@ -151,7 +151,7 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1645,
+          "confirmed": 1647,
           "rejected": 10,
           "unknown": 1
         }
@@ -559,8 +559,8 @@
       "expected_evidence": "a confirmed `CHOOSE_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 6,
-          "rejected": 1,
+          "confirmed": 7,
+          "rejected": 2,
           "unknown": 2
         }
       }
@@ -805,7 +805,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 100,
+          "confirmed": 101,
           "rejected": 0,
           "unknown": 0
         }
