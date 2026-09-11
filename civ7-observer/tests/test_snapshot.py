@@ -113,3 +113,12 @@ def test_snapshot_rejects_payload_age_that_disagrees_with_session(tmp_path):
     with pytest.raises(service.ObserverError) as ei:
         run_snapshot(tmp_path, json.dumps(other))
     assert ei.value.code == "CONTEXT_CHANGED"
+
+
+def test_observation_carries_the_attachment_identity(tmp_path, monkeypatch):
+    monkeypatch.setenv("CIV7_OBSERVER_STATE_DIR", str(tmp_path / "state"))
+    res, out, _ = run_snapshot(tmp_path, json.dumps(OBS))
+    doc = json.loads(out.read_text())
+    assert doc["attachment"]["match"] == "ABCDEF0123456789"
+    assert isinstance(doc["attachment"]["generation"], int) and doc["attachment"]["generation"] >= 1
+    assert doc["attachment"]["seat"] == 1

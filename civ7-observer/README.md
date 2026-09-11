@@ -1,11 +1,16 @@
 # civ7-observer
 
-Read-only local observer for **one** Civilization VII player, reached through the
-game's Cohtml UI debugger (Chrome DevTools Protocol on `127.0.0.1:9444`).
+Local companion for **one** Civilization VII player, reached through the game's Cohtml UI
+debugger (Chrome DevTools Protocol on `127.0.0.1:9444`). It reads that seat's state and can
+perform a small set of that seat's own native actions.
 
-Implemented so far from `plans/civ7-local-observer-poc-plan.md`: Change 1 (the
-**connection doctor**), Change 2 (the developer **capability probe** and the runtime
-contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
+> **This package mutates a running game.** `act perform` sends native operations (research and
+> civic selection, unit skip and adjacent move, unit production, end turn) and keeps persistent
+> host state under `~/.local/state/civ7-observer/`. See [STATUS.md](STATUS.md) for the
+> authoritative capability list, limitations and state locations.
+
+Implemented so far: Change 1 (the **connection doctor**), Change 2 (the developer **capability
+probe** and the runtime contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
 and units), Change 4 (technology and civics), Change 5 (the currently visible map with
 visibility-first filtering and anti-leak fixtures), and Change 6 (the narrow stdio MCP
 server and the isolated model demonstration).

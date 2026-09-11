@@ -476,3 +476,214 @@ def test_confirming_poll_records_the_relevant_effect(tmp_path):
     cb = res["confirmedBy"]
     assert cb["source"] == "poll" and cb["effect"] == {"techResearching": 701}
     assert "unitLocations" not in cb and "cityProduction" not in cb
+
+
+# ---- project-wide review: durable game-wide in-flight reservation before dispatch
+
+def test_crash_after_dispatch_is_visible_to_another_seat_without_reopening_the_first_journal(tmp_path):
+    """Journal A holds a pending row (process died after sending). Registry B, on another journal,
+    must see an unresolved write before it ever reloads A."""
+    reg_a = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg_a.list_offers(gs, player=1, mode="singleplayer")
+    pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+    # simulate: reservation + pending row written, then the process dies before any outcome
+    with open(tmp_path / "seat1.jsonl", "a") as fh:
+        fh.write(json.dumps({"requestId": "crash-a", "actionId": pottery["actionId"], "kind": "SET_TECH_TREE_NODE", "arg": 701, "arg2": 0, "arg3": 0, "pre": -1, "seat": 1, "turn": 12, "age": 4242, "match": "ABCDEF0123456789", "generation": 1, "status": "pending", "at": "t"}) + "\n")
+    reg_a._reserve_inflight({"requestId": "crash-a", "actionId": pottery["actionId"], "kind": "SET_TECH_TREE_NODE", "seat": 1, "match": "ABCDEF0123456789", "generation": 1, "journal": str(tmp_path / "seat1.jsonl")})
+    reg_b = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs2:
+        out = reg_b.list_offers(gs2, player=1, mode="singleplayer")
+        assert out["reconciliationRequired"] == ["crash-a"]
+        with pytest.raises(service.ObserverError) as ei:
+            reg_b.perform(gs2, action_id=out["offers"][0]["actionId"], request_id="b-1", player=1, mode="singleplayer")
+    assert ei.value.code == "RECONCILIATION_REQUIRED"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+
+
+def test_inflight_reservation_is_written_before_dispatch_and_cleared_after(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    seen = {}
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(PERFORMED)), ctx_reply(5)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        sock = f.all_sockets[-1]
+        original = sock.send
+
+        def send(data):
+            if "sendRequest" in data:
+                seen["inflight_at_dispatch"] = json.loads(reg.inflight_path.read_text()) if reg.inflight_path.exists() else {}
+            return original(data)
+        sock.send = send
+        reg.perform(gs, action_id=pottery["actionId"], request_id="res-1", player=1, mode="singleplayer")
+    assert "res-1" in seen["inflight_at_dispatch"], "the game-wide reservation must exist on disk before the mutation is sent"
+    assert seen["inflight_at_dispatch"]["res-1"]["seat"] == 1 and seen["inflight_at_dispatch"]["res-1"]["match"] == "ABCDEF0123456789"
+    after = json.loads(reg.inflight_path.read_text()) if reg.inflight_path.exists() else {}
+    assert "res-1" not in after
+
+
+def test_corrupt_shared_state_pauses_instead_of_clearing_the_barrier(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    reg.inflight_path.write_text("{not json")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs2, pytest.raises(service.ObserverError) as ei:
+        reg.perform(gs2, action_id=offers["offers"][0]["actionId"], request_id="c-1", player=1, mode="singleplayer")
+    assert ei.value.code == "STATE_CORRUPT"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+
+
+def test_recovery_writes_happen_only_under_the_game_lock(tmp_path, monkeypatch):
+    """Constructing a registry over a journal with a pending row must not write shared state
+    outside the lock; the conversion to unknown happens on the next locked operation."""
+    (tmp_path / "journal.jsonl").write_text(json.dumps({"requestId": "p-1", "actionId": "x" * 24, "kind": "END_TURN", "arg": 0, "arg2": 0, "arg3": 0, "pre": 0, "seat": 1, "turn": 12, "age": 4242, "match": "ABCDEF0123456789", "generation": 1, "status": "pending", "at": "t"}) + "\n")
+    writes = []
+    original = actions.write_atomic
+
+    def spy(path, text):
+        writes.append(str(path))
+        return original(path, text)
+    monkeypatch.setattr(actions, "write_atomic", spy)
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    assert writes == [], f"constructor wrote shared state outside the lock: {writes}"
+    assert reg.needs_reconciliation() == ["p-1"]
+
+
+# ---- project-wide review: durable in-flight reservation, corrupt state, rebind
+
+def test_pending_write_in_one_journal_blocks_another_journal_without_reopening_the_first(tmp_path):
+    """Crash window: registry A died after reserving/sending; B must see the uncertain write immediately."""
+    reg_a = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg_a.list_offers(gs, player=1, mode="singleplayer")
+    pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+    # simulate A dying right after the reservation + pending row (before any outcome row)
+    with reg_a._locked():
+        reg_a._reserve_and_journal(reg_a._base(pottery["actionId"], "a-dead", 1))
+    reg_b = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs2:
+        out = reg_b.list_offers(gs2, player=1, mode="singleplayer")
+        assert out["reconciliationRequired"] == ["a-dead"]
+        with pytest.raises(service.ObserverError) as ei:
+            reg_b.perform(gs2, action_id=out["offers"][0]["actionId"], request_id="b-1", player=1, mode="singleplayer")
+    assert ei.value.code == "RECONCILIATION_REQUIRED"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+    rec = reg_b.get_result("a-dead")
+    assert rec is not None and rec["status"] == "unknown" and rec["actionId"] == pottery["actionId"] and rec["seat"] == 1
+
+
+def test_corrupt_shared_state_pauses_instead_of_clearing_the_barrier(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    reg.inflight_path.write_text("{not json")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs2, pytest.raises(service.ObserverError) as ei:
+        reg.perform(gs2, action_id=offers["offers"][0]["actionId"], request_id="c-1", player=1, mode="singleplayer")
+    assert ei.value.code == "STATE_CORRUPT"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+
+
+def test_recovery_writes_happen_only_under_the_game_lock(tmp_path, monkeypatch):
+    """Constructing a registry over a journal with a pending row must not write shared state
+    outside the lock; the conversion to unknown happens on the next locked operation."""
+    (tmp_path / "journal.jsonl").write_text(json.dumps({"requestId": "p-1", "actionId": "x" * 24, "kind": "END_TURN", "arg": 0, "arg2": 0, "arg3": 0, "pre": 0, "seat": 1, "turn": 12, "age": 4242, "match": "ABCDEF0123456789", "generation": 1, "status": "pending", "at": "t"}) + "\n")
+    writes = []
+    original = actions.write_atomic
+
+    def spy(path, text):
+        writes.append(str(path))
+        return original(path, text)
+    monkeypatch.setattr(actions, "write_atomic", spy)
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    assert writes == [], f"constructor wrote shared state outside the lock: {writes}"
+    assert reg.needs_reconciliation() == ["p-1"]
+
+
+# ---- project-wide review: durable in-flight reservation, corrupt state, rebind
+
+def test_pending_write_in_one_journal_blocks_another_journal_without_reopening_the_first(tmp_path):
+    """Crash window: registry A died after reserving/sending; B must see the uncertain write immediately."""
+    reg_a = actions.ActionRegistry(journal_path=tmp_path / "seat1.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg_a.list_offers(gs, player=1, mode="singleplayer")
+    pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+    # simulate A dying right after the reservation + pending row (before any outcome row)
+    with reg_a._locked():
+        reg_a._reserve_and_journal(reg_a._base(pottery["actionId"], "a-dead", 1))
+    reg_b = actions.ActionRegistry(journal_path=tmp_path / "seat0.jsonl")
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs2:
+        out = reg_b.list_offers(gs2, player=1, mode="singleplayer")
+        assert out["reconciliationRequired"] == ["a-dead"]
+        with pytest.raises(service.ObserverError) as ei:
+            reg_b.perform(gs2, action_id=out["offers"][0]["actionId"], request_id="b-1", player=1, mode="singleplayer")
+    assert ei.value.code == "RECONCILIATION_REQUIRED"
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+    rec = reg_b.get_result("a-dead")
+    assert rec is not None and rec["status"] == "unknown" and rec["actionId"] == pottery["actionId"] and rec["seat"] == 1
+
+
+def test_reservation_is_written_before_dispatch_and_cleared_after(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    seen = {}
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(PERFORMED)), ctx_reply(5)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+        pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        sock = f.all_sockets[-1]
+        original_send = sock.send
+
+        def send(data):
+            if "sendRequest" in data or "sendTurnComplete" in data:
+                seen["inflight_at_send"] = json.loads(reg.inflight_path.read_text()) if reg.inflight_path.exists() else {}
+            original_send(data)
+        sock.send = send
+        reg.perform(gs, action_id=pottery["actionId"], request_id="res-1", player=1, mode="singleplayer")
+    assert "res-1" in seen["inflight_at_send"], "the reservation must be durable before the mutation is dispatched"
+    assert seen["inflight_at_send"]["res-1"]["kind"] == "SET_TECH_TREE_NODE" and seen["inflight_at_send"]["res-1"]["seat"] == 1
+    after = json.loads(reg.inflight_path.read_text()) if reg.inflight_path.exists() else {}
+    assert "res-1" not in after
+
+
+def test_corrupt_shared_state_pauses_instead_of_clearing_the_barrier(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    reg.state_dir.mkdir(parents=True, exist_ok=True)
+    reg.unresolved_path.write_text("{not json")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs, pytest.raises(service.ObserverError) as ei:
+        reg.list_offers(gs, player=1, mode="singleplayer")
+    assert ei.value.code == "STATE_CORRUPT"
+    assert not any("sendRequest" in m for sock in f.all_sockets for m in sock.sent)
+
+
+def test_explicit_rebind_bumps_generation_and_expires_offers(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    gen0 = offers["generation"]
+    new_gen = reg.rebind(match="ABCDEF0123456789", note="human loaded a save at the same turn")
+    assert new_gen == gen0 + 1
+    gs2, f2 = open_session({"a": [ctx_reply(1), ctx_reply(1)]})
+    with gs2, pytest.raises(service.ObserverError) as ei:
+        reg.perform(gs2, action_id=offers["offers"][0]["actionId"], request_id="rb-1", player=1, mode="singleplayer")
+    assert ei.value.code in ("ACTION_EXPIRED", "UNKNOWN_ACTION")
+    assert not any("sendRequest" in m for sock in f2.all_sockets for m in sock.sent)
+
+
+def test_attachment_is_reported_with_offers(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    assert offers["attachment"] == {"match": "ABCDEF0123456789", "generation": offers["generation"], "seat": 1, "turn": 12, "age": 4242}

@@ -10,6 +10,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from civ7_observer import cdp, schema
+from civ7_observer.attachment import SharedState
 from civ7_observer.payloads import render_payload
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import ObserverError, open_game_session
@@ -42,13 +43,25 @@ class SnapshotResult:
 
 
 def capture(gs, *, player: int | None, mode: str) -> dict[str, Any]:
-    """Run observe.js on an open GameSession and return a validated Observation dict."""
+    """Run observe.js on an open GameSession and return a validated Observation dict.
+
+    Captures take the game-wide lock so an observation is never interleaved with a dispatch."""
     if mode not in schema.MODES:
         raise ValueError(f"mode must be one of {schema.MODES}")
     local = gs.context.local_player_id
     bound = local if player is None else player
     if bound != local or gs.context.local_observer_id != local:
         raise ObserverError("WRONG_PLAYER", f"bound player {bound} is not the local seat (localPlayerId={local}, localObserverId={gs.context.local_observer_id})")
+    shared = SharedState()
+    with shared.locked():
+        attachment = shared.attachment(gs, seat=bound, advance=True)
+        obs = _capture_locked(gs, bound=bound, mode=mode)
+    obs["attachment"] = {k: attachment[k] for k in ("match", "generation", "seat", "turn", "age")}
+    return obs
+
+
+def _capture_locked(gs, *, bound: int, mode: str) -> dict[str, Any]:
+    local = gs.context.local_player_id
     expression = render_payload("observe.js", bound_player_id=bound, allowed_mode=mode)
     try:
         value = gs.session.evaluate_readonly(expression)

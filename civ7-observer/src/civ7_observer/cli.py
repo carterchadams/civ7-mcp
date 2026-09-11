@@ -62,7 +62,7 @@ def _build_parser() -> argparse.ArgumentParser:
     sv.add_argument("-v", "--verbose", action="store_true")
 
     act = sub.add_parser("act", help="constrained actions for one bound seat (research/civic selection, end turn)")
-    act.add_argument("verb", choices=["list", "perform", "result", "reconcile"])
+    act.add_argument("verb", choices=["list", "perform", "result", "reconcile", "rebind"])
     act.add_argument("--player", type=int, required=True)
     act.add_argument("--mode", choices=MODES, required=True)
     act.add_argument("--port", type=int, default=DEFAULT_PORT)
@@ -158,7 +158,12 @@ def _run_act(args) -> int:
             return _emit(args, {"ok": True, "result": reg.get_result(args.request_id)}, 0)
         if args.verb == "perform" and not (args.action_id and args.request_id):
             raise SystemExit("act perform requires --action-id and --request-id")
+        if args.verb == "rebind" and not args.note:
+            raise SystemExit("act rebind requires --note describing why (e.g. 'loaded save X at the same turn')")
         with open_game_session(port=args.port, timeout=args.timeout, target_id=args.target_id) as gs:
+            if args.verb == "rebind":
+                gen = reg.rebind(match=str(gs.context.game_guid), note=args.note)
+                return _emit(args, {"ok": True, "match": gs.context.game_guid, "generation": gen}, 0)
             if args.verb == "list":
                 return _emit(args, {"ok": True, **reg.list_offers(gs, player=args.player, mode=args.mode)}, 0)
             res = reg.perform(gs, action_id=args.action_id, request_id=args.request_id, player=args.player, mode=args.mode)

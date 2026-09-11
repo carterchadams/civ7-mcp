@@ -3,9 +3,7 @@ request ids, and a persisted journal with explicit reconciliation for unknown ou
 
 from __future__ import annotations
 
-import fcntl
 import json
-import os
 import re
 import secrets
 import time
@@ -14,14 +12,10 @@ from pathlib import Path
 from typing import Any
 
 from civ7_observer import cdp
+from civ7_observer.attachment import SharedState, state_dir
 from civ7_observer.payloads import load_payload, render_action_payload, render_payload
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
-
-def state_dir() -> Path:
-    """Game-wide host state: one lock, one unresolved-write barrier, attachment generations."""
-    return Path(os.environ.get("CIV7_OBSERVER_STATE_DIR") or Path.home() / ".local" / "state" / "civ7-observer")
-
 
 PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
@@ -79,49 +73,86 @@ class ActionRegistry:
         self._offers: dict[str, dict[str, Any]] = {}
         self._results: dict[str, dict[str, Any]] = {}
         self._pending: set[str] = set()
-        self.state_dir = state_dir()
-        self.lock_path = self.state_dir / "game.lock"
-        self.unresolved_path = self.state_dir / "unresolved.json"
-        self.generations_path = self.state_dir / "generations.json"
+        self.shared = SharedState()
+        self.state_dir = self.shared.dir
+        self.lock_path = self.shared.lock_path
+        self.unresolved_path = self.shared.unresolved_path
+        self.inflight_path = self.shared.inflight_path
+        self.generations_path = self.shared.generations_path
+        self._recovered: dict[str, dict[str, Any]] = {}
+        # constructor: read-only; shared state is only written under the game lock
         self._load_journal()
         self._load_offers()
 
     @contextmanager
     def _locked(self):
         """One interprocess lock for the whole game: every registry, whatever journal it uses,
-        serializes reload + check + pending + dispatch + outcome against the shared instance."""
-        self.state_dir.mkdir(parents=True, exist_ok=True)
-        with open(self.lock_path, "a+") as fh:
-            fcntl.flock(fh.fileno(), fcntl.LOCK_EX)
-            try:
-                self._reload()
-                yield
-            finally:
-                fcntl.flock(fh.fileno(), fcntl.LOCK_UN)
+        serializes reload + check + reserve + dispatch + outcome against the shared instance."""
+        with self.shared.locked():
+            self._reload()
+            yield
 
     def _reload(self) -> None:
+        # read every shared file first: corruption must pause before the game is touched
+        for path in (self.inflight_path, self.unresolved_path, self.generations_path):
+            self._read_shared(path)
         self._offers = {}
         self._results = {}
         self._pending = set()
         self._load_journal()
         self._load_offers()
+        # rows recovered as unknown become visible game-wide now that we hold the lock
+        for rid, entry in list(self._recovered.items()):
+            self._mark_unresolved(rid, entry)
+            self._release_inflight(rid)
+        self._recovered = {}
 
     # ---- shared, game-wide state (read/written only under the lock)
     def _read_shared(self, path: Path) -> dict[str, Any]:
+        """Shared recovery state. Corruption must pause, never silently clear a barrier."""
         if not path.exists():
             return {}
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
-            return {}
-        return data if isinstance(data, dict) else {}
+        except ValueError as exc:
+            raise ObserverError("STATE_CORRUPT", f"{path.name} is not valid JSON; repair or remove it deliberately before acting: {exc}") from exc
+        if not isinstance(data, dict):
+            raise ObserverError("STATE_CORRUPT", f"{path.name} does not hold an object")
+        return data
+
+    def _stale_inflight(self) -> dict[str, dict[str, Any]]:
+        """Reservations with no recorded outcome. We hold the game lock, so every entry here
+        belongs to a caller that died between reserving and journaling its result."""
+        return {rid: rec for rid, rec in self._read_shared(self.inflight_path).items()
+                if rid not in self._results or self._results[rid]["status"] == "unknown"}
+
+    def _reserve_inflight(self, entry: dict[str, Any]) -> None:
+        """Durable game-wide reservation written BEFORE anything is sent to the engine."""
+        shared = self._read_shared(self.inflight_path)
+        shared[entry["requestId"]] = {k: entry.get(k) for k in ("actionId", "kind", "arg", "arg2", "arg3", "pre", "seat", "match", "generation", "journal", "turn", "age")}
+        shared[entry["requestId"]]["at"] = _now()
+        self._write_shared(self.inflight_path, shared)
+
+    def _reserve_and_journal(self, base: dict[str, Any]) -> None:
+        """The two durable records that must exist before dispatch: the game-wide reservation
+        and this seat's pending row. A crash after this point is visible to every other caller."""
+        self._reserve_inflight({**base, "journal": str(self.journal_path)})
+        self._journal({**base, "status": "pending", "at": _now()})
+        self._pending.add(base["requestId"])
+
+    def _release_inflight(self, request_id: str) -> None:
+        shared = self._read_shared(self.inflight_path)
+        if request_id in shared:
+            del shared[request_id]
+            self._write_shared(self.inflight_path, shared)
 
     def _write_shared(self, path: Path, data: dict[str, Any]) -> None:
         write_atomic(path, json.dumps(data))
 
     def _mark_unresolved(self, request_id: str, entry: dict[str, Any]) -> None:
         shared = self._read_shared(self.unresolved_path)
-        shared[request_id] = {"journal": str(self.journal_path), "match": entry.get("match"), "seat": entry.get("seat"), "kind": entry.get("kind")}
+        shared[request_id] = {"journal": str(self.journal_path), "match": entry.get("match"), "seat": entry.get("seat"), "kind": entry.get("kind"),
+                              "generation": entry.get("generation"), "actionId": entry.get("actionId")}
         self._write_shared(self.unresolved_path, shared)
 
     def _clear_unresolved(self, request_id: str) -> None:
@@ -130,25 +161,24 @@ class ActionRegistry:
             del shared[request_id]
             self._write_shared(self.unresolved_path, shared)
 
+    def _base(self, action_id: str, request_id: str, player: int) -> dict[str, Any]:
+        """The complete, resolved intent of one action: everything needed to recover it."""
+        offer = self._offers[action_id]
+        return {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"],
+                "arg2": offer.get("arg2", 0), "arg3": offer.get("arg3", 0), "pre": offer["pre"], "seat": player,
+                "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"]}
+
     def _generation(self, gs: GameSession, *, advance: bool) -> tuple[int, bool]:
-        """Host attachment generation per match. Bumps when the observed turn goes backwards
-        (a reload of an earlier save) so offers and receipts from before the reload die."""
-        gens = self._read_shared(self.generations_path)
-        key = str(gs.context.game_guid)
-        rec = gens.get(key) if isinstance(gens.get(key), dict) else None
-        reattached = False
-        if rec is None:
-            rec = {"generation": 1, "maxTurn": gs.context.turn}
-            reattached = True
-        elif gs.context.turn < rec.get("maxTurn", gs.context.turn):
-            rec = {"generation": rec["generation"] + 1, "maxTurn": gs.context.turn}
-            reattached = True
-        elif gs.context.turn > rec.get("maxTurn", 0):
-            rec = {**rec, "maxTurn": gs.context.turn}
-        if advance or reattached:
-            gens[key] = rec
-            self._write_shared(self.generations_path, gens)
-        return rec["generation"], reattached
+        return self.shared.generation(gs, advance=advance)
+
+    def rebind(self, *, match: str, note: str) -> int:
+        """Explicit host rebind (e.g. a same-turn reload the game cannot signal). Bumps the
+        generation so every outstanding offer for the match is refused."""
+        with self._locked():
+            gen = self.shared.rebind(match, note=note)
+            self._offers = {k: v for k, v in self._offers.items() if v.get("match") != match}
+            self._save_offers()
+            return gen
 
     def _load_offers(self) -> None:
         if self.offers_path.exists():
@@ -183,7 +213,7 @@ class ActionRegistry:
         for rid in list(self._pending):
             self._results[rid] = {**self._pending_rows[rid], "status": "unknown", "note": "process ended before the outcome was recorded"}
             self._pending.discard(rid)
-            self._mark_unresolved(rid, self._results[rid])
+            self._recovered[rid] = self._results[rid]   # written to shared state under the lock, in _reload
 
     def _journal(self, entry: dict[str, Any]) -> None:
         self.journal_path.parent.mkdir(parents=True, exist_ok=True)
@@ -191,9 +221,12 @@ class ActionRegistry:
             fh.write(json.dumps(entry) + "\n")
 
     def needs_reconciliation(self) -> list[str]:
+        """Every uncertain write on this host: local unknowns, game-wide unknowns, and any
+        in-flight reservation whose owner never recorded an outcome (crash after dispatch)."""
         local = {rid for rid, r in self._results.items() if r["status"] == "unknown"}
         shared = set(self._read_shared(self.unresolved_path))
-        return sorted(local | shared)
+        inflight = {rid for rid in self._read_shared(self.inflight_path) if rid not in self._results or self._results[rid]["status"] == "unknown"}
+        return sorted(local | shared | inflight)
 
     def reconcile(self, request_id: str, status: str, *, note: str) -> None:
         with self._locked():
@@ -203,16 +236,34 @@ class ActionRegistry:
         if status not in ("confirmed", "rejected"):
             raise ValueError("reconcile status must be confirmed or rejected")
         prior = self._results.get(request_id)
-        if prior is None or prior["status"] != "unknown":
+        if prior is None:
+            shared = self._read_shared(self.inflight_path).get(request_id) or self._read_shared(self.unresolved_path).get(request_id)
+            if shared is None:
+                raise ValueError(f"request {request_id!r} is not awaiting reconciliation")
+            prior = {"requestId": request_id, **shared, "status": "unknown", "note": "recovered from game-wide state; owner journal not available"}
+        if prior["status"] != "unknown":
             raise ValueError(f"request {request_id!r} is not awaiting reconciliation")
         entry = {**prior, "status": status, "reconciled": True, "note": note, "at": _now()}
         self._results[request_id] = entry
         self._journal(entry)
         self._clear_unresolved(request_id)
+        self._release_inflight(request_id)
 
     def get_result(self, request_id: str) -> dict[str, Any] | None:
         with self._locked():
-            return self._results.get(request_id)
+            return self._result_unlocked(request_id)
+
+    def _result_unlocked(self, request_id: str) -> dict[str, Any] | None:
+        rec = self._results.get(request_id)
+        if rec is not None:
+            return rec
+        stale = self._stale_inflight().get(request_id)
+        if stale is not None:
+            return {**stale, "status": "unknown", "note": "reservation found without an outcome (process ended mid-action)"}
+        shared = self._read_shared(self.unresolved_path).get(request_id)
+        if shared is not None:
+            return {**shared, "requestId": request_id, "status": "unknown"}
+        return None
 
     # ---- offers
     def list_offers(self, gs: GameSession, *, player: int, mode: str) -> dict[str, Any]:
@@ -271,7 +322,8 @@ class ActionRegistry:
         # offers from earlier turns or other matches can never be performed; drop them so the file stays small
         self._offers = {k: v for k, v in self._offers.items() if (v.get("turn"), v.get("age"), v.get("match"), v.get("generation")) == (gs.context.turn, gs.context.age, gs.context.game_guid, generation)}
         self._save_offers()
-        return {"context": ctx, "offers": public, "generation": generation, "reattached": reattached, "reconciliationRequired": self.needs_reconciliation()}
+        attachment = {"match": gs.context.game_guid, "generation": generation, "seat": player, "turn": gs.context.turn, "age": gs.context.age}
+        return {"context": ctx, "offers": public, "generation": generation, "reattached": reattached, "attachment": attachment, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform
     def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str) -> dict[str, Any]:
@@ -301,10 +353,8 @@ class ActionRegistry:
             raise ObserverError("ACTION_EXPIRED", "the offer was made on a different turn, match or attachment generation; request fresh offers")
         if not offer["canStart"]:
             raise ObserverError("ACTION_NOT_STARTABLE", "the offer was not startable when enumerated; request fresh offers")
-        base = {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"], "arg2": offer.get("arg2", 0), "arg3": offer.get("arg3", 0),
-                "pre": offer["pre"], "seat": player, "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"]}
-        self._journal({**base, "status": "pending", "at": _now()})
-        self._pending.add(request_id)
+        base = self._base(action_id, request_id, player)
+        self._reserve_and_journal(base)
         expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"],
                                            expected_match=offer["match"], pre=offer["pre"], arg2=offer.get("arg2", 0), arg3=offer.get("arg3", 0))
         # From here on the request may have reached the engine: only an explicit, well-formed refusal
@@ -401,6 +451,8 @@ class ActionRegistry:
             self._mark_unresolved(base["requestId"], entry)
         else:
             self._clear_unresolved(base["requestId"])
+        self._release_inflight(base["requestId"])
+        self._release_inflight(base["requestId"])
         if raise_code:
             raise ObserverError(raise_code, f"action {base['requestId']} outcome is {status}; reconcile before acting again", result=entry)
         return entry

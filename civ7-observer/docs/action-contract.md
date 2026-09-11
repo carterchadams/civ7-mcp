@@ -10,7 +10,7 @@ engine-call allowlist by `tests/test_payload_policy.py`. Offers come from `paylo
 | `research` | `Game.PlayerOperations.sendRequest(pid, PlayerOperationTypes.SET_TECH_TREE_NODE, {ProgressionTreeNodeType: hash})` after `canStart(...)` `Success` | node hash from `Techs.getAllAvailableNodeTypes()` | `canStart` immediately before send | `Techs.getResearching().type === hash` (asynchronous; observed within 0.2–0.4 s) |
 | `civic` | same with `SET_CULTURE_TREE_NODE` and `Culture` | node hash | same | `Culture.getResearching().type` |
 | `skip_unit` | `Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.SKIP_TURN, {})` after `canStart(unitId, SKIP_TURN, {}, false)` | the unit's `id.id`; the unit must be in the bound player's `Units.getUnits()` (ownership enforced there, `Units.get` never used) | `canStart` immediately before send | unit no longer in `unitsReadyToMove` (asynchronous) |
-| `move_unit` | `Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, {X, Y, Modifiers: 0})` after `canStart(...)` | the unit's `id.id` plus a target plot that is **adjacent** (via `getAdjacentPlotLocation`) and **not HIDDEN** for the bound player; `Modifiers` is pinned to NONE so a move can never become an attack, a war declaration, or a step into unexplored land (the shipped UI uses `ATTACK + MOVE_IGNORE_UNEXPLORED_DESTINATION` for human clicks) | `canStart` immediately before send; adjacency and visibility re-checked inside the payload; **`Units.getPathTo(unitId, {x, y})` must return a non-empty path whose last `turns` entry is 1** | unit location equals the target (asynchronous) |
+| `move_unit` | `Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, {X, Y, Modifiers: 0})` after `canStart(...)` | the unit's `id.id` plus a target plot that is **adjacent** (via `getAdjacentPlotLocation`) and **currently VISIBLE** to the bound player; `Modifiers` is pinned to NONE so a move can never become an attack, a war declaration, or a step into unexplored land (the shipped UI uses `ATTACK + MOVE_IGNORE_UNEXPLORED_DESTINATION` for human clicks) | `canStart` immediately before send; adjacency and visibility re-checked inside the payload; **`Units.getPathTo(unitId, {x, y})` must return a non-empty path whose last `turns` entry is 1** | unit location equals the target (asynchronous) |
 | `produce_unit` | `Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, {UnitType: hash})` after `canStart(...)` `Success` | the city's `id.id` (must be in the bound player's `Cities.getCities()`) and a unit definition hash; offers enumerate `GameInfo.Units` per city and keep only `canStart` successes | `canStart` immediately before send; purchases (`CityCommands`) and constructibles/projects (which need plot placement) are not offered | `BuildQueue.currentProductionTypeHash === hash` (asynchronous) |
 | `end_turn` | `GameContext.sendTurnComplete()` | none | `Game.Notifications.getEndTurnBlockingType(pid) === EndTurnBlockingTypes.NONE (0)` and `!GameContext.hasSentTurnComplete()` | `hasSentTurnComplete() true`, then the seat/turn moves on |
 
@@ -77,3 +77,31 @@ and the human-verified reconciliation recorded it as `rejected`. The shipped UI 
 `Units.getPathTo` (empty `plots` for unreachable, `turns` per plot otherwise); offers and
 performs now require a one-turn native path. This is exactly why the plan insists on
 read-back and reconciliation rather than trusting a transport acknowledgement.
+
+## Authoritative lifecycle (project-wide review, 2026-09-11)
+
+`attachment.SharedState` owns the game-wide facts every participant must agree on, and lives in
+one host state directory (`$CIV7_OBSERVER_STATE_DIR` or `~/.local/state/civ7-observer`):
+
+| file | contents |
+|---|---|
+| `game.lock` | the single interprocess lock. **Captures take it too**, so an observation can never interleave with a dispatch |
+| `generations.json` | `{match: {generation, maxTurn}}` — the attachment generation |
+| `inflight.json` | durable reservation of the complete resolved intent, written **before** dispatch |
+| `unresolved.json` | game-wide barrier of uncertain outcomes |
+
+Ordering guarantee for a mutation: reserve game-wide → journal `pending` in the seat journal →
+dispatch → outcome row → release the reservation. A process that dies at any point after the
+reservation leaves an entry that the *next* caller sees while holding the lock, whichever journal
+it uses; `needs_reconciliation()` is the union of local unknowns, the shared barrier and stale
+reservations. Corrupt shared state raises `STATE_CORRUPT` and refuses to proceed rather than
+reading as empty and silently lifting the barrier.
+
+Attachment identity travels with everything: observations carry `attachment`, offers carry
+`attachment` and `generation`, and journal rows carry `match` and `generation`.
+
+**Reload detection is partial and must be described as such.** Turn regression is the only signal
+the game gives us (`campaignSetupGUID` survives a reload of the same campaign, verified live). A
+same-turn or forward reload is undetectable, so the host provides an explicit
+`act rebind --note "..."`, which bumps the generation and kills every outstanding offer for that
+match. After any load, rebind before resuming.
