@@ -121,4 +121,5 @@ units, production) was handled by the action catalog alone.
 |---|---|
 | offers | `generation 1`, `reattached true` on first sight of match `83853C0C…`; `~/.local/state/civ7-observer/generations.json` = `{"83853C0C…": {"generation": 1, "maxTurn": 13}}` |
 | `skip_unit` 196609 | `confirmed`, `confirmedBy.effect = {"unitNoLongerReady": 196609}` with match/turn/age/player/observer |
-| reload of an earlier save of the same campaign | pending human action: expected `reattached true`, generation 2, pre-reload offers refused |
+| load of a **different** game (single-player, turn 2, match `E8D5748A…`) | PASS: doctor context shows the new match id; performing an offer id from the previous game was refused (`WRONG_PLAYER`, the old offer belonged to seat 1; a same-seat id would fail `ACTION_EXPIRED`) with nothing dispatched; listing registered the new match with `generation 1`, `reattached true`; `generations.json` now holds both matches; the previous game's 14 stale offers were pruned |
+| reload of an earlier save of the **same** campaign | pending: no autosave of game 2 existed; procedure: save at turn N, end a turn, load the save, expect `reattached true` and generation N+1 with pre-reload offers refused |
