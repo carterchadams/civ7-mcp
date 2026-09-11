@@ -18,7 +18,7 @@ observation-only any more: `act perform` mutates the running game.
 | read-only observation of one bound seat (settlements, units, technology, civics, visible map) | working, live-verified |
 | stdio MCP server exposing `get_observation` / `get_status` | working, live-verified |
 | constrained native actions (research, civic, skip unit, standing unit orders (fortify, alert, sleep, heal), move unit, produce unit or building with placement, found city, place new population, activate and confirm traditions, narrative story choice, found pantheon, change government, buy and consider attribute points, assign resources, choose celebration, promote unit, choose town project, purchase unit, crisis cards, age-transition civilization choice and finish, new-age legacy cards, first-contact greeting, trade route, end turn) | working, live-verified |
-| compact turn brief (`get_turn_brief`): the required decision, bounded options, explicit pause | working, live-verified (~4 KB, ~150 ms) |
+| compact turn brief (`get_turn_brief`): the required decision, bounded options, every unit listed, explicit pause | working, live-verified (~4-5 KB) |
 | actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
 | agent runner: a model plays one turn of one bound seat (`play`, direct API) | working, offline-tested only |
 | seat sessions over MCP: `demo/agent-game.py` plays every seat of a hotseat game with one isolated `claude -p` session per seat turn | working, live (4 agent seats, consecutive turns under the curtain) |

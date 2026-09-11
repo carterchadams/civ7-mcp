@@ -14,6 +14,9 @@ from civ7_observer.actions import ActionRegistry
 from civ7_observer.service import GameSession
 
 DEFAULT_MAX_OPTIONS = 6
+# Entities are one short record each, so a seat can see its whole roster even when the option list is
+# bounded (live friction: a seat with nine units was shown six and could not command the rest).
+DEFAULT_MAX_ENTITIES = 16
 
 # Which of our public action kinds resolves each native end-turn blocker. A blocker missing from
 # this map is a decision the catalog cannot make: the brief pauses instead of guessing.
@@ -97,7 +100,7 @@ DECISION_OF_KIND = {
 }
 
 OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "turns",
-                 "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
+                 "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns", "steps",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
@@ -133,7 +136,8 @@ LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (
 MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
                   "standing order that also ends the unit's turn: Heal rests a damaged unit until full, Fortify and Alert hold "
-                  "ground, Sleep waits. A unit carrying `damage` is wounded")
+                  "ground, Sleep waits. A unit carrying `damage` is wounded. A move option's `steps` is how far away the "
+                  "destination is: every one listed is reachable this turn, so a fast unit can cross several tiles at once")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
@@ -172,7 +176,7 @@ def _entity(offer: dict[str, Any]) -> dict[str, Any] | None:
 
 
 def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode: str,
-                max_options: int = DEFAULT_MAX_OPTIONS) -> dict[str, Any]:
+                max_options: int = DEFAULT_MAX_OPTIONS, max_entities: int = DEFAULT_MAX_ENTITIES) -> dict[str, Any]:
     """One small, self-contained view of what this seat must decide."""
     listing = registry.list_offers(gs, player=player, mode=mode)
     unresolved = listing["reconciliationRequired"]
@@ -266,7 +270,7 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         entity = _entity(offer)
         if entity is not None and entity["unitId"] not in group["_seen"]:
             group["_seen"].add(entity["unitId"])
-            if len(group["entities"]) < max_options:
+            if len(group["entities"]) < max_entities:
                 group["entities"].append(entity)
 
     decisions = []

@@ -203,15 +203,18 @@ function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [] } = {}) {
   return g;
 }
 
-test("move offers cover adjacent known reachable plots only, with canStart(MOVE_TO) and Modifiers NONE", () => {
+test("move offers cover everywhere reachable this turn, visible and with a native one-turn path, Modifiers NONE", () => {
   const log = [];
   const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]], unreachable: [[10, 11]] }); g._log = log;
   const r = runOffers(g);
   const moves = r.offers.filter((o) => o.kind === "MOVE_UNIT");
-  assert.equal(moves.length, 4, "six neighbours minus one hidden minus one with no path");
+  // the unit has two movement, so the search reaches two rings: 18 plots less the hidden one and the one with no path
+  assert.equal(moves.length, 16);
+  assert.ok(moves.every((o) => o.steps >= 1 && o.steps <= 2), "nothing beyond the unit's movement is offered");
+  assert.ok(moves.some((o) => o.steps === 2), "a two-tile destination is reachable in one action");
   assert.ok(!moves.some((o) => o.x === 10 && o.y === 11), "plot with an empty native path must not be offered");
   assert.ok(moves.every((o) => o.pathTurns === 1));
-  assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.direction >= 0 && o.terrainKey === "TERRAIN_FLAT"));
+  assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.terrainKey === "TERRAIN_FLAT"));
   // the plot detail a settling decision needs travels with the move (live friction, turn 34)
   assert.ok(moves.every((o) => o.yields && o.yields.food === 2 && o.yields.production === undefined), "zero yields are dropped to keep the listing small");
   const riverMove = moves.find((o) => o.x === 11 && o.y === 10);
@@ -220,7 +223,7 @@ test("move offers cover adjacent known reachable plots only, with canStart(MOVE_
   assert.ok(!forestMove || forestMove.featureKey === "FEATURE_FOREST");
   assert.ok(!moves.some((o) => o.x === 11 && o.y === 10), "hidden plot must not be offered");
   const moveChecks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1477390184"));
-  assert.equal(moveChecks.length, 4);
+  assert.equal(moveChecks.length, 16);
   assert.ok(moveChecks.every((e) => e.includes('"Modifiers":0')));
   // visibility is read before canStart for each plot
   for (const o of moves) {
@@ -1119,6 +1122,7 @@ test("move and found offers carry the game's own minimum-settlement-distance rul
   const moves = runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT");
   assert.ok(moves.length > 0);
   assert.ok(moves.every((o) => o.tooCloseToSettle === undefined), "a unit that cannot found gets no settling hint");
+  assert.ok(moves.length > 6, "the search reaches past the immediate neighbours");
   const settler = withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])); settler._log = [];
   settler.GameplayMap.isCityWithinMinimumDistance = (x) => x <= 11;
   settler.UnitOperationTypes.FOUND_CITY = 1463004268;
@@ -1126,8 +1130,10 @@ test("move and found offers carry the game's own minimum-settlement-distance rul
   settler.Game.UnitOperations.canStart = (uid, op, args, show) => (op === 1463004268 ? { Success: true } : innerCan(uid, op, args, show));
   const smoves = runOffers(settler).offers.filter((o) => o.kind === "MOVE_UNIT");
   assert.ok(smoves.every((o) => o.tooCloseToSettle === (o.x <= 11)), "a settler's destinations report the rule");
-  const far = moves.find((o) => o.x > 11);
-  assert.ok(!far || far.tooCloseToSettle === false);
+  // a destination beyond the rule reports false for the settler, and nothing at all for the other unit
+  const far = smoves.find((o) => o.x > 11);
+  assert.ok(far && far.tooCloseToSettle === false, "the wider reach now includes plots outside the minimum distance");
+  assert.equal(moves.find((o) => o.x > 11).tooCloseToSettle, undefined);
   assert.ok(!JSON.stringify(moves).includes('"owner"'));
 });
 

@@ -87,10 +87,11 @@ def test_brief_is_small(tmp_path):
     many += [{**UNITS[0], "arg": 100 + i, "unitId": 100 + i} for i in range(30)]
     b, _, _ = build(tmp_path, offers_with(many))
     encoded = json.dumps(b)
-    assert len(encoded) < 4000, f"brief grew to {len(encoded)} bytes"
+    assert len(encoded) < 5200, f"brief grew to {len(encoded)} bytes"
     assert sum(len(d["options"]) for d in b["decisions"]) <= brief.DEFAULT_MAX_OPTIONS * len(b["decisions"])
     unit = next(d for d in b["decisions"] if d["kind"] == "unit")
-    assert unit["entityCount"] == 30 and len(unit["entities"]) == brief.DEFAULT_MAX_OPTIONS and unit["entitiesOmitted"] == 24
+    # every unit is worth listing even when its options are not: entities are one short record each
+    assert unit["entityCount"] == 30 and len(unit["entities"]) == brief.DEFAULT_MAX_ENTITIES and unit["entitiesOmitted"] == 14
     research = next(d for d in b["decisions"] if d["kind"] == "research")
     assert research["optionCount"] == 40 and research["omitted"] == 34
 

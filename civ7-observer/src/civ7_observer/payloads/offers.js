@@ -5,6 +5,8 @@
   const result = { payloadVersion: 1, refused: null, context: null, offers: null };
   const refuse = (code, message) => { result.refused = { code: code, message: message }; return JSON.stringify(result); };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
+  const MOVE_RADIUS_CAP = 4;     // how far out to look for this turn's destinations
+  const MOVE_OFFER_CAP = 18;     // per unit, so one fast unit cannot fill the listing
   const isBool = (v) => typeof v === "boolean";
   const lookupKey = (table, hash, field) => {
     if (!isInt(hash) || hash === -1) return null;
@@ -152,9 +154,31 @@
         if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || u.location.x < 0) continue;
         if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
         const unitId = u.id;
-        for (let d = 0; d < 6; d++) {
-          const loc = GameplayMap.getAdjacentPlotLocation(u.location, d);
-          if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0 || loc.y < 0) continue;
+        // Everywhere the unit can actually reach this turn, not just its six neighbours: a scout with
+        // four movement had to be moved one tile per action. Breadth-first over adjacency out to the
+        // unit's remaining movement, bounded, with the same one-turn native path test as before.
+        const radius = Math.min(u.Movement.movementMovesRemaining, MOVE_RADIUS_CAP);
+        const seen = {}; const frontier = [u.location]; const candidates = [];
+        seen[GameplayMap.getIndexFromXY(u.location.x, u.location.y)] = true;
+        for (let step = 0; step < radius && candidates.length < MOVE_OFFER_CAP * 3; step++) {
+          const next = [];
+          for (const from of frontier) {
+            for (let d = 0; d < 6; d++) {
+              const loc = GameplayMap.getAdjacentPlotLocation(from, d);
+              if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0 || loc.y < 0) continue;
+              const key = GameplayMap.getIndexFromXY(loc.x, loc.y);
+              if (seen[key]) continue;
+              seen[key] = true;
+              next.push(loc); candidates.push({ loc: loc, steps: step + 1, dir: step === 0 ? d : -1 });
+            }
+          }
+          frontier.length = 0; for (const n of next) frontier.push(n);
+        }
+        let offered = 0;
+        for (const cand of candidates) {
+          if (offered >= MOVE_OFFER_CAP) break;
+          const loc = cand.loc;
+          const d = cand.dir;
           const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, loc.x, loc.y);
           if (!isInt(state) || state !== RevealedStates.VISIBLE) continue;   // currently visible plots only (fogged plots could leak via the native path preview)
           // canStart(MOVE_TO) does not validate the destination (live: it accepted an impassable
@@ -170,10 +194,11 @@
           const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
           const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
           offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
-            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1],
+            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1], steps: cand.steps,
             featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: plotIsRiver(loc.x, loc.y), yields: plotYieldsNonZero(loc.x, loc.y),
             tooCloseToSettle: canFoundUnits[u.id.id] === true ? tooCloseToSettlement(loc.x, loc.y) : undefined,
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
+          offered += 1;
         }
       }
     }

@@ -316,7 +316,7 @@ class ActionRegistry:
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
-                for k in ("terrainKey", "pathTurns", "featureKey", "river", "yields", "tooCloseToSettle"):
+                for k in ("terrainKey", "pathTurns", "steps", "featureKey", "river", "yields", "tooCloseToSettle"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "FOUND_CITY":
