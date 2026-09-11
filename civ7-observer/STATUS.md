@@ -110,6 +110,6 @@ semantics and binding rules), `docs/live-test-results.md` and `docs/phase-2-live
 civ7-observer/run-tests.sh        # pytest + node --test
 ```
 
-337 Python tests and 78 JavaScript tests at the time of writing. Offline tests use a fake Cohtml
+354 Python tests and 78 JavaScript tests at the time of writing. Offline tests use a fake Cohtml
 debugger and mocked game globals; **passing them does not establish native engine semantics**, only
 that our code behaves as intended against our understanding of it.

@@ -149,3 +149,33 @@ left an entry in `unresolved.json` that would have blocked the live game's actio
 gets its own state directory via an autouse fixture, spawned MCP servers inherit it explicitly
 (the stdio client otherwise gives a child a minimal default environment), and a guard test asserts
 the real directory is never used. The stale entry was removed from the live state.
+
+## A model played a whole agent turn behind the curtain (game 2, player 0, turn 13)
+
+`demo/play-turn.sh`: a separate non-interactive Claude session with the built-in tool set disabled
+(`--tools ""`), one MCP server, and only the four action tools allowed. It was told to resolve the
+required decision repeatedly and end the turn, to stop on any `pause`, and never to invent an
+action id. The human did not touch the game; the pass-device curtain was displayed throughout.
+
+| measure | value |
+|---|---|
+| effective tools at init | exactly `get_turn_brief`, `list_actions`, `perform_action`, `get_action_result` |
+| tool calls made | 6 × `get_turn_brief`, 6 × `perform_action`, nothing else |
+| actions | 5 scout moves and end turn, every receipt `confirmed` |
+| pauses / errors / unknown outcomes | none |
+| game after | seat advanced to player 1, same turn, curtain shown for the next seat |
+| wall time | 33.5 s for the whole turn (13 model turns) |
+| tokens | 1,679 output; 23,488 cache-creation and 181,746 cache-read input (the brief itself is ~4 KB) |
+| cost | $0.37 for the turn on a frontier model |
+
+Its own summary of the reasoning: it treated each required decision in turn, spent scout movement
+on land rather than skipping, and deliberately left the optional civic, research and production
+decisions alone because the brief did not mark them required.
+
+This is the closed loop the project-wide review asked for, minus the agent-owned plan file: a
+compact pending decision went to a tool-only client, execution went through the same validated
+service the CLI uses, receipts came back, and control returned to the human at the next curtain.
+
+**Cost note:** the cached input dominates because a general-purpose client resends its whole system
+prompt each model turn. A purpose-built runner sending only the brief and a short skill card should
+be far cheaper; that measurement is still missing.

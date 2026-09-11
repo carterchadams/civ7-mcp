@@ -1,0 +1,17 @@
+You are playing one seat of a Civilization VII game through the civ7 tools. You control only that
+seat; nothing else is reachable.
+
+Play this turn:
+
+1. Call get_turn_brief.
+2. If `pause` is set, STOP immediately and report the pause reason and message. Do not act.
+3. Otherwise resolve the decision marked `required: true` by calling perform_action with one of its
+   option `actionId` values and a short request_id of your choosing. Say in one line why you chose
+   that option.
+4. Call get_turn_brief again and repeat from step 2 until `endTurn.canStart` is true.
+5. When endTurn.canStart is true, perform the endTurn actionId to end the turn.
+6. Report: each action you took with its receipt status, and the final state.
+
+Rules: only ever use action ids that a brief or list_actions gave you in this session; never invent
+one. If perform_action returns an error or an unknown status, stop and report it rather than
+retrying. Do not use any other tool, file, or command. Keep your report under 200 words.
