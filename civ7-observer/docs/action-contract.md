@@ -147,3 +147,16 @@ promotion can actually be taken is `canEarnPromotion(disciplineType, promotionTy
 which is what the offers gate on. Note also that `getStoredPromotionPoints`, `getLevel`,
 `getNumPromotions`, `getStoredCommendations` and `getTotalPromotionsEarned` are **properties, not
 methods**, on this build; calling them returns nothing.
+
+## Lesson: the ATTACK modifier is not a target test either
+
+Live (turn 28): `canStart(unitId, MOVE_TO, {X, Y, Modifiers: UnitOperationMoveModifiers.ATTACK})`
+returned `Success: true` for every adjacent **empty** visible plot, exactly as the plain move does.
+The discriminator the shipped UI relies on is `Game.Combat.testAttackInto(unitId, {x, y})`, which
+returned `-1` for every such plot. An attack action must therefore gate on that preview, not on
+`canStart`, and the positive shape of `testAttackInto` has not been observed yet: attack is
+deliberately **not implemented** until a seat is adjacent to a real target and the return value can
+be read. `UnitOperationMoveModifiers` on this build: NONE 0, TERRITORY_NO_UNEXPLORED 1,
+TERRITORY_NO_ENEMY 2, IGNORE_STACKING 4, IGNORE_DANGER 8, ATTACK 16, DECLARE_WAR 32,
+MAXIMIZE_EXPLORE 64, STAY_ON_LAND 128, ANY_ROUTE 512, ROUTE_ALLOW_UNEXPLORED 1024, IGNORE_ZOC 2048,
+IGNORE_STACKING_AFTER_TURN 4096, MOVE_IGNORE_UNEXPLORED_DESTINATION 16384.
