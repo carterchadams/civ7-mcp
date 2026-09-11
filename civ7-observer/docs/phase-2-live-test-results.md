@@ -14,7 +14,7 @@ Fresh hotseat game, seat 1 = player 0, turn 11, curtain already dismissed by the
 | `act perform` Pottery, request `gate1-research-pottery` | `confirmed`: payload ran `canStart` then `sendRequest(SET_TECH_TREE_NODE)`, immediate read-back `getResearching().type` matched the argument |
 | independent read-back via `snapshot` | technology current = `NODE_TECH_AQ_POTTERY`, IN_PROGRESS 39/46 (banked points retained), 1 turn left, no queued target |
 | journal | `pending` then `confirmed` rows for the same request id |
-| what the human saw | to be recorded by the human (the research panel should now show Pottery) |
+| what the human saw | not separately recorded; the later snapshot confirmed Pottery |
 
 Contract notes recorded on the way:
 
@@ -42,8 +42,22 @@ Performed with `hotseat-screen-curtain` present in the DOM throughout (every row
 | skip scout ×3 | each `confirmed` via the poll (`unitsReadyToMove` shrank by one each time); each subsequent listing showed the skipped unit's offer as `canStart false` |
 | end_turn | offer `canStart true` after the skips (blocker NONE); `confirmed` |
 | 2 s later | **turn 12, seat = player 0, curtain displayed for the human**; player 1's research persisted (Animal Husbandry) |
-| what the human saw | to be confirmed by the human: expected only the stock "pass device" screen for Alexander followed by the "pass device" screen for Isabella |
+| what the human saw | **confirmed by the human: only the curtain, no popups peeking through.** One quirk: the human had to click "Start turn" twice to reach player 1's interactivity |
 
 Gate decision (stage 1): native operations execute under the curtain, the turn advances
 through the normal hotseat flow, and no custom overlay was needed. Stage 2 (movement/camera,
 a blocking popup, diplomacy, pause/disconnect, human input during automation) remains.
+
+### Double-curtain quirk (observed once, explanation from the shipped script)
+
+`hotseat-curtain.js` mounts one curtain component per turn activation, suspends the display
+queue while mounted, and only sends `ACKNOWLEDGE_TURN_START` and resumes the queue when the
+human dismisses it. When the agent seat's turn is played and ended *under* its curtain, that
+component is never dismissed: it stays mounted, its label follows `localPlayerID` to the human's
+name, and the human's own curtain is queued behind it. The human's first click dismisses the
+stale instance (acknowledging turn start for the now-local human seat), the queue resumes, and
+the human's real curtain appears for a second click. Consequences: harmless for concealment,
+mildly confusing. Candidate fixes, deferred: (a) accept and document; (b) a tiny UI mod that
+auto-dismisses a curtain whose seat has already ended its turn; (c) investigate whether
+sending `ACKNOWLEDGE_TURN_START` for the agent seat before acting changes the behaviour
+(untested; it is a player operation and would need the allowlist extended).
