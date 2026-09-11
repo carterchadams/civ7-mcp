@@ -1238,9 +1238,9 @@ def test_founding_a_religion_confirms_on_the_religion_held_and_a_belief_on_the_c
         {"kind": "FOUND_RELIGION", "arg": 35560851, "pre": -1, "typeKey": "RELIGION_BUDDHISM", "displayName": "Buddhism", "canStart": True},
         {"kind": "ADD_BELIEF", "arg": 777, "pre": 0, "typeKey": "BELIEF_BONUS_1", "beliefClass": "ENHANCER", "displayName": "Bonus", "description": "+1", "canStart": True}]}
     performed_r = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "FOUND_RELIGION", "arg": 35560851, "religion": -1, "matches": False}}
-    performed_b = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ADD_BELIEF", "arg": 777, "beliefsBefore": 0, "beliefs": 0, "matches": False}}
+    performed_b = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ADD_BELIEF", "arg": 777, "beliefsBefore": 0, "held": [], "matches": False}}
     rb_r = {**RB, "religionType": 35560851}
-    rb_b = {**RB, "beliefsEarned": 1}
+    rb_b = {**RB, "beliefsHeld": [777]}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed_r)), reply(5, json.dumps(rb_r)),
                                 reply(6, json.dumps(performed_b)), reply(7, json.dumps(rb_b))]})

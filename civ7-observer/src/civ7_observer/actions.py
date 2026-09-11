@@ -789,9 +789,11 @@ class ActionRegistry:
                     if isinstance(held, int) and not isinstance(held, bool) and held == offer["arg"]:
                         effect = {"religionFounded": {"religion": offer["arg"]}}
                 elif kind == "ADD_BELIEF":
-                    earned = rb.get("beliefsEarned")
-                    if isinstance(earned, int) and not isinstance(earned, bool) and earned > offer["pre"]:
-                        effect = {"beliefAdded": {"belief": offer["arg"], "beliefs": earned}}
+                    # The earned count is slots, not beliefs, and never moves (live); the belief itself
+                    # appearing in the held list is the proof.
+                    held = rb.get("beliefsHeld")
+                    if isinstance(held, list) and offer["arg"] in held:
+                        effect = {"beliefAdded": {"belief": offer["arg"], "beliefs": len(held)}}
                 elif kind == "RESPOND_DIPLOMATIC_ACTION":
                     # The engine keeps accepting a second answer after the first (live: the check
                     # stayed true and the accept read as unknown); the event's own recorded response

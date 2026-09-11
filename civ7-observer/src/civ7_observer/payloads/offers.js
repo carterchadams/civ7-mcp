@@ -558,14 +558,14 @@
       }
     }
     if (isInt(PlayerOperationTypes.ADD_BELIEF) && player.Religion && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {
-      let earned = null; try { earned = player.Religion.getNumBeliefsEarned(); } catch (e) { earned = null; }
+      let heldBeliefs = null; try { const v = player.Religion.getBeliefs(); heldBeliefs = Array.isArray(v) ? v.length : null; } catch (e) { heldBeliefs = null; }
       let religion = null; try { religion = player.Religion.getReligionType(); } catch (e) { religion = null; }
-      if (isInt(earned) && isInt(religion) && religion !== -1) {
+      if (isInt(heldBeliefs) && isInt(religion) && religion !== -1) {
         for (const row of GameInfo.Beliefs) {
           if (!row || !isInt(row.$hash) || typeof row.BeliefType !== "string") continue;
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADD_BELIEF, { BeliefType: row.$hash }, false);
           if (!check || check.Success !== true) continue;
-          offers.push({ kind: "ADD_BELIEF", arg: row.$hash, pre: earned, typeKey: row.BeliefType,
+          offers.push({ kind: "ADD_BELIEF", arg: row.$hash, pre: heldBeliefs, typeKey: row.BeliefType,
             beliefClass: typeof row.BeliefClassType === "string" ? row.BeliefClassType.replace("BELIEF_CLASS_", "") : null,
             displayName: typeof row.Name === "string" ? compose(row.Name) : null,
             description: typeof row.Description === "string" ? compose(row.Description) : null, canStart: true });

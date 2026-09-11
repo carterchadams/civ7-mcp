@@ -1526,14 +1526,15 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
 });
 
 // ---- founding a religion and adding beliefs
-function withReligion(g, { held = -1, earned = 0, open = [35560851], beliefsOk = [777], applied = true } = {}) {
+function withReligion(g, { held = -1, beliefs = [], open = [35560851], beliefsOk = [777], applied = true } = {}) {
   const me = g.Players.get(1);
-  me.Religion = { getReligionType: () => held, getNumBeliefsEarned: () => earned };
+  let heldBeliefs = beliefs.slice();
+  me.Religion = { getReligionType: () => held, getBeliefs: () => heldBeliefs };
   g.PlayerOperationTypes = { ...g.PlayerOperationTypes, FOUND_RELIGION: 9501, ADD_BELIEF: 9502 };
   const religions = [{ $hash: 35560851, ReligionType: "RELIGION_BUDDHISM", Name: "LOC_BUD" }, { $hash: 1816441899, ReligionType: "RELIGION_CATHOLICISM", Name: "LOC_CATH" }, { $hash: -547366190, ReligionType: "RELIGION_CUSTOM_1", Name: "LOC_CUSTOM", RequiresCustomName: true }];
   g.GameInfo.Religions = table(religions); g.GameInfo.Religions[Symbol.iterator] = function* () { yield* religions; };
-  const beliefs = [{ $hash: 777, BeliefType: "BELIEF_BONUS_1", BeliefClassType: "BELIEF_CLASS_ENHANCER", Name: "LOC_B1", Description: "LOC_B1_D" }, { $hash: 778, BeliefType: "BELIEF_BONUS_2", BeliefClassType: "BELIEF_CLASS_FOUNDER", Name: "LOC_B2", Description: "LOC_B2_D" }];
-  g.GameInfo.Beliefs = table(beliefs); g.GameInfo.Beliefs[Symbol.iterator] = function* () { yield* beliefs; };
+  const beliefRows = [{ $hash: 777, BeliefType: "BELIEF_BONUS_1", BeliefClassType: "BELIEF_CLASS_ENHANCER", Name: "LOC_B1", Description: "LOC_B1_D" }, { $hash: 778, BeliefType: "BELIEF_BONUS_2", BeliefClassType: "BELIEF_CLASS_FOUNDER", Name: "LOC_B2", Description: "LOC_B2_D" }];
+  g.GameInfo.Beliefs = table(beliefRows); g.GameInfo.Beliefs[Symbol.iterator] = function* () { yield* beliefRows; };
   const inner = g.Game.PlayerOperations;
   g.Game.PlayerOperations = {
     canStart: (pid, op, args, show) => {
@@ -1543,7 +1544,7 @@ function withReligion(g, { held = -1, earned = 0, open = [35560851], beliefsOk =
     },
     sendRequest: (pid, op, args) => {
       if (op === 9501) { g._log.push(`relsendRequest(${JSON.stringify(args)})`); if (applied) me.Religion.getReligionType = () => args.ReligionType; return; }
-      if (op === 9502) { g._log.push(`belsendRequest(${JSON.stringify(args)})`); if (applied) me.Religion.getNumBeliefsEarned = () => earned + 1; return; }
+      if (op === 9502) { g._log.push(`belsendRequest(${JSON.stringify(args)})`); if (applied) heldBeliefs = heldBeliefs.concat([args.BeliefType]); return; }
       return inner.sendRequest(pid, op, args);
     },
   };
@@ -1569,12 +1570,12 @@ test("perform FOUND_RELIGION and ADD_BELIEF confirm on the religion held and the
   assert.ok(g._log.find((e) => e.startsWith("relsendRequest(") && e.includes('"ReligionType":35560851')));
   const h = withReligion(withUnits(world({ log: [] }), []), { held: 35560851 }); h._log = [];
   const rb = runPerformArgs(h, "ADD_BELIEF", 777, 0, 0, { pre: 0 });
-  assert.deepEqual(rb.readback, { kind: "ADD_BELIEF", arg: 777, beliefsBefore: 0, beliefs: 1, matches: true });
+  assert.deepEqual(rb.readback, { kind: "ADD_BELIEF", arg: 777, beliefsBefore: 0, held: [777], matches: true });
   for (const [label, mk, kind, arg, pre] of [
     ["not a religion", () => withReligion(withUnits(world({ log: [] }), [])), "FOUND_RELIGION", 4242, -1],
     ["religion changed", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851 }), "FOUND_RELIGION", 1816441899, -1],
     ["engine refuses religion", () => withReligion(withUnits(world({ log: [] }), []), { open: [] }), "FOUND_RELIGION", 35560851, -1],
-    ["belief count changed", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851, earned: 2 }), "ADD_BELIEF", 777, 0],
+    ["beliefs changed", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851, beliefs: [778, 779] }), "ADD_BELIEF", 777, 0],
     ["engine refuses belief", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851, beliefsOk: [] }), "ADD_BELIEF", 777, 0],
   ]) {
     const x = mk(); x._log = [];

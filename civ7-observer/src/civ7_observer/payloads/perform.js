@@ -395,15 +395,15 @@
     if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
     const brow = GameInfo.Beliefs.lookup(ARG);
     if (!brow || typeof brow.BeliefType !== "string") return refuse("UNKNOWN_ACTION", "not a belief definition");
-    let earnedBefore = null; try { earnedBefore = player.Religion.getNumBeliefsEarned(); } catch (e) { earnedBefore = null; }
-    if (earnedBefore !== PRE) return refuse("ACTION_EXPIRED", "this seat's beliefs changed since the offer was made");
+    let heldBefore = null; try { const v = player.Religion.getBeliefs(); heldBefore = Array.isArray(v) ? v.length : null; } catch (e) { heldBefore = null; }
+    if (heldBefore !== PRE) return refuse("ACTION_EXPIRED", "this seat's beliefs changed since the offer was made");
     const belArgs = { BeliefType: ARG };
     const bcheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], belArgs, false);
     if (!bcheck2 || bcheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that belief");
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], belArgs);
     result.outcome = "sent";
-    let earnedAfter = null; try { earnedAfter = player.Religion.getNumBeliefsEarned(); } catch (e) { earnedAfter = null; }
-    result.readback = { kind: KIND, arg: ARG, beliefsBefore: PRE, beliefs: isInt(earnedAfter) ? earnedAfter : null, matches: isInt(earnedAfter) && earnedAfter > PRE };
+    let heldNow = null; try { const v = player.Religion.getBeliefs(); heldNow = Array.isArray(v) ? v : null; } catch (e) { heldNow = null; }
+    result.readback = { kind: KIND, arg: ARG, beliefsBefore: PRE, held: heldNow, matches: Array.isArray(heldNow) && heldNow.indexOf(ARG) !== -1 };
     return JSON.stringify(result);
   }
   if (KIND === "START_DIPLOMATIC_ACTION") {
