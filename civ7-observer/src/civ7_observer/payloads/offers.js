@@ -805,9 +805,10 @@
           if (!row || !isInt(row.$hash) || typeof row.ReligionType !== "string") continue;
           if (row.RequiresCustomName === true) continue;   // a custom religion needs a name typed in; the named ones are enough
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.FOUND_RELIGION, { ReligionType: row.$hash }, false);
+          // a custom name may ride along with the founding (`text` on perform), as the shipped picker sends it
           if (!check || check.Success !== true) continue;
           offers.push({ kind: "FOUND_RELIGION", arg: row.$hash, pre: -1, typeKey: row.ReligionType,
-            displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
+            displayName: typeof row.Name === "string" ? compose(row.Name) : null, acceptsText: true, canStart: true });
         }
       }
     }
@@ -1460,6 +1461,27 @@
           offers.push({ kind: "SELECT_CAPITAL", arg: cid.id, arg2: swap ? 1 : 0, pre: capId, cityId: cid.id, cityName: compose(city.name), population: isInt(city.population) ? city.population : null,
             isTown: city.isTown === true, currentCapitalName: capital ? compose(capital.name) : null, swap: swap, canStart: !!(sc && sc.Success === true) });
         }
+      }
+    }
+    // ---- naming (A28): a unit (in practice a commander) or a settlement can be renamed; the engine's own
+    // canStart, probed with a placeholder, says which. The name itself arrives with the perform call.
+    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.NAME_UNIT)) {
+      let offeredNames = 0;
+      for (const u of player.Units.getUnits()) {
+        if (offeredNames >= 8 || !u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const check = Game.UnitCommands.canStart(u.id, UnitCommandTypes.NAME_UNIT, { Name: "Name" }, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "NAME_UNIT", arg: u.id.id, pre: 0, unitId: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), currentName: typeof u.name === "string" ? compose(u.name) : null,
+          isCommander: u.isCommanderUnit === true, needsText: true, canStart: true });
+        offeredNames++;
+      }
+    }
+    if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.NAME_CITY)) {
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
+        const check = Game.CityCommands.canStart(c.id, CityCommandTypes.NAME_CITY, { Name: "NAME" }, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "NAME_CITY", arg: c.id.id, pre: 0, cityId: c.id.id, cityName: compose(c.name), isTown: c.isTown === true, needsText: true, canStart: true });
       }
     }
     // ---- syncretism (A16): one of three ways to take on a related civilization's inheritance. The shipped

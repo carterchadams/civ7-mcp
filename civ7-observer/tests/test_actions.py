@@ -1190,6 +1190,39 @@ def test_automated_exploring_and_a_great_work_move_confirm_by_their_own_signals(
     assert r2["confirmedBy"]["effect"] == {"greatWorkMoved": {"greatWorkIndex": 7, "cityId": 131072, "buildingId": 9002}}
 
 
+def test_renaming_needs_text_which_travels_json_encoded_and_confirms_on_the_name_read_back(tmp_path):
+    nm = {"kind": "NAME_UNIT", "arg": 5, "pre": 0, "unitId": 5, "currentName": "Commander", "isCommander": True, "needsText": True, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [nm]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "NAME_UNIT", "arg": 5, "name": "Commander", "matches": False}}
+    rb = {**RB, "unitNames": {"5": "Old Ironsides"}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        n = next(o for o in out["offers"] if o["kind"] == "rename_unit")
+        assert n["needsText"] is True and n["currentName"] == "Commander"
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=n["actionId"], request_id="nm-0", player=1, mode="singleplayer")
+        assert info.value.code == "TEXT_REQUIRED"
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=n["actionId"], request_id="nm-0", player=1, mode="singleplayer", text='x"); Game.quit(); ("')
+        assert info.value.code == "INVALID_ARGUMENT"
+        res = reg.perform(gs, action_id=n["actionId"], request_id="nm-1", player=1, mode="singleplayer", text="Old Ironsides")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitRenamed": {"id": 5, "name": "Old Ironsides"}}
+    sent = [json.loads(m) for m in f.sent_texts()] if hasattr(f, "sent_texts") else []
+    journal = [json.loads(line) for line in (tmp_path / "journal.jsonl").read_text().splitlines()]
+    assert any(e.get("requestId") == "nm-1" and e.get("text") == "Old Ironsides" for e in journal), "the name is on the journal record"
+    with pytest.raises(service.ObserverError) as info:
+        reg2 = actions.ActionRegistry(journal_path=tmp_path / "j2.jsonl")
+        gs2, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+        with gs2:
+            out2 = reg2.list_offers(gs2, player=1, mode="singleplayer")
+            t = next(o for o in out2["offers"] if o["kind"] == "research")
+            reg2.perform(gs2, action_id=t["actionId"], request_id="nm-2", player=1, mode="singleplayer", text="Nope")
+    assert info.value.code == "INVALID_ARGUMENT"
+
+
 def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
     gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}

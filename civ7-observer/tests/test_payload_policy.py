@@ -125,6 +125,11 @@ MUTATION_ALLOWLIST = (
     'Game.UnitOperations.sendRequest(lUnitId, lType, lArgs)',
     'Game.UnitCommands.canStart(aUnitId2, aType, aArgs, false)',
     'Game.UnitCommands.sendRequest(aUnitId2, aType, aArgs)',
+    # naming: the name is the host's JSON-encoded TEXT token, data the payload passes through
+    'Game.UnitCommands.canStart(nUnitId, UnitCommandTypes[OP_KIND], nameArgs, false)',
+    'Game.UnitCommands.sendRequest(nUnitId, UnitCommandTypes[OP_KIND], nameArgs)',
+    'Game.CityCommands.canStart(nCityId, CityCommandTypes[OP_KIND], cityNameArgs, false)',
+    'Game.CityCommands.sendRequest(nCityId, CityCommandTypes[OP_KIND], cityNameArgs)',
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
     'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )

@@ -71,6 +71,8 @@
     advisorWarnings: t(() => { const out = []; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); const name = n ? Game.Notifications.getTypeName(n.Type) : ""; if (typeof name === "string" && name.indexOf("NOTIFICATION_ADVISOR_WARNING") === 0 && nid && Number.isInteger(nid.id)) out.push(nid.id); } return out; }),
     cityLocations: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.location) m[String(c.id.id)] = [c.location.x, c.location.y]; } return m; }) : null,
     // a unit travelling to reinforce an army is off the map but still in the roster
+    unitNames: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && Number.isInteger(u.id.id) && typeof u.name === "string") m[String(u.id.id)] = Locale.compose(u.name); } return m; }) : null,
+    cityNames: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && Number.isInteger(c.id.id) && typeof c.name === "string") m[String(c.id.id)] = Locale.compose(c.name); } return m; }) : null,
     unitsOnMap: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && Number.isInteger(u.id.id)) m[String(u.id.id)] = u.isOnMap === true ? 1 : 0; } return m; }) : null,
     unitLocations: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.location) m[String(u.id.id)] = [u.location.x, u.location.y]; } return m; }) : null,
     curtainDisplayed: t(() => typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null)

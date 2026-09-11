@@ -40,8 +40,8 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
 }
 const renderOffers = (id, mode) => offersRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
 const PRE_DEFAULT = { SET_TECH_TREE_NODE: 701, SET_CULTURE_TREE_NODE: -1, END_TURN: 0, SKIP_UNIT: 2, MOVE_UNIT: 1010, PRODUCE_UNIT: 0, PRODUCE_CONSTRUCTIBLE: 0 };
-const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0, pre = PRE_DEFAULT[kind] ?? 0, match = "ABCDEF0123456789") => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age)).replaceAll("EXPECTED_GUID", JSON.stringify(match)).replaceAll("OP_PRE", String(pre));
-const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3, pre, match), vm.createContext({ ...g }), { timeout: 2000 }));
+const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0, pre = PRE_DEFAULT[kind] ?? 0, match = "ABCDEF0123456789", text = null) => performRaw.replaceAll("OP_TEXT", JSON.stringify(text)).replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age)).replaceAll("EXPECTED_GUID", JSON.stringify(match)).replaceAll("OP_PRE", String(pre));
+const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match, text = null } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3, pre, match, text), vm.createContext({ ...g }), { timeout: 2000 }));
 const runOffers = (g, id = 1, mode = "singleplayer") => JSON.parse(vm.runInContext(renderOffers(id, mode), vm.createContext({ ...g }), { timeout: 2000 }));
 const runPerform = (g, kind, arg, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, 0, 0, pre, match), vm.createContext({ ...g }), { timeout: 2000 }));
 
@@ -3013,6 +3013,44 @@ test("great works are offered per (work, building with an empty slot) from the s
   assert.deepEqual(p.readback, { kind: "MOVE_GREAT_WORK", arg: 7, destinationCity: 131072, matches: true });
   assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 7, 65536, 9001, { pre: 65536 }).refused.code, "ACTION_EXPIRED", "the work has moved since");
   assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 99, 65536, 9001, { pre: -1 }).refused.code, "UNKNOWN_ACTION");
+});
+
+// ---- naming: the name is data the host JSON-encodes; the engine's canStart says what may be named
+test("units and settlements the engine lets the seat name are offered as needing text; naming sends the name as data, upper-cased for a settlement, and reads the name back", () => {
+  const g = withCity(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 }, name: "LOC_CMD", isCommanderUnit: true }), unit(6, { location: { x: 11, y: 10 } })])); g._log = [];
+  g.UnitCommandTypes = { ...(g.UnitCommandTypes || {}), NAME_UNIT: 7101 }; g.CityCommandTypes = { ...(g.CityCommandTypes || {}), NAME_CITY: 7102 };
+  g.Locale = { ...g.Locale, toUpper: (s) => s.toUpperCase() };
+  const city = g.Players.get(1).Cities.getCities()[0]; const units = g.Players.get(1).Units.getUnits();
+  const prevU = g.Game.UnitCommands, prevC = g.Game.CityCommands;
+  g.Game.UnitCommands = { canStart: (uid, t, args, show) => { if (t !== 7101) return prevU ? prevU.canStart(uid, t, args, show) : { Success: false }; g._log.push(`ncanStart(${uid.id},${JSON.stringify(args)})`); return { Success: uid.id === 5 }; },
+                          sendRequest: (uid, t, args) => { if (t !== 7101) return prevU ? prevU.sendRequest(uid, t, args) : undefined; g._log.push(`nsendRequest(${uid.id},${JSON.stringify(args)})`); units.find((u) => u.id.id === uid.id).name = args.Name; } };
+  g.Game.CityCommands = { canStart: (cid, t, args, show) => { if (t !== 7102) return prevC.canStart(cid, t, args, show); g._log.push(`ccanStartName(${JSON.stringify(args)})`); return { Success: true }; },
+                          sendRequest: (cid, t, args) => { if (t !== 7102) return prevC.sendRequest(cid, t, args); g._log.push(`csendName(${JSON.stringify(args)})`); city.name = args.Name; } };
+  const r = runOffers(g).offers;
+  assert.deepEqual(r.filter((o) => o.kind === "NAME_UNIT").map((o) => [o.arg, o.currentName, o.isCommander, o.needsText]), [[5, "LOC_CMD", true, true]], "only the unit the engine allows");
+  assert.deepEqual(r.filter((o) => o.kind === "NAME_CITY").map((o) => [o.arg, o.cityName, o.needsText]), [[65536, "Cordoba", true]]);
+  assert.ok(!g._log.some((e) => e.startsWith("nsendRequest") || e.startsWith("csendName")), "probing names nothing");
+  const p = runPerformArgs(g, "NAME_UNIT", 5, 0, 0, { pre: 0, text: "Old Ironsides" });
+  assert.equal(p.refused, null);
+  assert.ok(g._log.includes('nsendRequest(5,{"Name":"Old Ironsides"})'));
+  assert.deepEqual(p.readback, { kind: "NAME_UNIT", arg: 5, name: "Old Ironsides", matches: true });
+  assert.equal(runPerformArgs(g, "NAME_UNIT", 5, 0, 0, { pre: 0 }).refused.code, "UNKNOWN_ACTION", "no name, nothing sent");
+  assert.equal(runPerformArgs(g, "NAME_UNIT", 6, 0, 0, { pre: 0, text: "Nope" }).refused.code, "ACTION_NOT_STARTABLE");
+  const c = runPerformArgs(g, "NAME_CITY", 65536, 0, 0, { pre: 0, text: "New Cordoba" });
+  assert.equal(c.refused, null);
+  assert.ok(g._log.includes('csendName({"Name":"NEW CORDOBA"})'), "upper-cased as the shipped header sends it");
+  assert.equal(c.readback.matches, true);
+});
+
+test("a religion may be founded under a custom name, sent alongside its type exactly as the shipped picker does", () => {
+  const g = withReligion(withUnits(world({ log: [] }), [])); g._log = [];
+  const before = g._log.length;
+  const r = runPerformArgs(g, "FOUND_RELIGION", 35560851, 0, 0, { pre: -1, text: "Way of the Lake" });
+  assert.equal(r.refused, null);
+  assert.ok(g._log.slice(before).some((e) => e.includes('"ReligionCustomName":"Way of the Lake"')), "the name rides with the type");
+  const h = withReligion(withUnits(world({ log: [] }), [])); h._log = [];
+  assert.equal(runPerformArgs(h, "FOUND_RELIGION", 35560851, 0, 0, { pre: -1 }).refused, null, "no name is still a founding");
+  assert.ok(!h._log.some((e) => e.includes("ReligionCustomName")));
 });
 
 // ---- first contact (the other player's id comes from the seat's own notification text)

@@ -11,6 +11,8 @@
   const ARG3 = OP_ARG3;
   const EXPECTED_MATCH = EXPECTED_GUID;
   const PRE = OP_PRE;
+  // a name the seat gives something: JSON-encoded by the host, passed through as data, never evaluated
+  const TEXT = OP_TEXT;
   const result = { payloadVersion: 1, refused: null, context: null, outcome: null, readback: null };
   const refuse = (code, message, extra) => { result.refused = Object.assign({ code: code, message: message }, extra || {}); return JSON.stringify(result); };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
@@ -604,6 +606,8 @@
     let heldBefore = null; try { heldBefore = player.Religion.getReligionType(); } catch (e) { heldBefore = null; }
     if (heldBefore !== PRE) return refuse("ACTION_EXPIRED", "this seat's religion changed since the offer was made");
     const relArgs = { ReligionType: ARG };
+    // the shipped belief picker sends the custom name alongside the type, at founding only
+    if (typeof TEXT === "string" && TEXT.length > 0) relArgs.ReligionCustomName = TEXT;
     const rcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], relArgs, false);
     if (!rcheck || rcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused founding that religion");
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], relArgs);
@@ -1117,6 +1121,42 @@
     result.outcome = "sent";
     const after = slotsOf();
     result.readback = { kind: KIND, arg: ARG, destinationCity: ARG2, matches: Array.isArray(after[String(ARG2)]) && after[String(ARG2)].indexOf(ARG) !== -1 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "NAME_UNIT") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "unit argument is not an integer");
+    if (typeof TEXT !== "string" || TEXT.length === 0) return refuse("UNKNOWN_ACTION", "a name is required");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit naming unavailable");
+    let named = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { named = u; break; } } } catch (e) { named = null; }
+    if (!named) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const nUnitId = named.id;
+    const nameArgs = { Name: TEXT };
+    const ncheck = Game.UnitCommands.canStart(nUnitId, UnitCommandTypes[OP_KIND], nameArgs, false);
+    if (!ncheck || ncheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused naming the unit");
+    Game.UnitCommands.sendRequest(nUnitId, UnitCommandTypes[OP_KIND], nameArgs);
+    result.outcome = "sent";
+    let now = null; try { now = typeof named.name === "string" ? named.name : null; } catch (e) { now = null; }
+    result.readback = { kind: KIND, arg: ARG, name: now, matches: typeof now === "string" && now.indexOf(TEXT) !== -1 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "NAME_CITY") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "settlement argument is not an integer");
+    if (typeof TEXT !== "string" || TEXT.length === 0) return refuse("UNKNOWN_ACTION", "a name is required");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "settlement naming unavailable");
+    let settlement = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { settlement = c; break; } } } catch (e) { settlement = null; }
+    if (!settlement) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    const nCityId = settlement.id;
+    // the shipped header upper-cases the name before sending it
+    const upper = (typeof Locale !== "undefined" && typeof Locale.toUpper === "function") ? Locale.toUpper(TEXT) : TEXT.toUpperCase();
+    const cityNameArgs = { Name: upper };
+    const ccheck = Game.CityCommands.canStart(nCityId, CityCommandTypes[OP_KIND], cityNameArgs, false);
+    if (!ccheck || ccheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused naming the settlement");
+    Game.CityCommands.sendRequest(nCityId, CityCommandTypes[OP_KIND], cityNameArgs);
+    result.outcome = "sent";
+    let now = null; try { now = typeof settlement.name === "string" ? settlement.name : null; } catch (e) { now = null; }
+    result.readback = { kind: KIND, arg: ARG, name: now, matches: typeof now === "string" && now.toUpperCase().indexOf(upper.toUpperCase()) !== -1 };
     return JSON.stringify(result);
   }
   if (KIND === "SELECT_CAPITAL") {

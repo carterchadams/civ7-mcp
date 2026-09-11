@@ -13,7 +13,7 @@ from typing import Any
 
 from civ7_observer import cdp
 from civ7_observer.attachment import SharedState, state_dir
-from civ7_observer.payloads import load_payload, render_action_payload, render_payload
+from civ7_observer.payloads import TEXT_TOKEN, load_payload, render_action_payload, render_payload
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
@@ -101,12 +101,14 @@ PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic
                "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action",
                "SELECT_CAPITAL": "select_capital", "CHOOSE_SYNCRETISM_UNITS": "syncretism_units", "CHOOSE_SYNCRETISM_INFRASTRUCTURE": "syncretism_infrastructure", "CHOOSE_SYNCRETISM_SELF": "syncretism_self",
                "ADVANCED_START_REMOVE_CARD": "drop_legacy_card", "ADVANCED_START_PLACE_SETTLEMENT": "place_legacy_settlement", "RESETTLE": "resettle",
-               "EXCAVATE": "excavate", "RESEARCH_ARTIFACTS": "research_artifacts", "AIR_ATTACK": "air_attack", "NAVAL_ATTACK": "naval_attack", "CARGO_DROP": "cargo_drop", "UNIT_AIR_DROP": "unit_air_drop", "AUTOMATE_EXPLORE": "automate_explore", "WMD_STRIKE": "wmd_strike", "MOVE_GREAT_WORK": "move_great_work",
+               "EXCAVATE": "excavate", "RESEARCH_ARTIFACTS": "research_artifacts", "AIR_ATTACK": "air_attack", "NAVAL_ATTACK": "naval_attack", "CARGO_DROP": "cargo_drop", "UNIT_AIR_DROP": "unit_air_drop", "AUTOMATE_EXPLORE": "automate_explore", "WMD_STRIKE": "wmd_strike", "MOVE_GREAT_WORK": "move_great_work", "NAME_UNIT": "rename_unit", "NAME_CITY": "rename_city",
                "REINFORCE_ARMY": "reinforce_army", "REBASE": "rebase", "TELEPORT_TO_CITY": "teleport_to_city", "ESTABLISH_BASE": "establish_base", "DISPERSE_INDEPENDENT": "disperse_independent", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE": "convert_independent_to_city_state", "REPAIR": "repair", "REMOVE_FEATURE": "remove_feature", "REMOVE_IMPROVEMENT": "remove_improvement", "PLANT_FOREST": "plant_forest", "HARVEST_RESOURCE": "harvest_resource", "BUILD_IMPROVEMENT": "build_improvement", "EMBED_LOOKOUT": "embed_lookout", "SEARCH": "search", "AERIAL_RECON": "aerial_recon", "CALL_REINFORCEMENTS": "call_reinforcements", "CONNECT_WITH_ROAD": "connect_with_road", "MOVE_BY_RAIL": "move_by_rail", "UPGRADE_ARMY": "upgrade_army", "FOCUSED_ATTACK_LAND_MELEE": "focused_attack_land_melee", "FOCUSED_ATTACK_LAND_RANGED": "focused_attack_land_ranged", "FOCUSED_ATTACK_SEA_MELEE": "focused_attack_sea_melee", "FOCUSED_ATTACK_SEA_RANGED": "focused_attack_sea_ranged", "FOCUSED_ATTACK_AIR_TO_AIR": "focused_attack_air_to_air", "FOCUSED_ATTACK_AIR_TO_LAND": "focused_attack_air_to_land", "FOCUSED_ATTACK_AIR_BOMB": "focused_attack_air_bomb", "ARMY_OVERRUN": "army_overrun", "COMMANDER_ATTACK": "commander_attack", "STONE_TRAP": "stone_trap", "TREAT_SICK": "treat_sick", "CLAIM_RESOURCE": "claim_resource", "SCORCHED_EARTH": "scorched_earth", "DISPERSE_CLAN": "disperse_clan"}
 # Table-driven unit operations and commands (A19-A22): the offer says whether a plot was bound.
 TABLE_OPERATION_KINDS = frozenset({"EXCAVATE", "RESEARCH_ARTIFACTS", "AIR_ATTACK", "NAVAL_ATTACK", "CARGO_DROP", "UNIT_AIR_DROP", "AUTOMATE_EXPLORE", "WMD_STRIKE", "REINFORCE_ARMY", "REBASE", "TELEPORT_TO_CITY", "ESTABLISH_BASE", "DISPERSE_INDEPENDENT", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "REPAIR", "REMOVE_FEATURE", "REMOVE_IMPROVEMENT", "PLANT_FOREST", "HARVEST_RESOURCE", "BUILD_IMPROVEMENT", "EMBED_LOOKOUT", "SEARCH", "AERIAL_RECON", "CALL_REINFORCEMENTS"})
 TABLE_COMMAND_KINDS = frozenset({"CONNECT_WITH_ROAD", "MOVE_BY_RAIL", "UPGRADE_ARMY", "FOCUSED_ATTACK_LAND_MELEE", "FOCUSED_ATTACK_LAND_RANGED", "FOCUSED_ATTACK_SEA_MELEE", "FOCUSED_ATTACK_SEA_RANGED", "FOCUSED_ATTACK_AIR_TO_AIR", "FOCUSED_ATTACK_AIR_TO_LAND", "FOCUSED_ATTACK_AIR_BOMB", "ARMY_OVERRUN", "COMMANDER_ATTACK", "STONE_TRAP", "TREAT_SICK", "CLAIM_RESOURCE", "SCORCHED_EARTH", "DISPERSE_CLAN"})
 
+# Kinds that take a name: the two that need one, and the founding that may carry one.
+TEXT_KINDS = {"NAME_UNIT": True, "NAME_CITY": True, "FOUND_RELIGION": False}
 SYNCRETISM_KINDS = ("CHOOSE_SYNCRETISM_UNITS", "CHOOSE_SYNCRETISM_INFRASTRUCTURE", "CHOOSE_SYNCRETISM_SELF")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
@@ -293,7 +295,8 @@ class ActionRegistry:
         offer = self._offers[action_id]
         return {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"],
                 "arg2": offer.get("arg2", 0), "arg3": offer.get("arg3", 0), "pre": offer["pre"], "seat": player,
-                "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"]}
+                "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"],
+                **({"text": offer["text"]} if offer.get("text") is not None else {})}
 
     def _generation(self, gs: GameSession, *, advance: bool) -> tuple[int, bool]:
         return self.shared.generation(gs, advance=advance)
@@ -684,8 +687,12 @@ class ActionRegistry:
                 if o.get("requiresConfirmation"):
                     rec["requiresConfirmation"] = True
                     entry["guidance"] = CONFIRMATION_GUIDANCE["start_diplomatic_action"]
+            if kind in ("NAME_UNIT", "NAME_CITY"):
+                for k in ("unitId", "unitTypeKey", "currentName", "isCommander", "cityId", "cityName", "isTown", "needsText"):
+                    if o.get(k) is not None:
+                        entry[k] = o[k]
             if kind in ("FOUND_RELIGION", "ADD_BELIEF"):
-                for k in ("typeKey", "displayName", "description", "beliefClass"):
+                for k in ("typeKey", "displayName", "description", "beliefClass", "acceptsText"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
             if kind == "RESPOND_DIPLOMATIC_ACTION":
@@ -809,11 +816,11 @@ class ActionRegistry:
                 "unitIds": unit_ids if isinstance(unit_ids, list) else None, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform
-    def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False) -> dict[str, Any]:
+    def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False, text: str | None = None) -> dict[str, Any]:
         with self._locked():
-            return self._perform(gs, action_id=action_id, request_id=request_id, player=player, mode=mode, confirm=confirm)
+            return self._perform(gs, action_id=action_id, request_id=request_id, player=player, mode=mode, confirm=confirm, text=text)
 
-    def _perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False) -> dict[str, Any]:
+    def _perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False, text: str | None = None) -> dict[str, Any]:
         _bind_ok(gs, player)
         if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
             raise ObserverError("INVALID_REQUEST_ID", "request id must be 1-64 chars of [A-Za-z0-9._-]")
@@ -841,10 +848,18 @@ class ActionRegistry:
         if offer.get("requiresConfirmation") and confirm is not True:
             guidance = CONFIRMATION_GUIDANCE.get(PUBLIC_KIND.get(offer["kind"], ""), DISBAND_GUIDANCE)
             raise ObserverError("CONFIRMATION_REQUIRED", guidance + " Pass confirm=true to this call if that is really what you want.")
+        # A name travels only with the kinds that take one, and the ones that need one refuse without it.
+        if text is not None and offer["kind"] not in TEXT_KINDS:
+            raise ObserverError("INVALID_ARGUMENT", "this action takes no text")
+        if TEXT_KINDS.get(offer["kind"]) is True and text is None:
+            raise ObserverError("TEXT_REQUIRED", "this action needs `text`: the name to give (1-32 printable characters)")
+        if text is not None and (not isinstance(text, str) or not TEXT_TOKEN.match(text) or text != text.strip()):
+            raise ObserverError("INVALID_ARGUMENT", "text must be 1-32 printable characters with no quotes, backslashes or surrounding spaces")
+        offer["text"] = text
         base = self._base(action_id, request_id, player)
         self._reserve_and_journal(base)
         expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"],
-                                           expected_match=offer["match"], pre=offer["pre"], arg2=offer.get("arg2", 0), arg3=offer.get("arg3", 0))
+                                           expected_match=offer["match"], pre=offer["pre"], arg2=offer.get("arg2", 0), arg3=offer.get("arg3", 0), text=text)
         # From here on the request may have reached the engine: only an explicit, well-formed refusal
         # from the payload proves nothing was sent. Everything else ambiguous is unknown.
         try:
@@ -1123,6 +1138,12 @@ class ActionRegistry:
                     elif isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
                         effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"],
                                                              "influenceSpent": offer["pre"] - inf}}
+                elif kind in ("NAME_UNIT", "NAME_CITY"):
+                    names = rb.get("unitNames" if kind == "NAME_UNIT" else "cityNames")
+                    now = names.get(str(offer["arg"])) if isinstance(names, dict) else None
+                    want = offer.get("text") or ""
+                    if isinstance(now, str) and want and want.upper() in now.upper():
+                        effect = {("unitRenamed" if kind == "NAME_UNIT" else "cityRenamed"): {"id": offer["arg"], "name": now}}
                 elif kind == "FOUND_RELIGION":
                     held = rb.get("religionType")
                     if isinstance(held, int) and not isinstance(held, bool) and held == offer["arg"]:

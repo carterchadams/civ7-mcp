@@ -98,6 +98,8 @@ PERFORM_DESCRIPTION = (
     "game's own legality immediately before executing and reads the effect back. Returns a receipt with "
     "`status`: confirmed (the effect was observed), rejected (nothing was sent), or an error. An `unknown` "
     "outcome blocks all further actions until a human reconciles it. Never invent an action id. "
+    "`text` (1-32 printable characters) is the name for an option marked `needsText` (rename_unit, rename_city) and "
+    "may accompany found_religion as its custom name; it is stored as given and never interpreted. "
     "A few offers are marked `destructive` and carry `requiresConfirmation` plus a `guidance` line "
     "saying what is lost; those are refused unless you also pass `confirm=true`. Read the guidance "
     "before you do: an action marked that way is almost never the right move."
@@ -259,7 +261,7 @@ def build_server(
                 "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
-    def perform_action(action_id: str, request_id: str, confirm: bool = False) -> dict[str, Any]:
+    def perform_action(action_id: str, request_id: str, confirm: bool = False, text: str | None = None) -> dict[str, Any]:
         # Validate the handles before opening a session: a malformed id never reaches the game.
         if not isinstance(action_id, str) or not ACTION_ID.match(action_id):
             return {"error": {"code": "UNKNOWN_ACTION", "message": "action_id must be one offered by get_turn_brief or list_actions"}}
@@ -267,7 +269,9 @@ def build_server(
             return {"error": {"code": "INVALID_REQUEST_ID", "message": "request_id must be 1-64 chars of [A-Za-z0-9._-]"}}
         if not isinstance(confirm, bool):
             return {"error": {"code": "INVALID_ARGUMENT", "message": "confirm must be true or false"}}
-        return _with_session(lambda gs: registry.perform(gs, action_id=action_id, request_id=request_id, player=bound, mode=mode, confirm=confirm))
+        if text is not None and not isinstance(text, str):
+            return {"error": {"code": "INVALID_ARGUMENT", "message": "text must be a string"}}
+        return _with_session(lambda gs: registry.perform(gs, action_id=action_id, request_id=request_id, player=bound, mode=mode, confirm=confirm, text=text))
 
     @mcp.tool(name="get_action_result", description=RESULT_DESCRIPTION, annotations=READ_ONLY)
     def get_action_result(request_id: str) -> dict[str, Any]:

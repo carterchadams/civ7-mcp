@@ -115,6 +115,8 @@ DECISION_OF_KIND = {
     "pillage_route": "unit",
     "plunder_trade_route": "unit",
     "spread_religion": "unit",
+    "rename_unit": "unit",
+    "rename_city": "production",
     "excavate": "unit",
     "research_artifacts": "unit",
     "air_attack": "unit",
@@ -237,7 +239,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "movesLeft", "charges", "currentProject", "currentProjectKey", "position", "toPosition", "itemKey", "otherResourceKey", "otherCityName", "otherCityId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "currentName", "needsText", "acceptsText", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
                  "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
