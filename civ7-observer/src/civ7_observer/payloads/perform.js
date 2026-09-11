@@ -258,6 +258,43 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  // The six generic unit commands. The kind IS the engine's command name, validated host-side against
+  // the catalog, so nothing a caller says ever reaches UnitCommandTypes as text.
+  if (KIND === "UPGRADE" || KIND === "PACK_ARMY" || KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" ||
+      KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "unit command argument is not an integer");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit command type unavailable");
+    const needsPlot = KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" || KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON";
+    const expect = (KIND === "UPGRADE") ? "type"
+                 : (KIND === "PACK_ARMY" || KIND === "UNPACK_ARMY") ? "armySize"
+                 : (KIND === "ACTIVATE_GREAT_PERSON") ? "gone" : "army";
+    let actor = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor = u; break; } } } catch (e) { actor = null; }
+    if (!actor) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const sizeOf = (u) => { try { if (!u.armyId || !isInt(u.armyId.id) || u.armyId.id < 0) return -1; const a = Armies.get(u.armyId); return a && isInt(a.unitCount) ? a.unitCount : -1; } catch (e) { return -1; } };
+    const stateOf = (u) => expect === "type" ? (isInt(u.type) ? u.type : -1)
+                         : expect === "army" ? (u.armyId && isInt(u.armyId.id) ? u.armyId.id : -1)
+                         : expect === "armySize" ? sizeOf(u) : 1;
+    const before = stateOf(actor);
+    if (before !== PRE) return refuse("ACTION_EXPIRED", "the unit's state changed since the command was offered");
+    const cUnitId = actor.id;
+    let cmdArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    if (needsPlot) {
+      if (!isInt(ARG2) || !isInt(ARG3) || ARG2 < 0 || ARG3 < 0) return refuse("UNKNOWN_ACTION", "this command needs a target plot");
+      cmdArgs = { X: ARG2, Y: ARG3, UnitAbilityType: -1 };
+    }
+    const commandType = UnitCommandTypes[OP_KIND];
+    const ccheck = Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false);
+    if (!ccheck || ccheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the command");
+    Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs);
+    result.outcome = "sent";
+    let still = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG) { still = u; break; } } } catch (e) { still = null; }
+    const after = still ? stateOf(still) : null;
+    result.readback = { kind: KIND, arg: ARG, expect: expect, before: PRE, after: after, present: still !== null,
+      matches: expect === "gone" ? still === null : (after !== null && after !== PRE) };
+    return JSON.stringify(result);
+  }
   if (KIND === "ATTACK") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "attack arguments are not integers");
     if (!isInt(UnitOperationTypes.MOVE_TO) || !isInt(UnitOperationTypes.RANGE_ATTACK)) return refuse("API_CONTRACT_MISMATCH", "the attack operations are unavailable");

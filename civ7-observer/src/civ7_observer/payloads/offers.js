@@ -33,6 +33,9 @@
       return Number.isInteger(owner) && owner >= 0 && owner !== BOUND_PLAYER_ID;
     } catch (e) { return false; }
   };
+  // How many units a unit's army holds, or -1 when it is in none. Packing and unpacking move that
+  // number, and nothing a seat does in the same breath moves it too.
+  const armySizeOf = (u) => { try { if (!u.armyId || !Number.isInteger(u.armyId.id) || u.armyId.id < 0) return -1; const army = Armies.get(u.armyId); const n = army && Number.isInteger(army.unitCount) ? army.unitCount : -1; return n; } catch (e) { return -1; } };
   const curtain = () => { try { return typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null; } catch (e) { return null; } };
 
   // ---- guards (same as observe.js)
@@ -405,6 +408,62 @@
             upkeep: namedYields(slot.CurrentMaintenance), upkeepNext: namedYields(slot.NextMaintenance),
             terrainKey: loc ? lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") : null,
             canStart: true });
+        }
+      }
+    }
+    // Unit commands that are neither a move nor an order: joining and leaving an army, packing and
+    // unpacking one, spending a great person, and paying gold to upgrade. All six go through the one
+    // generic path the shipped unit-action list uses, with its no-target argument shape; the ones
+    // that need a plot take it from the engine's own Plots list for that command.
+    if (typeof UnitCommandTypes !== "undefined") {
+      const NO_TARGET = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+      const COMMANDS = [
+        // [command, whether it needs a plot, what would prove it happened]
+        ["UPGRADE", false, "type"],
+        ["PACK_ARMY", false, "armySize"],
+        ["ADD_TO_ARMY", true, "army"],
+        ["REMOVE_FROM_ARMY", true, "army"],
+        ["UNPACK_ARMY", true, "armySize"],
+        ["ACTIVATE_GREAT_PERSON", true, "gone"],
+      ];
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const unitId = u.id;
+        const unitKey = lookupKey(GameInfo.Units, u.type, "UnitType");
+        for (const [command, needsPlot, expect] of COMMANDS) {
+          const commandType = UnitCommandTypes[command];
+          if (!isInt(commandType)) continue;
+          const check = Game.UnitCommands.canStart(unitId, commandType, NO_TARGET, false);
+          if (!check || check.Success !== true) continue;
+          // The engine returns the gold price and what the unit becomes as one composed line, which
+          // is what the shipped tooltip shows; there is no separate accessor for either.
+          const detail = typeof check.AdditionalDescription === "string" ? compose(check.AdditionalDescription) : null;
+          const common = { kind: command, arg: u.id.id, unitId: u.id.id, unitTypeKey: unitKey, expect: expect,
+            from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+            description: detail, armyId: u.armyId && isInt(u.armyId.id) ? u.armyId.id : null,
+            isCommander: u.isCommanderUnit === true, canStart: true };
+          const pre = expect === "type" ? (isInt(u.type) ? u.type : -1)
+                    : expect === "army" ? (u.armyId && isInt(u.armyId.id) ? u.armyId.id : -1)
+                    : expect === "armySize" ? armySizeOf(u)
+                    : 1;
+          if (!needsPlot) { offers.push({ ...common, pre: pre }); continue; }
+          let plots = Array.isArray(check.Plots) ? check.Plots : [];
+          if (plots.length === 0 && command === "ACTIVATE_GREAT_PERSON") {
+            try { if (u.shouldShowActivationPlots(command === "ACTIVATE_GREAT_PERSON" ? "UNITCOMMAND_ACTIVATE_GREAT_PERSON" : command)) { const p = u.getActivationPlots("UNITCOMMAND_ACTIVATE_GREAT_PERSON", false); if (Array.isArray(p)) plots = p; } } catch (e) { /* none */ }
+          }
+          let offeredHere = 0;
+          for (const pi of plots) {
+            if (offeredHere >= 6) break;
+            if (!isInt(pi)) continue;
+            const loc = GameplayMap.getLocationFromIndex(pi);
+            if (!loc || !isInt(loc.x) || loc.x < 0) continue;
+            const cmdArgs = { X: loc.x, Y: loc.y, UnitAbilityType: -1 };
+            const at = Game.UnitCommands.canStart(unitId, commandType, cmdArgs, false);
+            if (!at || at.Success !== true) continue;
+            offers.push({ ...common, arg2: loc.x, arg3: loc.y, pre: pre, to: { x: loc.x, y: loc.y }, plotIndex: pi,
+              terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") });
+            offeredHere++;
+          }
         }
       }
     }

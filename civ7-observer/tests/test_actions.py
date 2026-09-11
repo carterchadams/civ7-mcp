@@ -1064,6 +1064,42 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_a_unit_upgrade_confirms_on_the_type_changing(tmp_path):
+    up = {"kind": "UPGRADE", "arg": 5, "pre": 99, "unitId": 5, "unitTypeKey": "UNIT_WARRIOR", "expect": "type",
+          "description": "Upgrade to Swordsman: 120 Gold", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [up]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "UPGRADE", "arg": 5, "expect": "type", "before": 99, "after": 99, "present": True, "matches": False}}
+    rb = {**RB, "unitTypes": {"5": 100}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        u = next(o for o in out["offers"] if o["kind"] == "upgrade_unit")
+        assert u["description"] == "Upgrade to Swordsman: 120 Gold" and "requiresConfirmation" not in u and "arg" not in u
+        res = reg.perform(gs, action_id=u["actionId"], request_id="up-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitCommand": {"unitId": 5, "command": "upgrade_unit", "was": 99, "now": 100}}
+
+
+def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
+    gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "expect": "gone", "before": 1, "after": 1, "present": True, "matches": False}}
+    rb = {**RB, "unitLocations": {"5": [1, 1]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        g = next(o for o in out["offers"] if o["kind"] == "activate_great_person")
+        assert g["requiresConfirmation"] is True and "consumed" in g["guidance"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=g["actionId"], request_id="gp-0", player=1, mode="singleplayer")
+        assert info.value.code == "CONFIRMATION_REQUIRED"
+        res = reg.perform(gs, action_id=g["actionId"], request_id="gp-1", player=1, mode="singleplayer", confirm=True)
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"greatPersonActivated": {"unitId": 6}}
+
+
 def test_an_attack_confirms_on_the_unit_spending_its_attack(tmp_path):
     atk = {"kind": "ATTACK", "arg": 5, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 5, "unitTypeKey": "UNIT_SWORDSMAN",
            "from": {"x": 10, "y": 10}, "to": {"x": 11, "y": 10}, "plotIndex": 1011, "ranged": False, "attacksRemaining": 1,

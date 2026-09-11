@@ -85,6 +85,10 @@ MUTATION_ALLOWLIST = (
     'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs)',
     'Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs, false)',
     'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs)',
+    # the six generic unit commands: the kind IS the engine's command name, validated host-side
+    # against the catalog, so no caller text ever reaches UnitCommandTypes
+    'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
+    'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )
 MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")

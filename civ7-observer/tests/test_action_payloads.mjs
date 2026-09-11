@@ -1525,6 +1525,86 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- the six generic unit commands (upgrade, army packing, great person)
+function withUnitCommands(g, { ok = ["UPGRADE"], plots = [1011], typeAfter = 100, armyAfter = null, gone = false } = {}) {
+  withMap(g, {});
+  g.UnitCommandTypes = { ...(g.UnitCommandTypes || {}), UPGRADE: 7001, PACK_ARMY: 7002, ADD_TO_ARMY: 7003, REMOVE_FROM_ARMY: 7004, UNPACK_ARMY: 7005, ACTIVATE_GREAT_PERSON: 7006 };
+  const names = { 7001: "UPGRADE", 7002: "PACK_ARMY", 7003: "ADD_TO_ARMY", 7004: "REMOVE_FROM_ARMY", 7005: "UNPACK_ARMY", 7006: "ACTIVATE_GREAT_PERSON" };
+  g.GameplayMap = { ...g.GameplayMap, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  g.Armies = { get: (aid) => ({ unitCount: 3 }) };
+  const me = g.Players.get(1);
+  const u = me.Units.getUnits()[0];
+  u.type = 99; u.armyId = { id: -1 };
+  const prev = g.Game.UnitCommands;
+  g.Game.UnitCommands = {
+    canStart: (uid, cmd, args, show) => {
+      const name = names[cmd];
+      if (!name) return prev ? prev.canStart(uid, cmd, args, show) : { Success: false };
+      g._log.push(`ucanStart(${uid.id},${name},${JSON.stringify(args)},${show})`);
+      if (!ok.includes(name)) return { Success: false };
+      return { Success: true, Plots: plots, AdditionalDescription: name === "UPGRADE" ? "LOC_UPGRADE_INFO" : undefined };
+    },
+    sendRequest: (uid, cmd, args) => {
+      const name = names[cmd];
+      if (!name) return prev ? prev.sendRequest(uid, cmd, args) : undefined;
+      g._log.push(`usendRequest(${uid.id},${name},${JSON.stringify(args)})`);
+      if (name === "UPGRADE") u.type = typeAfter;
+      if (name === "ADD_TO_ARMY" && armyAfter !== null) u.armyId = { id: armyAfter };
+      if (gone) me.Units = { getUnits: () => [] };
+    },
+  };
+  return g;
+}
+
+test("no-target commands are offered once per unit, plot commands once per engine-listed plot, each saying what proves it", () => {
+  const log = [];
+  const g = withUnitCommands(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: ["UPGRADE", "ADD_TO_ARMY"], plots: [1011, 1012] }); g._log = log;
+  const r = runOffers(g);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "UPGRADE").map((o) => [o.arg, o.pre, o.expect, o.description, o.arg2]), [[5, 99, "type", "LOC_UPGRADE_INFO", undefined]]);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "ADD_TO_ARMY").map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.expect]), [[5, 11, 10, -1, "army"], [5, 12, 10, -1, "army"]]);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "PACK_ARMY"), [], "a command the engine refuses is not offered");
+  assert.ok(log.filter((e) => e.startsWith("ucanStart(") && e.includes('"X":-9999')).length >= 1, "the shipped no-target probe shape");
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+test("perform UPGRADE sends the no-target shape and confirms on the unit's type changing", () => {
+  const log = [];
+  const g = withUnitCommands(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const r = runPerformArgs(g, "UPGRADE", 5, 0, 0, { pre: 99 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "UPGRADE", arg: 5, expect: "type", before: 99, after: 100, present: true, matches: true });
+  assert.ok(log.find((e) => e.startsWith("usendRequest(") && e.includes("UPGRADE") && e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')));
+});
+
+test("perform ADD_TO_ARMY needs a plot and confirms on the unit's army changing; ACTIVATE_GREAT_PERSON confirms on the unit being spent", () => {
+  const g = withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: ["ADD_TO_ARMY"], armyAfter: 42 }); g._log = [];
+  const r = runPerformArgs(g, "ADD_TO_ARMY", 5, 11, 10, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual([r.readback.before, r.readback.after, r.readback.matches], [-1, 42, true]);
+  assert.ok(g._log.find((e) => e.startsWith("usendRequest(") && e.includes('"X":11,"Y":10')));
+  const noPlot = withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: ["ADD_TO_ARMY"] }); noPlot._log = [];
+  assert.ok(runPerformArgs(noPlot, "ADD_TO_ARMY", 5, -1, -1, { pre: -1 }).refused, "a plot command without a plot is refused");
+  const gp = withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: ["ACTIVATE_GREAT_PERSON"], gone: true }); gp._log = [];
+  const rg = runPerformArgs(gp, "ACTIVATE_GREAT_PERSON", 5, 11, 10, { pre: 1 });
+  assert.deepEqual([rg.readback.present, rg.readback.matches], [false, true]);
+});
+
+test("perform of a unit command refuses an unknown unit, a changed state and a refused check without sending", () => {
+  for (const [label, mk, kind, uid, pre] of [
+    ["unknown unit", () => withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), "UPGRADE", 9, 99],
+    ["state changed", () => withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), "UPGRADE", 5, 12],
+    ["engine refuses", () => withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ok: [] }), "UPGRADE", 5, 99],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    assert.ok(runPerformArgs(h, kind, uid, 0, 0, { pre }).refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("usendRequest")), `${label}: must not send`);
+  }
+  const same = withUnitCommands(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { typeAfter: 99 }); same._log = [];
+  const rr = runPerformArgs(same, "UPGRADE", 5, 0, 0, { pre: 99 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- attacking
 function withAttack(g, { defenders = { "1010": { id: 77, owner: 4 } }, ranged = false, canAttack = true, attacksRemaining = 1,
                          startsWar = false, spend = true, reach = null, opOk = true } = {}) {
