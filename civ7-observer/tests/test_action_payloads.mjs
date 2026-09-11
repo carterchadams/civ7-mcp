@@ -1212,6 +1212,61 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- city projects (a third thing the build queue can hold; no plot, no gold)
+function withProjects(g, { startable = [301] } = {}) {
+  withBuildings(g, {});
+  const rows = [{ $hash: 301, ProjectType: "PROJECT_CITY_SCIENCE_PROJECT", Name: "LOC_SCIENCE_PROJECT", Description: "LOC_SCIENCE_DESC" },
+                { $hash: 302, ProjectType: "PROJECT_CITY_CULTURE_PROJECT", Name: "LOC_CULTURE_PROJECT", Description: "LOC_CULTURE_DESC" }];
+  g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
+  const city = g.Players.get(1).Cities.getCities()[0];
+  const inner = g.Game.CityOperations;
+  g.Game.CityOperations = {
+    canStart: (cid, op, args, show) => {
+      if (args.ProjectType === undefined) return inner.canStart(cid, op, args, show);
+      g._log.push(`prcanStart(${JSON.stringify(cid)},${op},${JSON.stringify(args)},${show})`);
+      return { Success: cid.owner === 1 && startable.includes(args.ProjectType) };
+    },
+    sendRequest: (cid, op, args) => {
+      if (args.ProjectType === undefined) return inner.sendRequest(cid, op, args);
+      g._log.push(`prsendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`);
+      city.BuildQueue._q.push({ type: args.ProjectType, kind: 3 });
+    },
+  };
+  return g;
+}
+
+test("project offers list only the projects the native BUILD check accepts, with the queue they would join", () => {
+  const log = [];
+  const g = withProjects(withUnits(world({ log }), [])); g._log = log;
+  const projects = runOffers(g).offers.filter((o) => o.kind === "PRODUCE_PROJECT");
+  assert.deepEqual(projects.map((o) => [o.arg, o.arg2, o.typeKey, o.displayName, o.description, o.pre, o.queueLength]),
+    [[65536, 301, "PROJECT_CITY_SCIENCE_PROJECT", "LOC_SCIENCE_PROJECT", "LOC_SCIENCE_DESC", 0, 0]]);
+  assert.ok(!log.some((e) => e.startsWith("prsendRequest")));
+});
+
+test("perform PRODUCE_PROJECT enqueues the project and reads it back at the offered position", () => {
+  const log = [];
+  const g = withProjects(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "PRODUCE_PROJECT", 65536, 301, 0, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "PRODUCE_PROJECT", arg: 65536, projectType: 301, queuedAt: 0, queueLength: 1, matches: true });
+  assert.ok(log.find((e) => e.startsWith("prsendRequest(") && e.includes('"ProjectType":301')));
+});
+
+test("perform PRODUCE_PROJECT refuses an unknown city, a non-project, a changed queue and a refused check", () => {
+  for (const [label, mk, cid, pt, pre] of [
+    ["unknown city", () => withProjects(withUnits(world({ log: [] }), [])), 7, 301, 0],
+    ["not a project", () => withProjects(withUnits(world({ log: [] }), [])), 65536, 4242, 0],
+    ["queue changed", () => withProjects(withUnits(world({ log: [] }), [])), 65536, 301, 2],
+    ["canStart false", () => withProjects(withUnits(world({ log: [] }), []), { startable: [] }), 65536, 301, 0],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "PRODUCE_PROJECT", cid, pt, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("prsendRequest")), `${label}: must not send`);
+  }
+});
+
 // ---- standing research and civic goals
 function withTreeGoals(g, { techTarget = -1, civicTarget = -1, acceptable = [701, 702, 801], applied = true } = {}) {
   const me = g.Players.get(1);

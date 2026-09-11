@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -405,6 +405,13 @@ class ActionRegistry:
                           "group", "cost", "costYield", "influenceBalance", "affordable"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "PRODUCE_PROJECT":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "project offer without a project type")
+                rec["arg2"] = o["arg2"]
+                for k in ("cityId", "cityName", "typeKey", "displayName", "description", "turns", "queue", "queueLength"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "PURCHASE_CONSTRUCTIBLE":
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "purchase offer without a constructible and plot")
@@ -635,6 +642,11 @@ class ActionRegistry:
                     if isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
                         effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"],
                                                              "influenceSpent": offer["pre"] - inf}}
+                elif kind == "PRODUCE_PROJECT":
+                    queues = rb.get("cityQueues")
+                    q = queues.get(str(offer["arg"])) if isinstance(queues, dict) else None
+                    if isinstance(q, list) and len(q) > offer["pre"] and q[offer["pre"]] == offer["arg2"]:
+                        effect = {"projectQueued": {"cityId": offer["arg"], "projectType": offer["arg2"], "position": offer["pre"]}}
                 elif kind == "PURCHASE_CONSTRUCTIBLE":
                     # Only a mutation moves the treasury within a turn, so a lighter balance is the
                     # specific effect; the building itself lands on the plot the offer named.

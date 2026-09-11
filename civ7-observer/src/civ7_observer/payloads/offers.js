@@ -464,6 +464,21 @@
               cost: upCost, goldBalance: goldBalance, affordable: isInt(upCost) ? goldBalance >= upCost : null, canStart: true });
           }
         }
+        // City projects are the third thing a queue can hold. They take no plot and no gold, so the
+        // offer is the plain enqueue: precondition = queue length, confirmed by the item landing there.
+        if (GameInfo.Projects && typeof GameInfo.Projects[Symbol.iterator] === "function") {
+          for (const row of GameInfo.Projects) {
+            if (!row || !isInt(row.$hash) || typeof row.ProjectType !== "string") continue;
+            const projArgs = { ProjectType: row.$hash };
+            const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, projArgs, false);
+            if (!check || check.Success !== true) continue;
+            offers.push({ kind: "PRODUCE_PROJECT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
+              queue: queueKeys, queueLength: ppre, typeKey: row.ProjectType,
+              displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+              description: typeof row.Description === "string" ? compose(row.Description) : null,
+              turns: turnsFor(row.$hash), canStart: true });
+          }
+        }
         // Buildings need a plot: the shipped chooser asks canStart(BUILD, {ConstructibleType}) and the
         // placement mode then offers `Plots` (existing urban plots) and `ExpandUrbanPlots` (rural plots
         // that would become urban). One offer per (constructible, plot); the plot index rides as arg3.

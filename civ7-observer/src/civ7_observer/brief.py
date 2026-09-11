@@ -72,6 +72,7 @@ DECISION_OF_KIND = {
     "research_goal": "research",
     "civic_goal": "civic",
     "produce_unit": "production",
+    "produce_project": "production",
     "produce_constructible": "production",
     "purchase_unit": "production",
     "purchase_constructible": "production",

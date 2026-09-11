@@ -42,6 +42,9 @@ MUTATION_ALLOWLIST = (
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, moveArgs)',
     'Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false)',
     'Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs)',
+    # a city project: the same BUILD, with a project instead of a unit or a constructible
+    'Game.CityOperations.canStart(pCityId, CityOperationTypes.BUILD, buildArgs, false)',
+    'Game.CityOperations.sendRequest(pCityId, CityOperationTypes.BUILD, buildArgs)',
     'Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false)',
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, foundArgs)',
     # standing orders: the operation is a table hash the payload restricts to a fixed no-target set

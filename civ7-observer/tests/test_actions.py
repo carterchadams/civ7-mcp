@@ -1064,6 +1064,35 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_a_city_project_confirms_on_the_queue_position_it_was_offered(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PRODUCE_PROJECT", "arg": 65536, "arg2": 301, "pre": 1, "cityId": 65536, "cityName": "Pārsa", "typeKey": "PROJECT_CITY_SCIENCE_PROJECT", "displayName": "Scientific Research", "description": "science in this city", "turns": 6, "queue": ["BUILDING_GRANARY"], "queueLength": 1, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PRODUCE_PROJECT", "arg": 65536, "projectType": 301, "queuedAt": 1, "queueLength": 1, "matches": False}}
+    rb = {**RB, "cityQueues": {"65536": [900, 301]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pr = next(o for o in out["offers"] if o["kind"] == "produce_project")
+        assert pr["displayName"] == "Scientific Research" and pr["queueLength"] == 1 and "arg" not in pr
+        res = reg.perform(gs, action_id=pr["actionId"], request_id="prj-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"projectQueued": {"cityId": 65536, "projectType": 301, "position": 1}}
+
+
+def test_a_project_that_never_reaches_the_queue_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PRODUCE_PROJECT", "arg": 65536, "arg2": 301, "pre": 1, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PRODUCE_PROJECT", "arg": 65536, "projectType": 301, "queuedAt": 1, "queueLength": 1, "matches": False}}
+    rb = {**RB, "cityQueues": {"65536": [900]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pr = next(o for o in out["offers"] if o["kind"] == "produce_project")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=pr["actionId"], request_id="prj-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
 def test_a_standing_research_goal_confirms_on_the_node_the_engine_holds(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "SET_TECH_TREE_TARGET_NODE", "arg": 702, "pre": -1, "typeKey": "NODE_TECH_EX_GUNPOWDER", "displayName": "Gunpowder", "tree": "TREE_TECHS_EX", "cost": 900, "turns": 14, "currentTarget": -1, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_TARGET_NODE", "arg": 702, "targetNode": -1, "matches": False}}

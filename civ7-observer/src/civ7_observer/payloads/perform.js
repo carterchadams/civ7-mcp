@@ -355,6 +355,27 @@
     result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, matches: isInt(after) && after > PRE };
     return JSON.stringify(result);
   }
+  if (KIND === "PRODUCE_PROJECT") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "project arguments are not integers");
+    if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");
+    let pcity = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { pcity = c; break; } } } catch (e) { pcity = null; }
+    if (!pcity) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const projRow = GameInfo.Projects.lookup(ARG2);
+    if (!projRow || typeof projRow.ProjectType !== "string") return refuse("UNKNOWN_ACTION", "project type is not a project definition");
+    const pqueue = pcity.BuildQueue && typeof pcity.BuildQueue.getQueue === "function" ? pcity.BuildQueue.getQueue() : null;
+    if (!Array.isArray(pqueue) || pqueue.length !== PRE) return refuse("ACTION_EXPIRED", "the city's build queue changed since the project was offered");
+    const pCityId = pcity.id;
+    const buildArgs = { ProjectType: ARG2 };
+    const pcheck = Game.CityOperations.canStart(pCityId, CityOperationTypes.BUILD, buildArgs, false);
+    if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the project");
+    Game.CityOperations.sendRequest(pCityId, CityOperationTypes.BUILD, buildArgs);
+    result.outcome = "sent";
+    let pafter = null; try { pafter = pcity.BuildQueue.getQueue(); } catch (e) { pafter = null; }
+    const queuedP = Array.isArray(pafter) && pafter.length > PRE && pafter[PRE] && pafter[PRE].type === ARG2;
+    result.readback = { kind: KIND, arg: ARG, projectType: ARG2, queuedAt: PRE, queueLength: Array.isArray(pafter) ? pafter.length : null, matches: queuedP };
+    return JSON.stringify(result);
+  }
   if (KIND === "PRODUCE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
     if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");
