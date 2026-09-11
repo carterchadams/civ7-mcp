@@ -149,3 +149,13 @@ def test_traditions_blocker_is_a_supported_policies_decision_with_activation_and
     assert [d["kind"] for d in required] == ["policies"]
     kinds = [(o["kind"], o.get("displayName"), o.get("slot"), o.get("slotsFree"), o.get("description")) for o in required[0]["options"]]
     assert kinds == [("activate_tradition", "Trial of Time", "TRADITION_CULTURE_SLOT", 1, "+1 culture"), ("confirm_traditions", None, None, None, None)]
+
+
+def test_a_notification_named_blocker_for_a_discovery_story_is_a_supported_narrative_decision(tmp_path):
+    story = [{"kind": "CHOOSE_NARRATIVE_STORY_DIRECTION", "arg": 28, "arg2": 7001, "pre": -1089908522, "storyId": 28, "storyKey": "DISCOVERY_X", "title": "Merciless Mercenaries", "body": "Mercenaries...", "answerKey": "DISCOVERY_X_A", "option": "Hire them", "reward": "+50 gold", "action": None, "cost": 0, "costYield": None, "affordable": True, "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(story, end_can_start=False, blocking="NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION"))
+    assert b["pause"] is None and b["endTurn"]["supported"] is True
+    required = [d for d in b["decisions"] if d["required"]]
+    assert [d["kind"] for d in required] == ["narrative"]
+    o = required[0]["options"][0]
+    assert (o["kind"], o["title"], o["option"], o["reward"], o["answerKey"], o["affordable"]) == ("narrative_choice", "Merciless Mercenaries", "Hire them", "+50 gold", "DISCOVERY_X_A", True)

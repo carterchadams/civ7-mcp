@@ -42,7 +42,7 @@
   if (KIND === "END_TURN") {
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
-    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
+    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && name) return name; } } } catch (e) { /* fall through to the raw value */ } return String(v); };
     if (!isInt(blockingType) || !isInt(none)) return refuse("API_CONTRACT_MISMATCH", "end-turn blocking contract unavailable");
     if (blockingType !== none) return refuse("ACTION_BLOCKED", "a notification blocks ending the turn", { blockingType: blockerName(blockingType) });
     if (GameContext.hasSentTurnComplete() === true) return refuse("ACTION_BLOCKED", "turn completion was already sent", { blockingType: null });
@@ -207,6 +207,28 @@
     let bt = null; try { bt = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID); } catch (e) { bt = null; }
     const bname = (v) => { try { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; } catch (e) { /* fall through */ } return null; };
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CHOOSE_NARRATIVE_STORY_DIRECTION") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "narrative arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Stories || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Activate)) return refuse("API_CONTRACT_MISMATCH", "narrative operation contract unavailable");
+    const st = player.Stories;
+    let sid = null;
+    try { const first = st.getFirstPendingDiscoveryLastMetID(); if (first && first.id === ARG) sid = first; if (!sid) { const met = st.getPendingMetIds(); if (Array.isArray(met)) for (const m of met) if (m && m.id === ARG) { sid = m; break; } } } catch (e) { sid = null; }
+    if (!sid) return refuse("ACTION_EXPIRED", "that story is no longer pending");
+    const story = st.find(sid);
+    if (!story || story.type !== PRE) return refuse("ACTION_EXPIRED", "the pending story changed since the offer was made");
+    let key = null;
+    if (ARG2 === -1) key = "CLOSE";
+    else { const ld = GameInfo.NarrativeStories.lookup(ARG2); if (ld && typeof ld.NarrativeStoryType === "string") key = ld.NarrativeStoryType; }
+    if (key === null) return refuse("UNKNOWN_ACTION", "answer is not a narrative story link");
+    const args = { TargetType: key, Target: sid, Action: PlayerOperationParameters.Activate };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that story direction");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let stillPending = null; try { const first = st.getFirstPendingDiscoveryLastMetID(); stillPending = !!(first && first.id === ARG); } catch (e) { stillPending = null; }
+    result.readback = { kind: KIND, arg: ARG, answerKey: key, stillPending: stillPending, matches: stillPending === false };
     return JSON.stringify(result);
   }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");

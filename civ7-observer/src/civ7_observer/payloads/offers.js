@@ -41,7 +41,7 @@
   try {
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
-    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
+    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && name) return name; } } } catch (e) { /* fall through to the raw value */ } return String(v); };
     if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
     const blocked = blockingType !== none;
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
@@ -223,6 +223,40 @@
       if (blocked && blockerName(blockingType) === "TRADITIONS" && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS, {}, false);
         offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
+      }
+    }
+    if (isInt(PlayerOperationTypes.CHOOSE_NARRATIVE_STORY_DIRECTION) && player.Stories && typeof StoryTextTypes !== "undefined" && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate)) {
+      // Narrative events: the shipped screen shows the first pending story, one button per eligible
+      // link (or a single CLOSE when the story has none), and sends CHOOSE_NARRATIVE_STORY_DIRECTION
+      // {TargetType: linkKey, Target: storyId, Action: Activate}. Text comes from the stories component.
+      const st = player.Stories;
+      const sid = st.getFirstPendingDiscoveryLastMetID();
+      const story = sid && isInt(sid.id) ? st.find(sid) : null;
+      const def = story && isInt(story.type) ? GameInfo.NarrativeStories.lookup(story.type) : null;
+      if (sid && story && def && typeof def.NarrativeStoryType === "string") {
+        const inject = (hash, textType) => { try { const s = st.determineNarrativeInjection(sid, hash, textType); return typeof s === "string" ? compose(s) : null; } catch (e) { return null; } };
+        const title = compose(def.StoryTitle || def.Name); const body = compose(def.Completion || def.Description);
+        let linkKeys = [];
+        if (def.VariableLinks) { const ol = st.getOrderedLinks(sid); if (Array.isArray(ol)) linkKeys = ol.map((l) => (l && typeof l === "object" ? l.ToNarrativeStoryType : l)); }
+        else { for (const row of GameInfo.NarrativeStory_Links) { if (row && row.FromNarrativeStoryType === def.NarrativeStoryType) linkKeys.push(row.ToNarrativeStoryType); } }
+        const answers = [];
+        for (const key of linkKeys) {
+          if (typeof key !== "string") continue;
+          const ld = GameInfo.NarrativeStories.lookup(key);
+          if (!ld || !isInt(ld.$hash) || typeof ld.Activation !== "string") continue;
+          const act = ld.Activation.toUpperCase();
+          const eligible = act === "LINKED" || ((act === "LINKED_REQUISITE" || act === "LINKED_SUBJECT_REQUISITE") && st.determineRequisiteLink(ld.NarrativeStoryType, sid) === true);
+          if (!eligible) continue;
+          const affordable = ld.Cost === 0 || !isInt(ld.Cost) || st.canAfford(ld.NarrativeStoryType) === true;
+          answers.push({ key: ld.NarrativeStoryType, hash: ld.$hash, option: inject(ld.$hash, StoryTextTypes.OPTION), reward: inject(ld.$hash, StoryTextTypes.REWARD), action: inject(ld.$hash, StoryTextTypes.IMPERATIVE), cost: isInt(ld.Cost) ? ld.Cost : 0, costYield: typeof ld.CostYield === "string" ? ld.CostYield : null, affordable: affordable });
+        }
+        if (answers.length === 0) answers.push({ key: "CLOSE", hash: -1, option: compose("LOC_NARRATIVE_STORY_END_STORY_NAME"), reward: (() => { try { const s = st.determineNarrativeInjectionComponentId(sid, StoryTextTypes.REWARD); return typeof s === "string" ? compose(s) : null; } catch (e) { return null; } })(), action: null, cost: 0, costYield: null, affordable: true });
+        for (const a of answers) {
+          const nargs = { TargetType: a.key, Target: sid, Action: PlayerOperationParameters.Activate };
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHOOSE_NARRATIVE_STORY_DIRECTION, nargs, false);
+          offers.push({ kind: "CHOOSE_NARRATIVE_STORY_DIRECTION", arg: sid.id, arg2: a.hash, pre: story.type, storyId: sid.id, storyKey: def.NarrativeStoryType, title: title, body: body,
+            answerKey: a.key, option: a.option, reward: a.reward, action: a.action, cost: a.cost, costYield: a.costYield, affordable: a.affordable, canStart: !!(check && check.Success === true) && a.affordable });
+        }
       }
     }
     const alreadySent = GameContext.hasSentTurnComplete() === true;

@@ -870,3 +870,19 @@ def test_tradition_offers_and_confirmation_flow_through_the_registry(tmp_path):
         co = next(o for o in out["offers"] if o["kind"] == "confirm_traditions")
         res2 = reg.perform(gs, action_id=co["actionId"], request_id="tr-2", player=1, mode="singleplayer")
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"endTurnBlocking": "NONE"}
+
+
+def test_narrative_offers_carry_story_text_and_perform_confirms_when_the_story_leaves_the_pending_list(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CHOOSE_NARRATIVE_STORY_DIRECTION", "arg": 28, "arg2": 7001, "pre": -1089908522, "storyId": 28, "storyKey": "DISCOVERY_X", "title": "Merciless Mercenaries", "body": "Mercenaries...", "answerKey": "DISCOVERY_X_A", "option": "Hire them", "reward": "+50 gold", "action": "Pay", "cost": 0, "costYield": None, "affordable": True, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHOOSE_NARRATIVE_STORY_DIRECTION", "arg": 28, "answerKey": "DISCOVERY_X_A", "stillPending": True, "matches": False}}
+    rb = {**RB, "pendingStories": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        nc = next(o for o in out["offers"] if o["kind"] == "narrative_choice")
+        assert nc["title"] == "Merciless Mercenaries" and nc["option"] == "Hire them" and nc["reward"] == "+50 gold" and nc["answerKey"] == "DISCOVERY_X_A" and "arg" not in nc and "arg2" not in nc
+        res = reg.perform(gs, action_id=nc["actionId"], request_id="nc-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"storyResolved": 28}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"CHOOSE_NARRATIVE_STORY_DIRECTION"' in sent and "const ARG = 28;" in sent and "const ARG2 = 7001;" in sent and "const PRE = -1089908522;" in sent

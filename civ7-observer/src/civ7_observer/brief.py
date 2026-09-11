@@ -26,6 +26,10 @@ BLOCKER_DECISION = {
     "STACKED_UNITS": "unit",
     "NEW_POPULATION": "population",
     "TRADITIONS": "policies",
+    # data-driven blockers are named after the blocking notification's type
+    "NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION": "narrative",
+    "NOTIFICATION_CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative",
+    "NOTIFICATION_CHOOSE_AUTO_STORY_DIRECTION": "narrative",
 }
 
 # Public action kinds grouped into the decision a player actually faces.
@@ -42,6 +46,7 @@ DECISION_OF_KIND = {
     "expand_city": "population",
     "activate_tradition": "policies",
     "confirm_traditions": "policies",
+    "narrative_choice": "narrative",
     "end_turn": "end_turn",
 }
 
@@ -49,7 +54,8 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex",
-                 "slot", "slotsTotal", "slotsFree", "description")
+                 "slot", "slotsTotal", "slotsFree", "description",
+                 "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")

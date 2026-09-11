@@ -585,3 +585,90 @@ test("perform CHANGE_TRADITION refuses a mismatched identity, a changed slot cou
     assert.ok(!log.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- narrative choices (the first pending story; links or a single CLOSE)
+function withStory(g, { links = ["DISCOVERY_X_A", "DISCOVERY_X_B"], variable = false, afterChoice = "resolved", canOk = true, blockerNotif = true } = {}) {
+  const me = g.Players.get(1);
+  let pending = { owner: 1, id: 28, type: 35 };
+  const rows = [
+    { $hash: -1089908522, $index: 1, NarrativeStoryType: "DISCOVERY_X", Activation: "AUTO", StoryTitle: "LOC_X_TITLE", Completion: "LOC_X_BODY", Name: "LOC_X_NAME", VariableLinks: variable, Cost: 0 },
+    { $hash: 7001, $index: 2, NarrativeStoryType: "DISCOVERY_X_A", Activation: "LINKED", Cost: 0 },
+    { $hash: 7002, $index: 3, NarrativeStoryType: "DISCOVERY_X_B", Activation: "LINKED_REQUISITE", Cost: 50, CostYield: "YIELD_GOLD" },
+    { $hash: 7003, $index: 4, NarrativeStoryType: "DISCOVERY_X_C", Activation: "LINKED", Cost: 0 },
+  ];
+  g.GameInfo.NarrativeStories = { lookup: (k) => rows.find((r) => r.$hash === k || r.NarrativeStoryType === k) ?? null };
+  g.GameInfo.NarrativeStory_Links = links.map((to) => ({ FromNarrativeStoryType: "DISCOVERY_X", ToNarrativeStoryType: to }));
+  g.StoryTextTypes = { INVALID: 0, BODY: 1, OPTION: 2, REWARD: 3, IMPERATIVE: 4, TITLE: 5 };
+  g.PlayerOperationParameters = { Activate: -1326475004, Deactivate: 1318334332 };
+  g.PlayerOperationTypes.CHOOSE_NARRATIVE_STORY_DIRECTION = 1916708168;
+  me.Stories = {
+    getFirstPendingDiscoveryLastMetID: () => pending, getPendingMetIds: () => null,
+    find: (id) => (pending && id.id === pending.id ? { id, type: -1089908522, state: 4 } : null),
+    getOrderedLinks: () => (variable ? links.slice() : []),
+    determineNarrativeInjection: (sid, hash, tt) => `${hash}:${tt}`,
+    determineNarrativeInjectionComponentId: () => "LOC_END_REWARD",
+    determineRequisiteLink: (key) => key === "DISCOVERY_X_B",
+    canAfford: (key) => key !== "DISCOVERY_X_B",
+  };
+  if (blockerNotif) {
+    g.Game.Notifications.getEndTurnBlockingType = () => -2084516792;
+    g.Game.Notifications.getIdsForPlayer = (pid) => { g._log.push(`notifIds(${pid})`); return [{ owner: 1, id: 11, type: 20 }]; };
+    g.Game.Notifications.find = () => ({ Type: 1287223640, BlocksTurnAdvancement: true });
+    g.Game.Notifications.getTypeName = (t) => (t === 1287223640 ? "NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION" : undefined);
+  }
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 1916708168) return inner.canStart(pid, op, args, show); g._log.push(`ncanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: canOk }; },
+    sendRequest: (pid, op, args) => { if (op !== 1916708168) return inner.sendRequest(pid, op, args); g._log.push(`nsendRequest(${pid},${JSON.stringify(args)})`); if (afterChoice === "resolved") pending = null; },
+  };
+  return g;
+}
+
+test("an unnamed end-turn blocker is named after the blocking notification's type, and narrative offers list eligible, affordable links", () => {
+  const log = [];
+  const g = withStory(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const end = r.offers.find((o) => o.kind === "END_TURN");
+  assert.equal(end.blockingType, "NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION");
+  assert.ok(log.every((e) => !e.startsWith("notifIds(") || e === "notifIds(1)"), "only the bound player's notifications are read");
+  const n = r.offers.filter((o) => o.kind === "CHOOSE_NARRATIVE_STORY_DIRECTION");
+  assert.deepEqual(n.map((o) => [o.arg, o.arg2, o.pre, o.storyId, o.storyKey, o.answerKey, o.option, o.reward, o.action, o.cost, o.costYield, o.affordable, o.canStart]),
+    [[28, 7001, -1089908522, 28, "DISCOVERY_X", "DISCOVERY_X_A", "7001:2", "7001:3", "7001:4", 0, null, true, true],
+     [28, 7002, -1089908522, 28, "DISCOVERY_X", "DISCOVERY_X_B", "7002:2", "7002:3", "7002:4", 50, "YIELD_GOLD", false, false]]);
+  assert.equal(n[0].title, "LOC_X_TITLE"); assert.equal(n[0].body, "LOC_X_BODY");
+  assert.ok(!log.some((e) => e.startsWith("nsendRequest")));
+});
+
+test("a story with no eligible links offers the single CLOSE answer", () => {
+  const g = withStory(world({ log: [] }), { links: [] }); g._log = [];
+  const n = runOffers(g).offers.filter((o) => o.kind === "CHOOSE_NARRATIVE_STORY_DIRECTION");
+  assert.deepEqual(n.map((o) => [o.arg2, o.answerKey, o.option, o.reward, o.canStart]), [[-1, "CLOSE", "LOC_NARRATIVE_STORY_END_STORY_NAME", "LOC_END_REWARD", true]]);
+});
+
+test("perform CHOOSE_NARRATIVE_STORY_DIRECTION re-finds the pending story, sends the string key with the story id, and reads back", () => {
+  const log = [];
+  const g = withStory(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "CHOOSE_NARRATIVE_STORY_DIRECTION", 28, 7001, 0, { pre: -1089908522 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "CHOOSE_NARRATIVE_STORY_DIRECTION", arg: 28, answerKey: "DISCOVERY_X_A", stillPending: false, matches: true });
+  const send = log.find((e) => e.startsWith("nsendRequest(1,"));
+  assert.ok(send && send.includes('"TargetType":"DISCOVERY_X_A","Target":{"owner":1,"id":28,"type":35},"Action":-1326475004'));
+  const c = withStory(world({ log: [] }), { links: [] }); c._log = [];
+  const rc = runPerformArgs(c, "CHOOSE_NARRATIVE_STORY_DIRECTION", 28, -1, 0, { pre: -1089908522 });
+  assert.equal(rc.outcome, "sent"); assert.equal(rc.readback.answerKey, "CLOSE");
+});
+
+test("perform CHOOSE_NARRATIVE_STORY_DIRECTION refuses a story that is not pending, a changed story type, an unknown answer and a canStart refusal without sending", () => {
+  for (const [label, mk, sid, hash, pre] of [
+    ["not pending", () => withStory(world({ log: [] })), 99, 7001, -1089908522],
+    ["story type changed", () => withStory(world({ log: [] })), 28, 7001, 5],
+    ["unknown answer", () => withStory(world({ log: [] })), 28, 4242, -1089908522],
+    ["canStart false", () => withStory(world({ log: [] }), { canOk: false }), 28, 7001, -1089908522],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "CHOOSE_NARRATIVE_STORY_DIRECTION", sid, hash, 0, { pre });
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("nsendRequest")), `${label}: must not send`);
+  }
+});
