@@ -89,6 +89,25 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
+  if (KIND === "PRODUCE_UNIT") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
+    if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");
+    let city = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { city = c; break; } } } catch (e) { city = null; }
+    if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const row = GameInfo.Units.lookup(ARG2);
+    if (!row || typeof row.UnitType !== "string") return refuse("UNKNOWN_ACTION", "unit type is not a unit definition");
+    const cityId = city.id;
+    const buildArgs = { UnitType: ARG2 };
+    const bcheck = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
+    if (!bcheck || bcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the build");
+    Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs);
+    result.outcome = "sent";
+    let observed = null;
+    try { observed = city.BuildQueue.currentProductionTypeHash; } catch (e) { observed = null; }
+    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, observedType: isInt(observed) ? observed : null, matches: observed === ARG2 };
+    return JSON.stringify(result);
+  }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");
   if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
   if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");

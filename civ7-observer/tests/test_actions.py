@@ -189,3 +189,18 @@ def test_move_offers_expose_target_and_perform_passes_coordinates(tmp_path):
     assert res["status"] == "confirmed"
     sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
     assert '"MOVE_UNIT"' in sent and "const ARG2 = 11;" in sent and "const ARG3 = 10;" in sent and "OP_ARG" not in sent
+
+
+def test_produce_offers_expose_city_and_unit_and_perform_passes_both(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PRODUCE_UNIT", "arg": 65536, "arg2": 100, "cityId": 65536, "cityName": "Athênai", "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PRODUCE_UNIT", "arg": 65536, "unitType": 100, "observedType": 100, "matches": True}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), ctx_reply(5)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pr = next(o for o in out["offers"] if o["kind"] == "produce_unit")
+        assert pr["cityName"] == "Athênai" and pr["unitTypeKey"] == "UNIT_WARRIOR" and "arg" not in pr and "arg2" not in pr
+        res = reg.perform(gs, action_id=pr["actionId"], request_id="pr-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"PRODUCE_UNIT"' in sent and "const ARG = 65536;" in sent and "const ARG2 = 100;" in sent

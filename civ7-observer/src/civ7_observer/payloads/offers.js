@@ -94,6 +94,22 @@
         }
       }
     }
+    if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {
+      const cities = player.Cities.getCities();
+      if (!Array.isArray(cities)) throw new Error("getCities() is not an array");
+      for (const c of cities) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
+        const cityId = c.id;
+        for (const row of GameInfo.Units) {
+          if (!row || !isInt(row.$hash) || typeof row.UnitType !== "string") continue;
+          const buildArgs = { UnitType: row.$hash };
+          const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
+          if (!check || check.Success !== true) continue;   // only buildable units are offered
+          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, cityId: c.id.id, cityName: typeof c.name === "string" ? c.name : null,
+            unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
+        }
+      }
+    }
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
     const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };

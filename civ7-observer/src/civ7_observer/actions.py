@@ -15,7 +15,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -144,6 +144,13 @@ class ActionRegistry:
                 for k in ("terrainKey", "pathTurns"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "PRODUCE_UNIT":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "produce offer without a unit type")
+                rec["arg2"] = o["arg2"]
+                for k in ("cityId", "cityName", "unitTypeKey", "displayName", "turns"):
+                    if k in o:
+                        entry[k] = o[k]
             self._offers[action_id] = rec
             for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent", "unitTypeKey", "movesRemaining", "location"):
                 if k in o:
@@ -222,6 +229,10 @@ class ActionRegistry:
             elif offer["kind"] == "MOVE_UNIT":
                 locs = rb.get("unitLocations")
                 if isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]:
+                    return True
+            elif offer["kind"] == "PRODUCE_UNIT":
+                prod = rb.get("cityProduction")
+                if isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]:
                     return True
             else:
                 key = "techResearching" if offer["kind"] == "SET_TECH_TREE_NODE" else "civicResearching"

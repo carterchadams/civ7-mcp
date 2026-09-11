@@ -239,3 +239,53 @@ test("perform MOVE_UNIT refuses non-adjacent, hidden, unknown-unit and canStart-
     assert.ok(!log.some((e) => e.startsWith("usendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- produce unit (city production, units only; constructibles need placement and are deferred)
+function withCity(g, { buildable = [99, 100], sentTo = null } = {}) {
+  const city = { id: { owner: 1, id: 65536, type: 1 }, owner: 1, name: "LOC_C", location: { x: 3, y: 4 }, isTown: false, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true } };
+  g.Players.get(1).Cities = { getCities: () => [city] };
+  g.GameInfo.Units = table([{ $hash: 99, UnitType: "UNIT_SCOUT", Name: "LOC_SCOUT", CoreClass: "CORE_CLASS_RECON" }, { $hash: 100, UnitType: "UNIT_WARRIOR", Name: "LOC_WARRIOR", CoreClass: "CORE_CLASS_MILITARY" }, { $hash: 101, UnitType: "UNIT_GALLEY", Name: "LOC_GALLEY", CoreClass: "CORE_CLASS_MILITARY" }]);
+  g.GameInfo.Units[Symbol.iterator] = function* () { yield* [{ $hash: 99, UnitType: "UNIT_SCOUT", Name: "LOC_SCOUT" }, { $hash: 100, UnitType: "UNIT_WARRIOR", Name: "LOC_WARRIOR" }, { $hash: 101, UnitType: "UNIT_GALLEY", Name: "LOC_GALLEY" }]; };
+  g.CityOperationTypes = { BUILD: 5551, CONSIDER_TOWN_PROJECT: 5552 };
+  g.Game.CityOperations = {
+    canStart: (cid, op, args, show) => { g._log.push(`ccanStart(${JSON.stringify(cid)},${op},${JSON.stringify(args)},${show})`); return { Success: cid.owner === 1 && buildable.includes(args.UnitType), Requirements: {}, FailureReasons: buildable.includes(args.UnitType) ? undefined : ["LOC_NO"] }; },
+    sendRequest: (cid, op, args) => { g._log.push(`csendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue.currentProductionTypeHash = sentTo ?? args.UnitType; city.BuildQueue.isEmpty = false; },
+  };
+  g.Game.CityCommands = { canStart: () => { g._log.push("PURCHASE"); return { Success: true }; }, sendRequest: () => { g._log.push("PURCHASE"); } };
+  return g;
+}
+
+test("produce offers list units the native BUILD canStart accepts, per owned city, never purchases", () => {
+  const log = [];
+  const g = withCity(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  const prod = r.offers.filter((o) => o.kind === "PRODUCE_UNIT");
+  assert.deepEqual(prod.map((o) => [o.arg, o.arg2, o.unitTypeKey, o.canStart]), [[65536, 99, "UNIT_SCOUT", true], [65536, 100, "UNIT_WARRIOR", true]]);
+  assert.ok(prod.every((o) => o.cityName === "LOC_C" && o.cityId === 65536));
+  assert.ok(log.filter((e) => e.startsWith("ccanStart(")).every((e) => e.includes('"owner":1') && e.includes(",5551,") && e.endsWith(",false)")));
+  assert.ok(!log.includes("PURCHASE") && !log.some((e) => e.startsWith("csendRequest")));
+});
+
+test("perform PRODUCE_UNIT resolves the city from the bound roster, checks canStart, sends BUILD and reads back", () => {
+  const log = [];
+  const g = withCity(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "PRODUCE_UNIT", 65536, 100, 0);
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "PRODUCE_UNIT", arg: 65536, unitType: 100, observedType: 100, matches: true });
+  const i = log.findIndex((e) => e.startsWith("ccanStart(") && e.includes('"UnitType":100'));
+  const j = log.findIndex((e) => e.startsWith("csendRequest(") && e.includes('"UnitType":100'));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+  assert.ok(!log.includes("PURCHASE"));
+});
+
+test("perform PRODUCE_UNIT refuses unknown city, unbuildable unit, and never uses Cities.get", () => {
+  for (const [label, cid, ut] of [["unknown city", 7, 100], ["unbuildable", 65536, 101]]) {
+    const log = [];
+    const g = withCity(withUnits(world({ log }), [])); g._log = log;
+    g.Cities = new Proxy({}, { get(_, k) { log.push(`Cities.${String(k)}`); return () => ({}); } });
+    const r = runPerformArgs(g, "PRODUCE_UNIT", cid, ut, 0);
+    assert.ok(r.refused, label);
+    assert.ok(!log.some((e) => e.startsWith("csendRequest") || e.startsWith("Cities.")), label);
+  }
+});
