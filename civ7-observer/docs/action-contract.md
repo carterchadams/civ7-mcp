@@ -41,7 +41,10 @@ does not name blocking types; the `EndTurnBlockingTypes` key does.
   and the highest turn observed. A session whose turn is lower than that maximum (a reload of
   an earlier save) bumps the generation and reports `reattached: true`; offers and receipts
   carry the generation and offers from an older generation are refused. This closes the
-  same-campaign reload gap that a campaign id alone cannot.
+  same-campaign reload gap that a campaign id alone cannot: live, `campaignSetupGUID` stayed
+  the same across a reload of an earlier save and the generation bumped from 1 to 2.
+  Whichever call first observes the regression (list or perform) performs the bump and is the
+  one that reports `reattached: true`.
 - **Journal**: `pending → confirmed | rejected | unknown`, each row carrying the full action
   identity (request id, action id, kind, args, precondition, seat, turn, age, match). A
   pending row without a final row after a restart becomes `unknown` with its identity intact;
