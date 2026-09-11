@@ -1220,8 +1220,8 @@ def test_a_specialist_assignment_confirms_on_the_plot_gaining_a_worker(tmp_path)
 
 def test_answering_a_proposal_confirms_once_it_is_no_longer_pending(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "arg2": 926305338, "pre": 1, "eventId": 16, "answer": "accept", "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "proposerPlayerId": 0, "proposerName": "Abbasid", "canStart": True}]}
-    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "response": 926305338, "stillOpen": True, "matches": False}}
-    rb = {**RB, "pendingProposals": []}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "response": 926305338, "recordedResponse": -1, "matches": False}}
+    rb = {**RB, "proposalResponses": {"16": 926305338}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
     with gs:

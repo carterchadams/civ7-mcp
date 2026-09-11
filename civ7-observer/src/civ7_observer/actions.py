@@ -781,8 +781,12 @@ class ActionRegistry:
                         effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"],
                                                              "influenceSpent": offer["pre"] - inf}}
                 elif kind == "RESPOND_DIPLOMATIC_ACTION":
-                    pending = rb.get("pendingProposals")
-                    if isinstance(pending, list) and offer["arg"] not in pending:
+                    # The engine keeps accepting a second answer after the first (live: the check
+                    # stayed true and the accept read as unknown); the event's own recorded response
+                    # is the signal, and it must be the very answer that was sent.
+                    responses = rb.get("proposalResponses")
+                    recorded = responses.get(str(offer["arg"])) if isinstance(responses, dict) else None
+                    if isinstance(recorded, int) and not isinstance(recorded, bool) and recorded == offer["arg2"]:
                         effect = {"proposalAnswered": {"eventId": offer["arg"], "response": offer["arg2"]}}
                 elif kind == "CANCEL_ALLIANCE":
                     rel = rb.get("diplomaticRelations")

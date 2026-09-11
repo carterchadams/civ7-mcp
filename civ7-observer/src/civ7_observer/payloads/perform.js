@@ -420,14 +420,15 @@
     let pending = null;
     try { for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && ev.uniqueID === ARG && ev.targetPlayer === BOUND_PLAYER_ID) { pending = ev; break; } } } catch (e) { pending = null; }
     if (!pending) return refuse("ACTION_EXPIRED", "no proposal with that id is pending for this seat");
+    if (pending.responseType !== DiplomaticResponseTypes.INVALID_RESPONSE) return refuse("ACTION_EXPIRED", "that proposal has already been answered");
     const respArgs = { ID: ARG, Type: ARG2 };
     const rcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs, false);
     if (!rcheck || rcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the response");
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs);
     result.outcome = "sent";
-    let stillOpen = null;
-    try { const again = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs, false); stillOpen = !!(again && again.Success === true); } catch (e) { stillOpen = null; }
-    result.readback = { kind: KIND, arg: ARG, response: ARG2, stillOpen: stillOpen, matches: stillOpen === false };
+    let recorded = null;
+    try { for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && ev.uniqueID === ARG) { recorded = isInt(ev.responseType) ? ev.responseType : null; break; } } } catch (e) { recorded = null; }
+    result.readback = { kind: KIND, arg: ARG, response: ARG2, recordedResponse: recorded, matches: recorded === ARG2 };
     return JSON.stringify(result);
   }
   if (KIND === "CANCEL_ALLIANCE") {

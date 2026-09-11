@@ -28,8 +28,8 @@
     // BEGIN VETTED MET-PLAYER SCOPE
     diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true }; } return m; }) : null,
     // END VETTED MET-PLAYER SCOPE
-    // Proposals still awaiting this seat's answer: the ids the engine would still let it accept.
-    pendingProposals: player ? t(() => { const out = []; for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (!ev || !Number.isInteger(ev.uniqueID) || ev.targetPlayer !== BOUND_PLAYER_ID) continue; const r = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.RESPOND_DIPLOMATIC_ACTION, { ID: ev.uniqueID, Type: DiplomaticResponseTypes.DIPLOMACY_RESPONSE_ACCEPT }, false); if (r && r.Success === true) out.push(ev.uniqueID); } return out; }) : null,
+    // The answer recorded on each proposal aimed at this seat (-1 while unanswered).
+    proposalResponses: player ? t(() => { const m = {}; for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && Number.isInteger(ev.uniqueID) && ev.targetPlayer === BOUND_PLAYER_ID && Number.isInteger(ev.responseType)) m[String(ev.uniqueID)] = ev.responseType; } return m; }) : null,
     influenceBalance: player ? t(() => Math.floor(player.DiplomacyTreasury.diplomacyBalance)) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
     // Neither getNumPromotions nor getTotalPromotionsEarned moves when a promotion is taken (both were

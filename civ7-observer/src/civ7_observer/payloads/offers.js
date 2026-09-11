@@ -609,6 +609,10 @@
       const names = {}; for (const other of metPlayers()) names[other.id] = other.name;
       if (Array.isArray(events)) for (const ev of events) {
         if (!ev || !isInt(ev.uniqueID) || ev.targetPlayer !== BOUND_PLAYER_ID) continue;
+        // An answered event stays in the list and the engine's check keeps accepting a second answer
+        // (live: it did, and the confirm built on it read as unknown); the event's own responseType
+        // is what says whether it has been answered.
+        if (ev.responseType !== DiplomaticResponseTypes.INVALID_RESPONSE) continue;
         for (const [answer, key] of [["accept", "DIPLOMACY_RESPONSE_ACCEPT"], ["reject", "DIPLOMACY_RESPONSE_REJECT"]]) {
           const responseType = DiplomaticResponseTypes[key];
           if (!isInt(responseType)) continue;

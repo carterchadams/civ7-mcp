@@ -1529,10 +1529,11 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
 function withProposal(g, { events = null, answerable = [16], closesAfter = true } = {}) {
   withDiplomacy(g, {});
   g.PlayerOperationTypes = { ...g.PlayerOperationTypes, RESPOND_DIPLOMATIC_ACTION: 9401 };
-  g.DiplomaticResponseTypes = { DIPLOMACY_RESPONSE_ACCEPT: 926305338, DIPLOMACY_RESPONSE_REJECT: 567527351 };
+  g.DiplomaticResponseTypes = { INVALID_RESPONSE: -1, DIPLOMACY_RESPONSE_ACCEPT: 926305338, DIPLOMACY_RESPONSE_REJECT: 567527351 };
   const rows = events ?? [
-    { uniqueID: 16, actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", name: "LOC_OPEN_BORDERS", description: "LOC_OB_DESC", initialPlayer: 0, targetPlayer: 1 },
-    { uniqueID: 17, actionType: 9002, actionTypeName: "DIPLOMACY_ACTION_DENOUNCE", name: "LOC_DENOUNCE", description: "LOC_D_DESC", initialPlayer: 1, targetPlayer: 0 },
+    { uniqueID: 16, actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", name: "LOC_OPEN_BORDERS", description: "LOC_OB_DESC", initialPlayer: 0, targetPlayer: 1, responseType: -1 },
+    { uniqueID: 17, actionType: 9002, actionTypeName: "DIPLOMACY_ACTION_DENOUNCE", name: "LOC_DENOUNCE", description: "LOC_D_DESC", initialPlayer: 1, targetPlayer: 0, responseType: -1 },
+    { uniqueID: 18, actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", name: "LOC_OPEN_BORDERS", description: "LOC_OB_DESC", initialPlayer: 0, targetPlayer: 1, responseType: 926305338 },
   ];
   let open = new Set(answerable);
   g.Game.Diplomacy.getPlayerEvents = (pid) => { g._log.push(`events(${pid})`); return rows; };
@@ -1546,7 +1547,7 @@ function withProposal(g, { events = null, answerable = [16], closesAfter = true 
     sendRequest: (pid, op, args) => {
       if (op !== 9401) return inner.sendRequest(pid, op, args);
       g._log.push(`rsendRequest(${pid},${JSON.stringify(args)})`);
-      if (closesAfter) open.delete(args.ID);
+      if (closesAfter) { const ev = rows.find((r) => r.uniqueID === args.ID); if (ev) ev.responseType = args.Type; }
     },
   };
   return g;
@@ -1560,6 +1561,7 @@ test("each pending proposal aimed at this seat is offered twice, to accept and t
     [[16, 926305338, "accept", "DIPLOMACY_ACTION_OPEN_BORDERS", 0, "LOC_ABBASID", 1],
      [16, 567527351, "reject", "DIPLOMACY_ACTION_OPEN_BORDERS", 0, "LOC_ABBASID", 1]]);
   assert.ok(!rs.some((o) => o.arg === 17), "an event this seat started is not something it answers");
+  assert.ok(!rs.some((o) => o.arg === 18), "an event already answered is not offered again, even though the engine's check still accepts one");
   assert.ok(!log.some((e) => e.startsWith("rsendRequest")));
 });
 
@@ -1568,11 +1570,12 @@ test("perform RESPOND_DIPLOMATIC_ACTION sends the event id and response type, an
   const g = withProposal(withUnits(world({ log }), [])); g._log = log;
   const r = runPerformArgs(g, "RESPOND_DIPLOMATIC_ACTION", 16, 926305338, 0, { pre: 1 });
   assert.equal(r.refused, null);
-  assert.deepEqual(r.readback, { kind: "RESPOND_DIPLOMATIC_ACTION", arg: 16, response: 926305338, stillOpen: false, matches: true });
+  assert.deepEqual(r.readback, { kind: "RESPOND_DIPLOMATIC_ACTION", arg: 16, response: 926305338, recordedResponse: 926305338, matches: true });
   assert.ok(log.find((e) => e.startsWith("rsendRequest(") && e.includes('"ID":16,"Type":926305338')));
   for (const [label, mk, id, type] of [
     ["not pending", () => withProposal(withUnits(world({ log: [] }), [])), 99, 926305338],
     ["seat's own event", () => withProposal(withUnits(world({ log: [] }), [])), 17, 926305338],
+    ["already answered", () => withProposal(withUnits(world({ log: [] }), []), { answerable: [16, 18] }), 18, 926305338],
     ["not accept or reject", () => withProposal(withUnits(world({ log: [] }), [])), 16, 4242],
     ["engine refuses", () => withProposal(withUnits(world({ log: [] }), []), { answerable: [] }), 16, 926305338],
   ]) {
