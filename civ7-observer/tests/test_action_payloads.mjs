@@ -1299,3 +1299,16 @@ test("perform SET_AGE_TRANSITION_DATA refuses until a civilization is chosen, th
   const stale = withAgeTransition(world({ log: [] }), { current: "CIVILIZATION_ABBASID" }); stale._log = [];
   assert.equal(runPerform(stale, "SET_AGE_TRANSITION_DATA", 0, { pre: -1 }).refused.code, "ACTION_EXPIRED");
 });
+
+test("a notification whose own blocking field went stale is not counted once the engine says it no longer blocks", () => {
+  // live (turn 93): CHOOSE_CIVILIZATION kept BlocksTurnAdvancement true after the finish; the per-id query said false
+  const g = withAgeTransition(world({ log: [] }), { current: "CIVILIZATION_ABBASID" }); g._log = [];
+  g.Game.Notifications.getEndTurnBlockingType = () => 23669119;   // UNITS still blocks
+  g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 786, type: 20 }, { owner: 1, id: 790, type: 20 }];
+  g.Game.Notifications.find = (id) => ({ Type: id.id, BlocksTurnAdvancement: true });
+  g.Game.Notifications.getTypeName = (t) => (t === 786 ? "NOTIFICATION_CHOOSE_CIVILIZATION" : "NOTIFICATION_COMMAND_UNITS");
+  g.Game.Notifications.getBlocksTurnAdvancement = (id) => id.id === 790;
+  const r = runOffers(g);
+  assert.deepEqual(r.context.blockingNotifications, ["NOTIFICATION_COMMAND_UNITS"]);
+  assert.equal(r.offers.filter((o) => o.kind === "CHOOSE_AGE_CIVILIZATION" || o.kind === "SET_AGE_TRANSITION_DATA").length, 0, "the transition is not offered again once satisfied");
+});

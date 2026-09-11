@@ -55,7 +55,8 @@
   try {
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
-    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && name) return name; } } } catch (e) { /* fall through to the raw value */ } return String(v); };
+    const blocksNow = (nid, n) => { try { if (typeof Game.Notifications.getBlocksTurnAdvancement === "function") { const b = Game.Notifications.getBlocksTurnAdvancement(nid); if (typeof b === "boolean") return b; } } catch (e) { /* fall back */ } return !!(n && n.BlocksTurnAdvancement === true); };
+    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (blocksNow(nid, n)) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && name) return name; } } } catch (e) { /* fall through to the raw value */ } return String(v); };
     if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
     const blocked = blockingType !== none;
     // The single blocker value can be a category (live: CULTURE while government and traditions were
@@ -64,7 +65,9 @@
     // Live (turn 93): after finishing the age transition the blocker was NONE while the choose-civilization
     // notification object lingered with BlocksTurnAdvancement still true, so the list is only consulted
     // while the engine itself says the turn is blocked.
-    if (blocked) { try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ } }
+    // A notification's own BlocksTurnAdvancement field goes stale (live: the choose-civilization one kept
+    // it after the choice was finished); Game.Notifications.getBlocksTurnAdvancement(id) is the live verdict.
+    if (blocked) { try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (blocksNow(nid, n)) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ } }
     result.context.blockingNotifications = blockingNotifications;
     try { result.context.unitIds = player.Units.getUnits().filter((u) => u && u.id && isInt(u.id.id)).map((u) => u.id.id); } catch (e) { result.context.unitIds = null; }
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
