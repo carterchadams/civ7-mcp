@@ -58,11 +58,22 @@ visible output short: a line per decision saying what you chose and why, and a c
 150 words. The skill cards below are your procedures; the rest of the catalog can be loaded on demand."""
 
 
-def context():
-    """Read-only: who is seated and what turn it is."""
-    with open_game_session(port=9444, timeout=5) as gs:
-        c = gs.context
-        return {"turn": c.turn, "age": c.age, "localPlayerId": c.local_player_id, "localObserverId": c.local_observer_id, "match": c.game_guid}
+def context(attempts: int = 6):
+    """Read-only: who is seated and what turn it is.
+
+    Right after a confirmed end turn the game is handing the seat over, so the context legitimately
+    changes between the doctor probe and the session open. Retry rather than treating it as a fault.
+    """
+    last: Exception | None = None
+    for i in range(attempts):
+        try:
+            with open_game_session(port=9444, timeout=5) as gs:
+                c = gs.context
+                return {"turn": c.turn, "age": c.age, "localPlayerId": c.local_player_id, "localObserverId": c.local_observer_id, "match": c.game_guid}
+        except Exception as exc:  # noqa: BLE001 - a handoff in progress is expected here
+            last = exc
+            time.sleep(0.5 * (i + 1))
+    raise last
 
 
 def brief_for(seat: int, mode: str) -> dict:

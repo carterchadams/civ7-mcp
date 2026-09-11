@@ -312,14 +312,14 @@ class ActionRegistry:
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
-                for k in ("terrainKey", "pathTurns"):
+                for k in ("terrainKey", "pathTurns", "featureKey", "river", "yields"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "FOUND_CITY":
                 if not isinstance(o.get("x"), int) or not isinstance(o.get("y"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "found-city offer without coordinates")
                 rec["arg2"], rec["arg3"] = o["x"], o["y"]
-                for k in ("terrainKey", "reason"):
+                for k in ("terrainKey", "reason", "featureKey", "river", "yields"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "EXPAND_CITY":

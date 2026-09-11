@@ -185,13 +185,15 @@ test("perform SKIP_UNIT refuses an id that is not in the bound roster and never 
 
 // ---- unit move (adjacent, known plots only, never an attack)
 function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [] } = {}) {
+  g.GameInfo.Features = table([{ $hash: 55, FeatureType: "FEATURE_FOREST" }]);
+  g.GameInfo.Yields = [{ $hash: 619730924, YieldType: "YIELD_FOOD" }, { $hash: -1155936758, YieldType: "YIELD_PRODUCTION" }];
   g.Units = { getPathTo: (uid, loc) => { g._log.push(`path(${uid.id},${loc.x},${loc.y})`); return unreachable.some(([ux, uy]) => ux === loc.x && uy === loc.y) ? { plots: [], turns: [], obstacles: [] } : { plots: [1, 2], turns: [1, 1], obstacles: [] }; } };
   g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), SKIP_TURN: 745019656, MOVE_TO: 1477390184 };
   g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
   g.RevealedStates = { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 };
   g.DirectionTypes = { NO_DIRECTION: -1, DIRECTION_NORTHEAST: 0, DIRECTION_EAST: 1, DIRECTION_SOUTHEAST: 2, DIRECTION_SOUTHWEST: 3, DIRECTION_WEST: 4, DIRECTION_NORTHWEST: 5, NUM_DIRECTION_TYPES: 6 };
   const neighbours = (loc, d) => [{ x: loc.x, y: loc.y + 1 }, { x: loc.x + 1, y: loc.y }, { x: loc.x, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y - 1 }, { x: loc.x - 1, y: loc.y }, { x: loc.x - 1, y: loc.y + 1 }][d];
-  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getAdjacentPlotLocation: (loc, d) => { g._log.push(`adj(${loc.x},${loc.y},${d})`); return neighbours(loc, d); }, getRevealedState: (pid, x, y) => { g._log.push(`vis(${pid},${x},${y})`); return hiddenAt.some(([hx, hy]) => hx === x && hy === y) ? 0 : 2; }, getTerrainType: () => 1 };
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getAdjacentPlotLocation: (loc, d) => { g._log.push(`adj(${loc.x},${loc.y},${d})`); return neighbours(loc, d); }, getRevealedState: (pid, x, y) => { g._log.push(`vis(${pid},${x},${y})`); return hiddenAt.some(([hx, hy]) => hx === x && hy === y) ? 0 : 2; }, getTerrainType: () => 1, getFeatureType: (x, y) => (x === 11 && y === 11 ? 55 : -1), isRiver: (x, y) => x === 11 && y === 10, getYield: (x, y, h) => (h === 619730924 ? 2 : 0) };
   g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
   const prev = g.Game.UnitOperations;
   g.Game.UnitOperations = {
@@ -210,6 +212,12 @@ test("move offers cover adjacent known reachable plots only, with canStart(MOVE_
   assert.ok(!moves.some((o) => o.x === 10 && o.y === 11), "plot with an empty native path must not be offered");
   assert.ok(moves.every((o) => o.pathTurns === 1));
   assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.direction >= 0 && o.terrainKey === "TERRAIN_FLAT"));
+  // the plot detail a settling decision needs travels with the move (live friction, turn 34)
+  assert.ok(moves.every((o) => o.yields && o.yields.food === 2 && o.yields.production === undefined), "zero yields are dropped to keep the listing small");
+  const riverMove = moves.find((o) => o.x === 11 && o.y === 10);
+  assert.ok(!riverMove || riverMove.river === true);
+  const forestMove = moves.find((o) => o.x === 11 && o.y === 11);
+  assert.ok(!forestMove || forestMove.featureKey === "FEATURE_FOREST");
   assert.ok(!moves.some((o) => o.x === 11 && o.y === 10), "hidden plot must not be offered");
   const moveChecks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1477390184"));
   assert.equal(moveChecks.length, 4);
@@ -322,7 +330,9 @@ function withFounder(g, units, { foundOk = true, cityAfter = true } = {}) {
   g.Players.get(1).Cities = { getCities: () => cities };
   g.UnitOperationTypes.FOUND_CITY = 1463004268;
   g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
-  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getTerrainType: () => 1 };
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getTerrainType: () => 1, getFeatureType: () => -1, isRiver: () => true, getYield: (x, y, h) => (h === 619730924 ? 3 : 0) };
+  g.GameInfo.Yields = [{ $hash: 619730924, YieldType: "YIELD_FOOD" }];
+  g.GameInfo.Features = table([]);
   const inner = g.Game.UnitOperations;
   g.Game.UnitOperations = {
     canStart: (uid, op, args, show) => op === 1463004268 ? (g._log.push(`ucanStart(${JSON.stringify(uid)},${op},${JSON.stringify(args)},${show})`), { Success: foundOk && uid.owner === 1 && units.some((u) => u.id.id === uid.id && u.type === 7) }) : inner.canStart(uid, op, args, show),
@@ -340,6 +350,7 @@ test("found offers exist only for units the native FOUND_CITY canStart accepts, 
   const found = r.offers.filter((o) => o.kind === "FOUND_CITY");
   assert.deepEqual(found.map((o) => [o.arg, o.x, o.y, o.pre, o.unitId, o.unitTypeKey, o.terrainKey, o.movesRemaining, o.canStart]), [[5, 15, 27, 2715, 5, "UNIT_FOUNDER", "TERRAIN_FLAT", 3, true]]);
   assert.deepEqual(found[0].from, { x: 15, y: 27 });
+  assert.deepEqual([found[0].yields, found[0].river, found[0].featureKey], [{ food: 3 }, true, null]);
   const checks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1463004268"));
   assert.equal(checks.length, 3, "an existence check per owned unit, then a legality check for the settler only");
   assert.ok(checks.every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')));
