@@ -290,3 +290,23 @@ def test_get_unit_options_says_when_a_unit_has_left_the_roster(tmp_path):
     assert gone["present"] is False and gone["count"] == 0 and "no longer in the seat's roster" in gone["note"]
     idle = tool(s, "get_unit_options").fn(unit_id=7)
     assert idle["present"] is True and idle["count"] == 0 and "no legal action this turn" in idle["note"]
+
+
+def test_per_entity_options_are_bounded_and_show_every_distinct_choice_first(tmp_path):
+    """Live (turn 92): one settlement offered 93 options at 52 KB, over the tool's output limit."""
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    many = []
+    for i in range(60):
+        many.append({"kind": "PRODUCE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 400 + i, "x": i, "y": 4, "pre": 0,
+                     "cityId": 65536, "cityName": "al-Fustat", "queue": [], "queueLength": 0, "constructibleKey": "BUILDING_GRANARY",
+                     "displayName": "Granary", "canStart": True})
+    many.append({"kind": "PRODUCE_UNIT", "arg": 65536, "arg2": 100, "pre": 0, "cityId": 65536, "cityName": "al-Fustat",
+                 "queue": [], "queueLength": 0, "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "canStart": True})
+    payload = json.dumps(offers_with(many, end_can_start=False, blocking="PRODUCTION"))
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)]}, journal=tmp_path / "j.jsonl")
+    out = tool(s, "get_city_options").fn(city_id=65536)
+    assert out["count"] == 61 and out["shown"] == 40 and out["omitted"] == 21
+    assert len(json.dumps(out)) < 30000
+    kinds = {o["kind"] for o in out["options"]}
+    assert kinds == {"produce_constructible", "produce_unit"}, "the single unit option must not be crowded out"

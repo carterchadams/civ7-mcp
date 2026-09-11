@@ -33,6 +33,33 @@ MUTATING = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotent
 HOST_STATE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempotentHint=False, openWorldHint=False)   # writes the seat workspace, never the game
 
 
+MAX_ENTITY_OPTIONS = 40
+
+
+def _bounded(options: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
+    """Cap one entity's option list, showing every distinct thing it can do before repeating.
+
+    A settlement offers one option per (building, placement plot), which ran to 93 options and
+    52 KB for one city (live, turn 92) and exceeded the tool's own output limit, so the seat saw
+    an error instead of its choices.
+    """
+    buckets: dict[Any, list[dict[str, Any]]] = {}
+    for option in options:
+        key = (option.get("kind"), option.get("constructibleKey") or option.get("unitTypeKey")
+               or option.get("typeKey") or option.get("resourceKey") or option.get("to") is not None)
+        buckets.setdefault(str(key), []).append(option)
+    chosen: list[dict[str, Any]] = []
+    lists = [list(v) for v in buckets.values()]
+    while lists and len(chosen) < MAX_ENTITY_OPTIONS:
+        for entries in list(lists):
+            if len(chosen) >= MAX_ENTITY_OPTIONS:
+                break
+            chosen.append(entries.pop(0))
+            if not entries:
+                lists.remove(entries)
+    return chosen, len(options) - len(chosen)
+
+
 def default_journal(player: int) -> Path:
     """One journal per seat, in the host state directory next to the shared lock and barrier."""
     return state_dir() / "journals" / f"seat{player}.jsonl"
@@ -246,8 +273,10 @@ def build_server(
             note = "this unit is no longer in the seat's roster; it was lost, disbanded or converted since it was last seen"
         elif present is True and not options:
             note = "this unit is still yours but has no legal action this turn"
+        shown, omitted = _bounded(options)
         return {"unitId": unit_id, "present": present, "note": note, "attachment": listing["attachment"],
-                "count": len(options), "options": options, "reconciliationRequired": listing["reconciliationRequired"]}
+                "count": len(options), "shown": len(shown), "omitted": omitted, "options": shown,
+                "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="get_city_options", description=CITY_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
     def get_city_options(city_id: int) -> dict[str, Any]:
@@ -259,7 +288,11 @@ def build_server(
         if isinstance(listing.get("attachment"), dict):
             last["attachment"] = listing["attachment"]
         options = [o for o in listing["offers"] if o.get("cityId") == city_id]
-        return {"cityId": city_id, "attachment": listing["attachment"], "count": len(options), "options": options,
+        shown, omitted = _bounded(options)
+        return {"cityId": city_id, "attachment": listing["attachment"], "count": len(options), "shown": len(shown),
+                "omitted": omitted, "options": shown,
+                "note": ("one option per building and placement plot; every distinct thing this settlement can do is "
+                         "shown once before any repeats" if omitted else None),
                 "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
