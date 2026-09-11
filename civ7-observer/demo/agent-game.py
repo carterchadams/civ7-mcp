@@ -184,6 +184,9 @@ def wait_for_seat_change(seat: int, turn: int, *, seconds: float = 20.0) -> dict
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--seats", type=int, nargs="+", default=[0, 1, 2, 3])
+    ap.add_argument("--from-current", action="store_true",
+                    help="rotate the seat list so the round starts at whichever seat the game currently has active "
+                         "(so a restart after a stop is always the same command)")
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--mode", default="local-hotseat")
     ap.add_argument("--model", default="sonnet")
@@ -193,9 +196,19 @@ def main() -> int:
     args = ap.parse_args()
     RUNS.mkdir(parents=True, exist_ok=True)
     log = RUNS / "log.jsonl"
+    seats = list(args.seats)
+    if args.from_current:
+        live = context()["localPlayerId"]
+        if live in seats:
+            i = seats.index(live)
+            seats = seats[i:] + seats[:i]
+            print(f"starting at the live seat {live}: {seats}", flush=True)
+        else:
+            print(f"the live seat is {live}, which is not in {seats}; nothing to play", flush=True)
+            return 1
 
     for round_no in range(args.rounds):
-        for seat in args.seats:
+        for seat in seats:
             res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout, raise_curtain=args.raise_curtain)
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
