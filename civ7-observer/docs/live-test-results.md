@@ -262,3 +262,11 @@ across handoffs.
 Still open, as the plan anticipates: automatic curtain detection (the engine switches
 seats before the human dismisses the pass-device screen), pending-operation visibility,
 the `UIDebugger 0` relaunch, and the blank DLC/mod/version fields in the environment table.
+
+## Change 6 review follow-ups (fresh hotseat game, seat 2 = player 1, turn 5)
+
+| test | result |
+|---|---|
+| `get_status` honesty | server bound to player 0 (hotseat): `ready false`, `WRONG_PLAYER`; bound to player 1 (hotseat): `ready true`, eligibility `{mode: local-hotseat, isTurnActive: true}`; bound to player 1 with `--mode singleplayer`: `ready false`, `UNSUPPORTED_GAME_MODE` |
+| demo runner boundary (run 3, `runs/demo-3.txt` + `.transcript.jsonl`) | client init reported `tools: ["mcp__civ7-observer__get_observation"]`, one MCP server connected; exactly one tool call made (`get_observation`); report grounded (Tokyo id 65536 at (21, 38), pop 3, producing a Scout; two scouts by id and coordinate) |
+| runner failure path | with a stub `claude` exiting 17: "demo FAILED: claude exited 17", exit 17, no report file |
