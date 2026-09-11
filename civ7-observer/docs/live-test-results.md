@@ -208,3 +208,13 @@ Ekklesia) between the turn-14 probe and this capture.
 | isolated model demonstration, run 1 | PASS: `claude -p` with only `mcp__civ7-observer__get_observation` allowed and `--strict-mcp-config`; report cites observation id `c2839732…`, turn 16, every settlement/unit by id and coordinate, current/banked/completed research and civics correctly, describes visible terrain by coordinate, lists the omitted features, and states that absence of enemies in the data is not evidence of absence (`runs/demo-1.txt`) |
 | grounding spot-checks on run 1 | population 5 (4 rural + 1 urban), 6 units with ids/locations/moves/damage, Irrigation 0/83 with Wheel queued, Masonry banked 18/83, Discipline depth 2 current with depth 1 completed, Ekklesia banked 16/100, 112 visible tiles, ocean at (0, 36) via horizontal wrap: all match the observation |
 | demonstration, run 2 after a human change | PASS: fresh observation ids (`a2b6c1d1…` via MCP client, `18ab5677…` in the model run); the only differences from the previous observation were Athênai's production going from empty to `WONDER_DUR_SHARRUKIN` (constructible) and the Army Commander 393220 moving (66, 37) → (66, 38) with movement 2/2 → 0/2; every other unit, research, civic and all 112 visible tiles were byte-identical. The model's second report (`runs/demo-2.txt`) shows the wonder in the production column and the commander at (66, 38) with 0 of 2 moves, matching the change without being told what changed |
+
+## Save replacement: fresh hotseat game (seat 1 = player 0, turn 1, no actions)
+
+| test | result |
+|---|---|
+| `doctor` | `IN_GAME`, turn 1, localPlayerId 0, localObserverId 0, same single target |
+| server bound to player 0: `get_status` / `get_observation` | ready; observation turn 1, Antiquity, local-hotseat: no settlements, one `UNIT_FOUNDER` id 65536 at (13, 23) with 3/3 moves, Agriculture current (0 completed), Chiefdom current on the main tree only, 13 visible / 16 revealed / 3375 hidden tiles, 0 warnings |
+| new session identity | new `sessionId`s (`3af37b5f…`, `6acd0700…`) vs the previous game's `0ab1b507…`; nothing from the old game (Athênai, 6 units, 112 tiles) appears |
+| server bound to player 1 (negative) | `WRONG_PLAYER`, no data |
+| open question from the previous game | the human believed a hoplite had been moved before demo run 2, but both captures showed it at (65, 37) with 0 of 2 moves; it could not have moved that turn, and a queued order would not show because the observation does not read `hasPendingOperations` / `operationQueueSize`. Consider exporting pending-operation flags in a later change so "ordered but not yet moved" is visible |
