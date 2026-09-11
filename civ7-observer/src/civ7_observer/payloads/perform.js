@@ -258,6 +258,25 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "DISBAND_UNIT") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "disband argument is not an integer");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.DELETE)) return refuse("API_CONTRACT_MISMATCH", "UnitCommandTypes.DELETE unavailable");
+    let doomed = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { doomed = u; break; } } } catch (e) { doomed = null; }
+    if (!doomed) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    let rosterBefore = null; try { rosterBefore = player.Units.getUnits().length; } catch (e) { rosterBefore = null; }
+    if (rosterBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's units changed since the disband was offered");
+    const unitId = doomed.id;
+    const delArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    const dcheck = Game.UnitCommands.canStart(unitId, UnitCommandTypes.DELETE, delArgs, false);
+    if (!dcheck || dcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the disband");
+    Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.DELETE, delArgs);
+    result.outcome = "sent";
+    let gone = null;
+    try { gone = player.Units.getUnits().every((u) => !u || !u.id || u.id.id !== ARG); } catch (e) { gone = null; }
+    result.readback = { kind: KIND, arg: ARG, unitsBefore: PRE, gone: gone, matches: gone === true };
+    return JSON.stringify(result);
+  }
   if (KIND === "START_DIPLOMATIC_ACTION") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "diplomacy arguments are not integers");
     if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");

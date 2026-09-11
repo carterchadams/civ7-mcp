@@ -360,6 +360,20 @@
           cost: cost, turns: turns, currentTarget: held, canStart: true });
       }
     }
+    // Disbanding a unit destroys it outright. The engine flags the command as needing confirmation and
+    // supplies its own warning text, both of which ride along so the seat cannot take it by accident.
+    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.DELETE)) {
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const check = Game.UnitCommands.canStart(u.id, UnitCommandTypes.DELETE, { X: -9999, Y: -9999, UnitAbilityType: -1 }, false);
+        if (!check || check.Success !== true) continue;
+        const warning = Array.isArray(check.ConfirmDialogBody) ? check.ConfirmDialogBody.filter((b) => typeof b === "string") : [];
+        offers.push({ kind: "DISBAND_UNIT", arg: u.id.id, pre: player.Units.getUnits().length, unitId: u.id.id,
+          unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+          from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+          destructive: true, requiresConfirmation: check.RequiresConfirmation === true, warning: warning, canStart: true });
+      }
+    }
     // ---- diplomacy
     // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
     // this is the one place the payload looks past the bound player. The scope is exactly the shipped

@@ -83,6 +83,7 @@ DECISION_OF_KIND = {
     "move_unit": "unit",
     "make_trade_route": "unit",
     "unit_order": "unit",
+    "disband_unit": "unit",
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
@@ -114,7 +115,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
+                 "destructive", "requiresConfirmation", "warning", "guidance", "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",

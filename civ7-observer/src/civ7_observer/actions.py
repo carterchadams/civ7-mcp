@@ -17,7 +17,16 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
+# Shown on every destructive offer and repeated in the refusal when the confirmation is missing. It
+# says what is lost, because a seat weighing the option needs the cost, not a scolding.
+DISBAND_GUIDANCE = (
+    "Disbanding destroys this unit permanently. It is almost never the right move: the unit's "
+    "production and any promotions it earned are gone for nothing, and a unit with no use this turn "
+    "can simply be told to fortify, sleep or heal instead. Disband only to escape a gold or happiness "
+    "upkeep the seat genuinely cannot pay, or to clear a unit that can never act again."
+)
+
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -397,6 +406,12 @@ class ActionRegistry:
                 for k in ("typeKey", "displayName", "tree", "cost", "turns", "currentTarget"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "DISBAND_UNIT":
+                rec["requiresConfirmation"] = True
+                for k in ("unitId", "unitTypeKey", "from", "destructive", "requiresConfirmation", "warning"):
+                    if k in o:
+                        entry[k] = o[k]
+                entry["guidance"] = DISBAND_GUIDANCE
             if kind == "START_DIPLOMATIC_ACTION":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "diplomatic offer without an action type")
@@ -489,11 +504,11 @@ class ActionRegistry:
                 "unitIds": unit_ids if isinstance(unit_ids, list) else None, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform
-    def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str) -> dict[str, Any]:
+    def perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False) -> dict[str, Any]:
         with self._locked():
-            return self._perform(gs, action_id=action_id, request_id=request_id, player=player, mode=mode)
+            return self._perform(gs, action_id=action_id, request_id=request_id, player=player, mode=mode, confirm=confirm)
 
-    def _perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str) -> dict[str, Any]:
+    def _perform(self, gs: GameSession, *, action_id: str, request_id: str, player: int, mode: str, confirm: bool = False) -> dict[str, Any]:
         _bind_ok(gs, player)
         if not isinstance(request_id, str) or not REQUEST_ID.match(request_id):
             raise ObserverError("INVALID_REQUEST_ID", "request id must be 1-64 chars of [A-Za-z0-9._-]")
@@ -516,6 +531,10 @@ class ActionRegistry:
             raise ObserverError("ACTION_EXPIRED", "the offer was made on a different turn, match or attachment generation; request fresh offers")
         if not offer["canStart"]:
             raise ObserverError("ACTION_NOT_STARTABLE", "the offer was not startable when enumerated; request fresh offers")
+        # Destroying something the seat owns is not an ordinary move, so it is refused unless the
+        # caller asks for it in as many words. The engine raises the same flag on its own command.
+        if offer.get("requiresConfirmation") and confirm is not True:
+            raise ObserverError("CONFIRMATION_REQUIRED", DISBAND_GUIDANCE + " Pass confirm=true to this call if that is really what you want.")
         base = self._base(action_id, request_id, player)
         self._reserve_and_journal(base)
         expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"],
@@ -635,6 +654,10 @@ class ActionRegistry:
                     held = rb.get("techTargetNode" if kind == "SET_TECH_TREE_TARGET_NODE" else "civicTargetNode")
                     if isinstance(held, int) and not isinstance(held, bool) and held == offer["arg"]:
                         effect = {"treeGoal": {"kind": PUBLIC_KIND[kind], "node": offer["arg"]}}
+                elif kind == "DISBAND_UNIT":
+                    locs = rb.get("unitLocations")
+                    if isinstance(locs, dict) and str(offer["arg"]) not in locs:
+                        effect = {"unitDisbanded": {"unitId": offer["arg"]}}
                 elif kind == "START_DIPLOMATIC_ACTION":
                     # Influence, like gold, only moves on a mutation within a turn, so a lighter
                     # balance is the positive effect. Free actions are never offered for this reason.

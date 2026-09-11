@@ -1012,7 +1012,9 @@ test("promotion offers pair each earnable promotion with its discipline, carryin
   const pr = r.offers.filter((o) => o.kind === "PROMOTE_UNIT");
   assert.deepEqual(pr.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.unitId, o.discipline, o.disciplineName, o.typeKey, o.displayName, o.description, o.commendation, o.promotionsEarned, o.promotionPoints, o.unitLevel, o.canStart]),
     [[5, 7101, 8101, 0, 5, "DISCIPLINE_X", "LOC_DX", "PROMOTION_A", "LOC_PA", "LOC_PA_D", false, 0, 1, 2, true]]);
-  assert.ok(log.filter((e) => e.startsWith("pcanStart(")).every((e) => e.includes('"PromotionType":7101,"PromotionDisciplineType":8101')), "hashes only, never type strings");
+  const promoChecks = log.filter((e) => e.startsWith("pcanStart(") && e.includes("PromotionType"));
+  assert.ok(promoChecks.length > 0 && promoChecks.every((e) => e.includes('"PromotionType":7101,"PromotionDisciplineType":8101')), "hashes only, never type strings");
+  assert.ok(!log.some((e) => e.startsWith("pcanStart(") && /"PROMOTION_|"DISCIPLINE_/.test(e)), "a type string must never reach the native check");
   assert.ok(!log.some((e) => e.startsWith("psendRequest")));
   const none = withPromotions(world({ log: [] }), { canPromote: false }); none._log = [];
   assert.equal(runOffers(none).offers.filter((o) => o.kind === "PROMOTE_UNIT").length, 0, "a unit that cannot promote is never queried");
@@ -1208,6 +1210,64 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   }
   const none = withPurchase(withUnits(world({ log: [] }), []), { unitsAfter: 0 }); none._log = [];
   const rr = runPerformArgs(none, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
+// ---- disbanding a unit (destructive; the engine raises its own confirmation flag)
+function withDisband(g, { deletable = [5], gone = true } = {}) {
+  g.UnitCommandTypes = { ...(g.UnitCommandTypes || {}), DELETE: 6660 };
+  const me = g.Players.get(1);
+  const inner = g.Game.UnitCommands;
+  g.Game.UnitCommands = {
+    canStart: (uid, cmd, args, show) => {
+      if (cmd !== 6660) return inner ? inner.canStart(uid, cmd, args, show) : { Success: false };
+      g._log.push(`delcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`);
+      return deletable.includes(uid.id)
+        ? { Success: true, RequiresConfirmation: true, ConfirmDialogBody: ["Are you sure you want to delete Scout?"] }
+        : { Success: false };
+    },
+    sendRequest: (uid, cmd, args) => {
+      if (cmd !== 6660) return inner ? inner.sendRequest(uid, cmd, args) : undefined;
+      g._log.push(`delsendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`);
+      if (gone) { const kept = me.Units.getUnits().filter((u) => u.id.id !== uid.id); me.Units = { getUnits: () => kept }; }
+    },
+  };
+  return g;
+}
+
+test("a disband offer carries the engine's own confirmation flag and warning text", () => {
+  const log = [];
+  const g = withDisband(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const dis = runOffers(g).offers.filter((o) => o.kind === "DISBAND_UNIT");
+  assert.deepEqual(dis.map((o) => [o.arg, o.unitId, o.destructive, o.requiresConfirmation, o.warning, o.pre]),
+    [[5, 5, true, true, ["Are you sure you want to delete Scout?"], 1]]);
+  assert.ok(!log.some((e) => e.startsWith("delsendRequest")), "enumeration must never disband anything");
+});
+
+test("perform DISBAND_UNIT removes the unit and reads back that it is gone", () => {
+  const log = [];
+  const g = withDisband(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const r = runPerformArgs(g, "DISBAND_UNIT", 5, 0, 0, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "DISBAND_UNIT", arg: 5, unitsBefore: 1, gone: true, matches: true });
+  assert.ok(log.find((e) => e.startsWith("delsendRequest(") && e.includes("6660")));
+  assert.ok(log.find((e) => e.startsWith("delsendRequest(") && e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')), "the shipped no-target argument shape");
+});
+
+test("perform DISBAND_UNIT refuses an unknown unit, a changed roster and a refused check without sending", () => {
+  for (const [label, mk, uid, pre] of [
+    ["unknown unit", () => withDisband(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 9, 1],
+    ["roster changed", () => withDisband(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 5, 4],
+    ["canStart false", () => withDisband(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { deletable: [] }), 5, 1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "DISBAND_UNIT", uid, 0, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("delsendRequest")), `${label}: must not send`);
+  }
+  const stays = withDisband(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { gone: false }); stays._log = [];
+  const rr = runPerformArgs(stays, "DISBAND_UNIT", 5, 0, 0, { pre: 1 });
   assert.equal(rr.outcome, "sent");
   assert.equal(rr.readback.matches, false);
 });

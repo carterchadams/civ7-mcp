@@ -1064,6 +1064,79 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
+                 "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
+
+
+def test_a_disband_offer_is_marked_destructive_and_carries_guidance_the_seat_can_read(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [DISBAND_OFFER]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "disband_unit")
+    assert d["destructive"] is True and d["requiresConfirmation"] is True
+    assert d["warning"] == ["Are you sure you want to delete Scout?"]
+    assert "almost never the right move" in d["guidance"]
+    assert "fortify, sleep or heal" in d["guidance"]
+
+
+def test_a_destructive_action_is_refused_without_an_explicit_confirmation_and_nothing_is_sent(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [DISBAND_OFFER]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "disband_unit")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=d["actionId"], request_id="dis-1", player=1, mode="singleplayer")
+    assert info.value.code == "CONFIRMATION_REQUIRED"
+    assert "confirm=true" in info.value.message
+    # the refusal happens before anything is rendered or dispatched
+    assert all("perform" not in json.dumps(sent) for sock in f.all_sockets for sent in sock.sent[3:])
+
+
+def test_a_confirmed_disband_goes_through_and_confirms_on_the_unit_leaving_the_roster(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [DISBAND_OFFER]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "DISBAND_UNIT", "arg": 5, "unitsBefore": 3, "gone": False, "matches": False}}
+    rb = {**RB, "unitLocations": {"6": [1, 1]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "disband_unit")
+        res = reg.perform(gs, action_id=d["actionId"], request_id="dis-2", player=1, mode="singleplayer", confirm=True)
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitDisbanded": {"unitId": 5}}
+
+
+def test_a_disbanded_unit_still_on_the_map_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [DISBAND_OFFER]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "DISBAND_UNIT", "arg": 5, "unitsBefore": 3, "gone": False, "matches": False}}
+    rb = {**RB, "unitLocations": {"5": [10, 10]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "disband_unit")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=d["actionId"], request_id="dis-3", player=1, mode="singleplayer", confirm=True)
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_an_ordinary_action_needs_no_confirmation(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_NODE", "arg": 701, "observedType": 701, "matches": True}}
+    rb = {**RB, "techResearching": 701}
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        r = next(o for o in out["offers"] if o["kind"] == "research")
+        assert "requiresConfirmation" not in r
+        res = reg.perform(gs, action_id=r["actionId"], request_id="ok-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+
+
 def test_a_city_project_confirms_on_the_queue_position_it_was_offered(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PRODUCE_PROJECT", "arg": 65536, "arg2": 301, "pre": 1, "cityId": 65536, "cityName": "Pārsa", "typeKey": "PROJECT_CITY_SCIENCE_PROJECT", "displayName": "Scientific Research", "description": "science in this city", "turns": 6, "queue": ["BUILDING_GRANARY"], "queueLength": 1, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PRODUCE_PROJECT", "arg": 65536, "projectType": 301, "queuedAt": 1, "queueLength": 1, "matches": False}}

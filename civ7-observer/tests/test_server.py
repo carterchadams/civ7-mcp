@@ -162,7 +162,9 @@ def test_acting_server_exposes_the_action_tools_with_honest_annotations(tmp_path
     perform = tool(s, "perform_action")
     assert perform.annotations.readOnlyHint is False and perform.annotations.idempotentHint is True
     assert perform.annotations.openWorldHint is False
-    assert set(perform.parameters["properties"]) == {"action_id", "request_id"}
+    # `confirm` is the gate on destructive offers; it defaults to false so an ordinary call is unchanged.
+    assert set(perform.parameters["properties"]) == {"action_id", "request_id", "confirm"}
+    assert "confirm" not in perform.parameters.get("required", [])
     for read_only in ("get_turn_brief", "list_actions", "get_observation", "get_status"):
         assert tool(s, read_only).annotations.readOnlyHint is True
     assert tool(s, "get_turn_brief").parameters.get("properties", {}) == {}
