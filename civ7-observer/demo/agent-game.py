@@ -27,6 +27,7 @@ from pathlib import Path
 from civ7_observer.actions import ActionRegistry
 from civ7_observer.attachment import state_dir
 from civ7_observer.brief import build_brief
+from civ7_observer.curtain import tidy
 from civ7_observer.runner import assemble_system_prompt
 from civ7_observer.server import default_journal
 from civ7_observer.service import open_game_session
@@ -90,13 +91,23 @@ def journal_rows(seat: int) -> list[dict]:
     return [json.loads(l) for l in path.read_text(encoding="utf-8").splitlines() if l.strip()]
 
 
-def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float) -> dict:
+def tidy_curtains(*, raise_curtain: bool) -> dict:
+    """UI only: drop stale curtain instances (or all of them when watching) and confirm the advisor popup."""
+    with open_game_session(port=9444, timeout=5) as gs:
+        return tidy(gs, mode="raise" if raise_curtain else "prune")
+
+
+def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float, raise_curtain: bool = False) -> dict:
     ctx = context()
     turn = ctx["turn"]
     tag = f"t{turn}-seat{seat}"
     summary: dict = {"seat": seat, "turn": turn, "match": ctx["match"], "tag": tag, "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}
     if ctx["localPlayerId"] != seat or ctx["localObserverId"] != seat:
         return {**summary, "status": "wrong_seat", "context": ctx}
+    try:
+        summary["curtain"] = tidy_curtains(raise_curtain=raise_curtain)
+    except Exception as exc:  # noqa: BLE001 - a UI tidy-up failure must not stop the seat
+        summary["curtain"] = {"error": str(exc)}
 
     brief = brief_for(seat, mode)
     if brief.get("pause"):
@@ -178,16 +189,19 @@ def main() -> int:
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--budget-usd", type=float, default=1.5, help="per seat-turn spend cap passed to claude")
     ap.add_argument("--timeout", type=float, default=1200.0, help="per seat-turn wall clock cap in seconds")
+    ap.add_argument("--raise-curtain", action="store_true", help="remove the hotseat curtain before each seat turn so play can be watched (default: only stale curtains are pruned)")
     args = ap.parse_args()
     RUNS.mkdir(parents=True, exist_ok=True)
     log = RUNS / "log.jsonl"
 
     for round_no in range(args.rounds):
         for seat in args.seats:
-            res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout)
+            res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout, raise_curtain=args.raise_curtain)
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
+            cur = res.get("curtain") or {}
             line = (f"[{res['tag']}] {res['status']}"
+                    + (f" (curtains {cur.get('curtainsBefore')}->{cur.get('curtainsAfter')}" + (", advisor popup confirmed" if (cur.get('advisorPopup') or {}).get('confirmed') else "") + ")" if cur and "curtainsBefore" in cur else "")
                     + (f" in {res['elapsedS']}s, ${res.get('costUsd') or 0:.2f}, tools {res['toolCalls']}, receipts "
                        f"{[(r['kind'], r['status']) for r in res['receipts']]}, friction {len(res['friction'])}" if "elapsedS" in res else ""))
             print(line, flush=True)

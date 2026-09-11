@@ -24,7 +24,8 @@ observation-only any more: `act perform` mutates the running game.
 | seat sessions over MCP: `demo/agent-game.py` plays every seat of a hotseat game with one isolated `claude -p` session per seat turn | working, live (4 agent seats, consecutive turns under the curtain) |
 | skill cards generated from the strategy guide, routed per decision; plan and friction tools over MCP | working, live |
 | per-seat plan and friction backlog (`friction`) | working, live |
-| scheduler inside the game (watching for a seat's turn, driving the curtain) | **not implemented**; the driver sequences seats from outside by reading the seat context |
+| scheduler inside the game (watching for a seat's turn) | **not implemented**; the driver sequences seats from outside by reading the seat context |
+| hotseat curtain handling (`curtain prune` / `curtain raise`, `agent-game.py --raise-curtain`): UI-only removal of stale curtain instances or all of them, and confirming the advisor popup with nothing followed | working, live (17 stale instances removed after five all-agent turns) |
 | in-game mod, remote seats, containers | **not implemented, deferred** (see release scope) |
 
 ## Commands
@@ -37,6 +38,7 @@ python -m civ7_observer serve    --player N --mode MODE [--allow-actions] [--jou
 python -m civ7_observer act      {list|perform|result|reconcile|rebind} --player N --mode MODE [...]
 python -m civ7_observer play     --player N --mode MODE [--model ID] [--max-tool-calls K] [--workspace DIR]
 python -m civ7_observer friction --player N [--kind KIND] [--workspace DIR]
+python -m civ7_observer curtain  {prune|raise} [--json]                      # hotseat UI tidy-up, sends no engine operation
 ```
 
 `play` runs one turn of the bound seat with a model and exits 0 only if the turn was ended. It

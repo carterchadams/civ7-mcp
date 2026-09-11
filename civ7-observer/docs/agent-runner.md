@@ -90,8 +90,18 @@ look. Runs go to `runs/agent-game/` (`log.jsonl`, and per seat turn the system p
 stream-json transcript and the closing report).
 
 ```
-python demo/agent-game.py --seats 0 1 2 3 --rounds 5 --model sonnet
+python demo/agent-game.py --seats 0 1 2 3 --rounds 5 --model sonnet [--raise-curtain]
 ```
+
+Before every seat turn the driver tidies the hotseat UI (`curtain.tidy`, a UI-only payload that
+sends no engine operation): the stock curtain component mounts one instance per turn activation and
+only a human click removes it, so stale instances are pruned to the newest one, and with
+`--raise-curtain` every instance is removed so the seat's play can be watched on screen. The advisor
+council popup, when present, is confirmed with nothing followed, the way its Confirm button would be.
+
+Production offers are enqueue requests: the game's BUILD operation appends to the city's build queue
+(live: three Warriors stacked before this was understood), so each offer carries the city's current
+`queue`, its precondition is the queue length, and the brief says so on the production decision.
 
 ## What this does not do
 

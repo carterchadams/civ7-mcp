@@ -179,3 +179,25 @@ service the CLI uses, receipts came back, and control returned to the human at t
 **Cost note:** the cached input dominates because a general-purpose client resends its whole system
 prompt each model turn. A purpose-built runner sending only the brief and a short skill card should
 be far cheaper; that measurement is still missing.
+
+## Agent-vs-agent hotseat game (2026-09-10/11, match F7AAFEF3…, four agent seats)
+
+Every seat is played by an isolated `claude -p --model sonnet` session through one MCP server bound
+to that seat (`demo/agent-game.py`); no human touches the game, and the curtain stays up for every
+seat. The driver stops at the first pause so the missing action can be added; each stop below is an
+action that entered the catalog during the game.
+
+| turn / seat | result |
+|---|---|
+| t1 all seats | every seat ended its turn: three founded in place (`found_city`, added before the game), seat 2 moved its founder; 18–54 s and $0.08–0.18 per seat turn; no friction |
+| t2 seat 2 | founder stood on a navigable-river tile: no `found_city` offer, seat skipped and filed `missing_action`. Fix: settler-class units are listed even when founding is refused, and the brief shows them as `settle` entities with `canFoundHere: false` and a note |
+| t3 seat 0 | **pause**: blocker `NEW_POPULATION`. Added `expand_city`; the seat then placed its population (farm at 16,28) and ended the turn |
+| t3 seat 2 | moved off the river, filed `missing_information` asking for a refusal reason (already provided by the fix above) |
+| t4 seat 2 | founded its capital |
+| t5 seat 1 | **pause**: blocker `-2084516792`, absent from `EndTurnBlockingTypes`; the bound player's blocking notification was `NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION` (story "Merciless Mercenaries", two answers). Blockers are now named after that notification and `narrative_choice` was added |
+| cost so far | turns 1–5, 17 seat turns: about $2.30 total, 14–58 s per seat turn |
+
+Also added during the game without a live blocker yet: `produce_constructible` (cities could only
+build units), `activate_tradition` / `confirm_traditions` (TRADITIONS, from the shipped policies
+screen and a live read of the culture API). The curtain lifecycle across consecutive agent seats
+held for every seat handoff so far.

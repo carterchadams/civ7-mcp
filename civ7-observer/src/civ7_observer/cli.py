@@ -96,6 +96,13 @@ def _build_parser() -> argparse.ArgumentParser:
     pl.add_argument("--json", action="store_true")
     pl.add_argument("-v", "--verbose", action="store_true")
 
+    cu = sub.add_parser("curtain", help="hotseat UI tidy-up: prune stale curtain instances, or raise them all to watch play; confirms the advisor popup")
+    cu.add_argument("verb", choices=["prune", "raise"])
+    cu.add_argument("--port", type=int, default=DEFAULT_PORT)
+    cu.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT)
+    cu.add_argument("--target-id", default=None)
+    cu.add_argument("--json", action="store_true")
+    cu.add_argument("-v", "--verbose", action="store_true")
     fr = sub.add_parser("friction", help="what a seat could not do: the backlog its agent reported")
     fr.add_argument("--player", type=int, required=True)
     fr.add_argument("--workspace", type=Path, default=None)
@@ -252,6 +259,13 @@ def main(argv: list[str] | None = None) -> int:
         return _run_play(args)
     if args.command == "friction":
         return _run_friction(args)
+    if args.command == "curtain":
+        from civ7_observer.curtain import tidy
+        try:
+            with open_game_session(port=args.port, timeout=args.timeout, target_id=args.target_id) as gs:
+                return _emit(args, {"ok": True, **tidy(gs, mode=args.verb)}, 0)
+        except (ObserverError, cdp.CdpError) as exc:
+            return _emit(args, {"ok": False, "error": exc.to_dict()}, 1)
     if args.command == "serve":
         from civ7_observer.server import serve
         return serve(port=args.port, timeout=args.timeout, player=args.player, mode=args.mode, target_id=args.target_id,

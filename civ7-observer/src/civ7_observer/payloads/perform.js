@@ -143,7 +143,8 @@
     if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
     const crow = GameInfo.Constructibles.lookup(ARG2);
     if (!crow || typeof crow.ConstructibleType !== "string") return refuse("UNKNOWN_ACTION", "type is not a constructible definition");
-    if (!city.BuildQueue || city.BuildQueue.currentProductionTypeHash !== PRE) return refuse("ACTION_EXPIRED", "city production changed since the build was offered");
+    const queueBefore = city.BuildQueue && typeof city.BuildQueue.getQueue === "function" ? city.BuildQueue.getQueue() : null;
+    if (!Array.isArray(queueBefore) || queueBefore.length !== PRE) return refuse("ACTION_EXPIRED", "the city's build queue changed since the build was offered");
     const ploc = GameplayMap.getLocationFromIndex(ARG3);
     if (!ploc || !isInt(ploc.x) || !isInt(ploc.y) || ploc.x < 0 || GameplayMap.getIndexFromXY(ploc.x, ploc.y) !== ARG3) return refuse("ACTION_NOT_STARTABLE", "placement plot is not a valid map plot");
     const cityId = city.id;
@@ -152,9 +153,9 @@
     if (!bcheck || bcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the build on that plot");
     Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs);
     result.outcome = "sent";
-    let observed = null;
-    try { observed = city.BuildQueue.currentProductionTypeHash; } catch (e) { observed = null; }
-    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, observedType: isInt(observed) ? observed : null, matches: observed === ARG2 };
+    let after = null; try { after = city.BuildQueue.getQueue(); } catch (e) { after = null; }
+    const queuedC = Array.isArray(after) && after.length > PRE && after[PRE] && after[PRE].type === ARG2;
+    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
   if (KIND === "PRODUCE_UNIT") {
@@ -165,16 +166,17 @@
     if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
     const row = GameInfo.Units.lookup(ARG2);
     if (!row || typeof row.UnitType !== "string") return refuse("UNKNOWN_ACTION", "unit type is not a unit definition");
-    if (!city.BuildQueue || city.BuildQueue.currentProductionTypeHash !== PRE) return refuse("ACTION_EXPIRED", "city production changed since the build was offered");
+    const uqueue = city.BuildQueue && typeof city.BuildQueue.getQueue === "function" ? city.BuildQueue.getQueue() : null;
+    if (!Array.isArray(uqueue) || uqueue.length !== PRE) return refuse("ACTION_EXPIRED", "the city's build queue changed since the build was offered");
     const cityId = city.id;
     const buildArgs = { UnitType: ARG2 };
     const bcheck = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
     if (!bcheck || bcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the build");
     Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs);
     result.outcome = "sent";
-    let observed = null;
-    try { observed = city.BuildQueue.currentProductionTypeHash; } catch (e) { observed = null; }
-    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, observedType: isInt(observed) ? observed : null, matches: observed === ARG2 };
+    let uafter = null; try { uafter = city.BuildQueue.getQueue(); } catch (e) { uafter = null; }
+    const queuedU = Array.isArray(uafter) && uafter.length > PRE && uafter[PRE] && uafter[PRE].type === ARG2;
+    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, queuedAt: PRE, queueLength: Array.isArray(uafter) ? uafter.length : null, matches: queuedU };
     return JSON.stringify(result);
   }
   if (KIND === "CHANGE_TRADITION") {

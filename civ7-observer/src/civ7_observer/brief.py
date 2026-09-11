@@ -53,9 +53,12 @@ DECISION_OF_KIND = {
 OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "turns",
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
-                 "constructibleKey", "constructibleClass", "placement", "plotIndex",
+                 "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable")
+
+PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
+                   "order); a city with a non-empty queue needs no production action this turn")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")
@@ -127,6 +130,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         if decision is None:
             continue
         group = group_for(decision)
+        if decision == "production":
+            group["note"] = PRODUCTION_NOTE
         group["optionCount"] += 1
         if len(group["options"]) < max_options:
             group["options"].append(_option(offer))

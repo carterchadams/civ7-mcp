@@ -160,7 +160,13 @@
       for (const c of cities) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
         const cityId = c.id;
-        const ppre = c.BuildQueue && isInt(c.BuildQueue.currentProductionTypeHash) ? c.BuildQueue.currentProductionTypeHash : -1;
+        // BUILD appends to the city's queue (live: three Warriors stacked up before this was
+        // understood), so the offer is an enqueue: precondition = queue length, and the queue is shown.
+        const queueItems = c.BuildQueue && typeof c.BuildQueue.getQueue === "function" ? c.BuildQueue.getQueue() : null;
+        if (!Array.isArray(queueItems)) throw new Error("BuildQueue.getQueue() is not an array");
+        const ppre = queueItems.length;
+        const typeKeyOf = (h) => lookupKey(GameInfo.Units, h, "UnitType") || lookupKey(GameInfo.Constructibles, h, "ConstructibleType") || (GameInfo.Projects ? lookupKey(GameInfo.Projects, h, "ProjectType") : null) || (isInt(h) ? String(h) : null);
+        const queueKeys = queueItems.map((it) => (it && isInt(it.type) ? typeKeyOf(it.type) : null));
         const cost = (fn, hash) => { try { const v = c.Production && typeof c.Production[fn] === "function" ? c.Production[fn](hash) : null; return isInt(v) ? v : null; } catch (e) { return null; } };
         const turnsFor = (hash) => { try { const v = c.BuildQueue && typeof c.BuildQueue.getTurnsLeft === "function" ? c.BuildQueue.getTurnsLeft(hash) : null; return isInt(v) ? v : null; } catch (e) { return null; } };
         for (const row of GameInfo.Units) {
@@ -168,7 +174,7 @@
           const buildArgs = { UnitType: row.$hash };
           const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
           if (!check || check.Success !== true) continue;   // only buildable units are offered
-          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
+          offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name), queue: queueKeys, queueLength: ppre,
             unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
             cost: cost("getUnitProductionCost", row.$hash), turns: turnsFor(row.$hash), canStart: true });
         }
@@ -189,7 +195,7 @@
                 const buildArgs = { ConstructibleType: row.$hash, X: loc.x, Y: loc.y };
                 const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
                 if (!check || check.Success !== true) continue;
-                offers.push({ kind: "PRODUCE_CONSTRUCTIBLE", arg: c.id.id, arg2: row.$hash, arg3: pi, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
+                offers.push({ kind: "PRODUCE_CONSTRUCTIBLE", arg: c.id.id, arg2: row.$hash, arg3: pi, pre: ppre, cityId: c.id.id, cityName: compose(c.name), queue: queueKeys, queueLength: ppre,
                   constructibleKey: row.ConstructibleType, constructibleClass: typeof row.ConstructibleClass === "string" ? row.ConstructibleClass : null,
                   displayName: typeof row.Name === "string" ? compose(row.Name) : null, cost: cost("getConstructibleProductionCost", row.$hash), turns: turnsFor(row.$hash),
                   x: loc.x, y: loc.y, plotIndex: pi, placement: placement, terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),

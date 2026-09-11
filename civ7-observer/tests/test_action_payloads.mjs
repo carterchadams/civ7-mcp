@@ -39,7 +39,7 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
   };
 }
 const renderOffers = (id, mode) => offersRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
-const PRE_DEFAULT = { SET_TECH_TREE_NODE: 701, SET_CULTURE_TREE_NODE: -1, END_TURN: 0, SKIP_UNIT: 2, MOVE_UNIT: 1010, PRODUCE_UNIT: -1 };
+const PRE_DEFAULT = { SET_TECH_TREE_NODE: 701, SET_CULTURE_TREE_NODE: -1, END_TURN: 0, SKIP_UNIT: 2, MOVE_UNIT: 1010, PRODUCE_UNIT: 0, PRODUCE_CONSTRUCTIBLE: 0 };
 const renderPerform = (id, mode, kind, arg, turn, age, arg2 = 0, arg3 = 0, pre = PRE_DEFAULT[kind] ?? 0, match = "ABCDEF0123456789") => performRaw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("OP_KIND", JSON.stringify(kind)).replaceAll("OP_ARG2", String(arg2)).replaceAll("OP_ARG3", String(arg3)).replaceAll("OP_ARG", String(arg)).replaceAll("EXPECTED_TURN", String(turn)).replaceAll("EXPECTED_AGE", String(age)).replaceAll("EXPECTED_GUID", JSON.stringify(match)).replaceAll("OP_PRE", String(pre));
 const runPerformArgs = (g, kind, arg, arg2, arg3, { id = 1, mode = "singleplayer", turn = 10, age = 4242, pre, match } = {}) => JSON.parse(vm.runInContext(renderPerform(id, mode, kind, arg, turn, age, arg2, arg3, pre, match), vm.createContext({ ...g }), { timeout: 2000 }));
 const runOffers = (g, id = 1, mode = "singleplayer") => JSON.parse(vm.runInContext(renderOffers(id, mode), vm.createContext({ ...g }), { timeout: 2000 }));
@@ -251,14 +251,14 @@ test("perform MOVE_UNIT refuses non-adjacent, hidden, unknown-unit and canStart-
 
 // ---- produce unit (city production, units only; constructibles need placement and are deferred)
 function withCity(g, { buildable = [99, 100], sentTo = null } = {}) {
-  const city = { id: { owner: 1, id: 65536, type: 1 }, owner: 1, name: "LOC_C", location: { x: 3, y: 4 }, isTown: false, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true } };
+  const city = { id: { owner: 1, id: 65536, type: 1 }, owner: 1, name: "LOC_C", location: { x: 3, y: 4 }, isTown: false, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true, _q: [], getQueue() { return this._q.slice(); } } };
   g.Players.get(1).Cities = { getCities: () => [city] };
   g.GameInfo.Units = table([{ $hash: 99, UnitType: "UNIT_SCOUT", Name: "LOC_SCOUT", CoreClass: "CORE_CLASS_RECON" }, { $hash: 100, UnitType: "UNIT_WARRIOR", Name: "LOC_WARRIOR", CoreClass: "CORE_CLASS_MILITARY" }, { $hash: 101, UnitType: "UNIT_GALLEY", Name: "LOC_GALLEY", CoreClass: "CORE_CLASS_MILITARY" }]);
   g.GameInfo.Units[Symbol.iterator] = function* () { yield* [{ $hash: 99, UnitType: "UNIT_SCOUT", Name: "LOC_SCOUT" }, { $hash: 100, UnitType: "UNIT_WARRIOR", Name: "LOC_WARRIOR" }, { $hash: 101, UnitType: "UNIT_GALLEY", Name: "LOC_GALLEY" }]; };
   g.CityOperationTypes = { BUILD: 5551, CONSIDER_TOWN_PROJECT: 5552 };
   g.Game.CityOperations = {
     canStart: (cid, op, args, show) => { g._log.push(`ccanStart(${JSON.stringify(cid)},${op},${JSON.stringify(args)},${show})`); return { Success: cid.owner === 1 && buildable.includes(args.UnitType), Requirements: {}, FailureReasons: buildable.includes(args.UnitType) ? undefined : ["LOC_NO"] }; },
-    sendRequest: (cid, op, args) => { g._log.push(`csendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue.currentProductionTypeHash = sentTo ?? args.UnitType; city.BuildQueue.isEmpty = false; },
+    sendRequest: (cid, op, args) => { g._log.push(`csendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue._q.push({ type: sentTo ?? args.UnitType, kind: 1 }); city.BuildQueue.currentProductionTypeHash = city.BuildQueue._q[0].type; city.BuildQueue.isEmpty = false; },
   };
   g.Game.CityCommands = { canStart: () => { g._log.push("PURCHASE"); return { Success: true }; }, sendRequest: () => { g._log.push("PURCHASE"); } };
   return g;
@@ -281,7 +281,7 @@ test("perform PRODUCE_UNIT resolves the city from the bound roster, checks canSt
   const r = runPerformArgs(g, "PRODUCE_UNIT", 65536, 100, 0);
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "PRODUCE_UNIT", arg: 65536, unitType: 100, observedType: 100, matches: true });
+  assert.deepEqual(r.readback, { kind: "PRODUCE_UNIT", arg: 65536, unitType: 100, queuedAt: 0, queueLength: 1, matches: true });
   const i = log.findIndex((e) => e.startsWith("ccanStart(") && e.includes('"UnitType":100'));
   const j = log.findIndex((e) => e.startsWith("csendRequest(") && e.includes('"UnitType":100'));
   assert.ok(i !== -1 && j !== -1 && i < j);
@@ -472,7 +472,7 @@ function withBuildings(g, { urban = [[3, 4]], expand = [[4, 4], [4, 5]], sentTo 
       if (args.X === undefined) return { Success: true, Plots: urban.map(idx), ExpandUrbanPlots: expand.map(idx) };
       return { Success: [...urban, ...expand].some(([x, y]) => x === args.X && y === args.Y) };
     },
-    sendRequest: (cid, op, args) => { if (args.ConstructibleType === undefined) return inner.sendRequest(cid, op, args); g._log.push(`bsendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue.currentProductionTypeHash = sentTo ?? args.ConstructibleType; },
+    sendRequest: (cid, op, args) => { if (args.ConstructibleType === undefined) return inner.sendRequest(cid, op, args); g._log.push(`bsendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue._q.push({ type: sentTo ?? args.ConstructibleType, kind: 2 }); city.BuildQueue.currentProductionTypeHash = city.BuildQueue._q[0].type; },
   };
   city.Production = { getUnitProductionCost: (h) => (h === 99 ? 30 : 40), getConstructibleProductionCost: () => 36 };
   city.BuildQueue.getTurnsLeft = (h) => (h === 501 ? 8 : 5);
@@ -484,7 +484,7 @@ test("production offers carry cost and turns for units, and one placement offer 
   const g = withBuildings(withUnits(world({ log }), [])); g._log = log;
   const r = runOffers(g);
   const units = r.offers.filter((o) => o.kind === "PRODUCE_UNIT");
-  assert.deepEqual(units.map((o) => [o.unitTypeKey, o.cost, o.turns]), [["UNIT_SCOUT", 30, 5], ["UNIT_WARRIOR", 40, 5]]);
+  assert.deepEqual(units.map((o) => [o.unitTypeKey, o.cost, o.turns, o.pre, o.queueLength, o.queue]), [["UNIT_SCOUT", 30, 5, 0, 0, []], ["UNIT_WARRIOR", 40, 5, 0, 0, []]]);
   const builds = r.offers.filter((o) => o.kind === "PRODUCE_CONSTRUCTIBLE");
   assert.deepEqual(builds.map((o) => [o.arg, o.arg2, o.arg3, o.x, o.y, o.placement, o.constructibleKey, o.displayName, o.cost, o.turns, o.canStart]),
     [[65536, 501, 403, 3, 4, "urban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true], [65536, 501, 404, 4, 4, "newUrban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true], [65536, 501, 504, 4, 5, "newUrban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true]]);
@@ -496,10 +496,10 @@ test("production offers carry cost and turns for units, and one placement offer 
 test("perform PRODUCE_CONSTRUCTIBLE derives the plot from its index, checks canStart with X/Y, sends BUILD with placement and reads back", () => {
   const log = [];
   const g = withBuildings(withUnits(world({ log }), [])); g._log = log;
-  const r = runPerformArgs(g, "PRODUCE_CONSTRUCTIBLE", 65536, 501, 404, { pre: -1 });
+  const r = runPerformArgs(g, "PRODUCE_CONSTRUCTIBLE", 65536, 501, 404, { pre: 0 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "PRODUCE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plot: { x: 4, y: 4, index: 404 }, observedType: 501, matches: true });
+  assert.deepEqual(r.readback, { kind: "PRODUCE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plot: { x: 4, y: 4, index: 404 }, queuedAt: 0, queueLength: 1, matches: true });
   const i = log.findIndex((e) => e.startsWith("bcanStart(") && e.includes('"X":4,"Y":4'));
   const j = log.findIndex((e) => e.startsWith("bsendRequest(") && e.includes('"ConstructibleType":501,"X":4,"Y":4'));
   assert.ok(i !== -1 && j !== -1 && i < j);
@@ -507,11 +507,11 @@ test("perform PRODUCE_CONSTRUCTIBLE derives the plot from its index, checks canS
 
 test("perform PRODUCE_CONSTRUCTIBLE refuses unknown city, non-constructible type, changed production, invalid plot and a refused placement without sending", () => {
   for (const [label, mk, cid, ct, pi, pre] of [
-    ["unknown city", () => withBuildings(withUnits(world({ log: [] }), [])), 7, 501, 404, -1],
-    ["not a constructible", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 99, 404, -1],
-    ["production changed", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 404, 77],
-    ["invalid plot", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, -5, -1],
-    ["placement refused", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 909, -1],
+    ["unknown city", () => withBuildings(withUnits(world({ log: [] }), [])), 7, 501, 404, 0],
+    ["not a constructible", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 99, 404, 0],
+    ["queue changed", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 404, 77],
+    ["invalid plot", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, -5, 0],
+    ["placement refused", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 909, 0],
   ]) {
     const g = mk(); const log = []; g._log = log;
     const r = runPerformArgs(g, "PRODUCE_CONSTRUCTIBLE", cid, ct, pi, { pre });
@@ -671,4 +671,20 @@ test("perform CHOOSE_NARRATIVE_STORY_DIRECTION refuses a story that is not pendi
     assert.ok(r.refused, `${label}: expected refusal`);
     assert.ok(!log.some((e) => e.startsWith("nsendRequest")), `${label}: must not send`);
   }
+});
+
+
+test("a city with a queue offers production as an append: precondition is the queue length and the queue is listed", () => {
+  const log = [];
+  const g = withBuildings(withUnits(world({ log }), [])); g._log = log;
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.BuildQueue._q.push({ type: 100, kind: 1 }); city.BuildQueue.currentProductionTypeHash = 100;
+  const r = runOffers(g);
+  const units = r.offers.filter((o) => o.kind === "PRODUCE_UNIT");
+  assert.ok(units.every((o) => o.pre === 1 && o.queueLength === 1 && o.queue.length === 1 && o.queue[0] === "UNIT_WARRIOR"));
+  const p = runPerformArgs(g, "PRODUCE_UNIT", 65536, 99, 0, { pre: 1 });
+  assert.equal(p.outcome, "sent");
+  assert.deepEqual(p.readback, { kind: "PRODUCE_UNIT", arg: 65536, unitType: 99, queuedAt: 1, queueLength: 2, matches: true });
+  const stale = runPerformArgs(g, "PRODUCE_UNIT", 65536, 99, 0, { pre: 1 });
+  assert.equal(stale.refused.code, "ACTION_EXPIRED", "a second append with the old queue length must be refused");
 });

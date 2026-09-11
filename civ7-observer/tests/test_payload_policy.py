@@ -28,7 +28,7 @@ FORBIDDEN_PATTERNS = {
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
 }
 
-MUTATION_PAYLOADS = {"perform.js"}
+MUTATION_PAYLOADS = {"perform.js", "curtain.js"}   # curtain.js mutates the UI only and may contain no engine call at all
 # The only engine calls a mutation payload may contain, as exact substrings.
 MUTATION_ALLOWLIST = (
     "Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND]",
@@ -107,13 +107,23 @@ def test_policy_allows_bound_player_reads(sample):
 
 
 def test_mutation_payload_exists_and_is_not_scanned_as_read_only():
-    assert [p.name for p in mutation_payloads()] == ["perform.js"]
+    assert [p.name for p in mutation_payloads()] == ["curtain.js", "perform.js"]
     assert "perform.js" not in [p.name for p in packaged_payloads()]
+
+
+def test_curtain_payload_touches_the_ui_only():
+    src = (PAYLOAD_DIR / "curtain.js").read_text(encoding="utf-8")
+    assert not ENGINE_CALL.search(src), "the curtain payload must send no engine operation"
+    assert not re.search(MUTATION_FORBIDDEN, src)
+    assert "sendRequest" not in src and "sendTurnComplete" not in src
+    assert [v for v in violations(src) if "mutating or revealing calls" not in v] == []
 
 
 @pytest.mark.parametrize("payload", mutation_payloads(), ids=lambda p: p.name)
 def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     src = payload.read_text(encoding="utf-8")
+    if payload.name == "curtain.js":
+        return   # covered by test_curtain_payload_touches_the_ui_only
     calls = [m.group(0) for m in ENGINE_CALL.finditer(src)]
     assert calls, "mutation payload must contain the allowlisted calls"
     for call in calls:

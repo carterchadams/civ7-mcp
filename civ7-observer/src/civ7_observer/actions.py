@@ -335,7 +335,7 @@ class ActionRegistry:
                     raise ObserverError("API_CONTRACT_MISMATCH", "constructible offer without a type and placement plot")
                 rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
                 entry["to"] = {"x": o["x"], "y": o["y"]}
-                for k in ("cityId", "cityName", "constructibleKey", "constructibleClass", "plotIndex", "placement", "terrainKey", "featureKey", "river", "yields"):
+                for k in ("cityId", "cityName", "constructibleKey", "constructibleClass", "plotIndex", "placement", "terrainKey", "featureKey", "river", "yields", "queue", "queueLength"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "CHOOSE_NARRATIVE_STORY_DIRECTION":
@@ -356,7 +356,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "produce offer without a unit type")
                 rec["arg2"] = o["arg2"]
-                for k in ("cityId", "cityName", "unitTypeKey", "displayName", "turns"):
+                for k in ("cityId", "cityName", "unitTypeKey", "displayName", "turns", "queue", "queueLength"):
                     if k in o:
                         entry[k] = o[k]
             self._offers[action_id] = rec
@@ -492,9 +492,11 @@ class ActionRegistry:
                     if isinstance(rb.get("endTurnBlocking"), str) and rb["endTurnBlocking"] != "TRADITIONS":
                         effect = {"endTurnBlocking": rb["endTurnBlocking"]}
                 elif kind in ("PRODUCE_UNIT", "PRODUCE_CONSTRUCTIBLE"):
-                    prod = rb.get("cityProduction")
-                    if isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]:
-                        effect = {"cityProduction": {"cityId": offer["arg"], ("unitType" if kind == "PRODUCE_UNIT" else "constructibleType"): offer["arg2"]}}
+                    # BUILD enqueues: the item must now sit at the queue position the offer was made for
+                    queues = rb.get("cityQueues")
+                    q = queues.get(str(offer["arg"])) if isinstance(queues, dict) else None
+                    if isinstance(q, list) and len(q) > offer["pre"] and q[offer["pre"]] == offer["arg2"]:
+                        effect = {"queued": {"cityId": offer["arg"], ("unitType" if kind == "PRODUCE_UNIT" else "constructibleType"): offer["arg2"], "position": offer["pre"]}}
             if effect is not None:
                 return {"source": "poll", "gameGuid": rb.get("gameGuid"), "turn": turn, "age": age, "localPlayerId": seat, "localObserverId": observer, "effect": effect}
         return None
