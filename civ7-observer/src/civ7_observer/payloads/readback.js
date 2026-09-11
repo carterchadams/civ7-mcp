@@ -10,6 +10,7 @@
     techResearching: player ? t(() => player.Techs.getResearching().type) : null,
     civicResearching: player ? t(() => player.Culture.getResearching().type) : null,
     hasSentTurnComplete: t(() => GameContext.hasSentTurnComplete()),
+    blockingNotifications: t(() => { const out = []; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) out.push(Game.Notifications.getTypeName(n.Type)); } return out; }),
     endTurnBlocking: t(() => { const v = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID); for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) return Game.Notifications.getTypeName(n.Type); } return String(v); }),
     pendingStories: player ? t(() => { const out = []; const st = player.Stories; const first = st.getFirstPendingDiscoveryLastMetID(); if (first && Number.isInteger(first.id)) out.push(first.id); const met = st.getPendingMetIds(); if (Array.isArray(met)) for (const m of met) if (m && Number.isInteger(m.id) && out.indexOf(m.id) === -1) out.push(m.id); return out; }) : null,
     governmentType: player ? t(() => player.Culture.getGovernmentType()) : null,

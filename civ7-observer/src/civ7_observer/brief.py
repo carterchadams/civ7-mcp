@@ -68,9 +68,13 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
-                 "slot", "slotsTotal", "slotsFree", "description",
+                 "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration")
+
+POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
+                 "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
+                 "while a card can still be activated")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn")
@@ -158,6 +162,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         group = group_for(decision)
         if decision == "production":
             group["note"] = PRODUCTION_NOTE
+        if decision == "policies":
+            group["note"] = POLICIES_NOTE
         group["optionCount"] += 1
         if len(group["options"]) < max_options:
             group["options"].append(_option(offer))

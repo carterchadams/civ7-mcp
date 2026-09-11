@@ -856,8 +856,8 @@ def test_tradition_offers_and_confirmation_flow_through_the_registry(tmp_path):
         {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHANGE_TRADITION", "arg": 11, "tradition": 9001, "active": False, "matches": False}}
     confirmed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "blocking": "TRADITIONS", "matches": False}}
-    rb1 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "TRADITIONS"}
-    rb2 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "NONE"}
+    rb1 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "TRADITIONS", "blockingNotifications": ["NOTIFICATION_TRADITIONS_AVAILABLE"]}
+    rb2 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "NONE", "blockingNotifications": []}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb1)), reply(6, json.dumps(confirmed)), reply(7, json.dumps(rb2))]})
     with gs:
@@ -870,7 +870,7 @@ def test_tradition_offers_and_confirmation_flow_through_the_registry(tmp_path):
         assert '"CHANGE_TRADITION"' in sent and "const ARG = 11;" in sent and "const ARG2 = 9001;" in sent
         co = next(o for o in out["offers"] if o["kind"] == "confirm_traditions")
         res2 = reg.perform(gs, action_id=co["actionId"], request_id="tr-2", player=1, mode="singleplayer")
-    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"endTurnBlocking": "NONE"}
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"endTurnBlocking": "NONE", "traditionsNotificationCleared": True}
 
 
 def test_narrative_offers_carry_story_text_and_perform_confirms_when_the_story_leaves_the_pending_list(tmp_path):
@@ -930,3 +930,18 @@ def test_government_offer_and_confirmation_by_hash_or_index(tmp_path):
         assert go["celebration"] == "c" and "arg" not in go and "arg2" not in go
         res = reg.perform(gs, action_id=go["actionId"], request_id="go-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"governmentType": -87192893}
+
+
+def test_confirm_traditions_does_not_confirm_while_the_traditions_notification_still_blocks(tmp_path):
+    """Live (turn 8): the operation was accepted, the blocker value read CULTURE, and TRADITIONS_AVAILABLE stayed."""
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "blocking": "CULTURE", "matches": True}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    rb = {**RB, "endTurnBlocking": "CULTURE", "blockingNotifications": ["NOTIFICATION_TRADITIONS_AVAILABLE"]}
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps({**performed, "readback": {**performed["readback"], "matches": False}}))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        co = next(o for o in out["offers"] if o["kind"] == "confirm_traditions")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=co["actionId"], request_id="ct-x", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"

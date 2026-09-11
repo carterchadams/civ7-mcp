@@ -531,6 +531,7 @@ function withTraditions(g, { unlocked = [9001, 9002], active = [], slots = 1, ac
   const rows = [{ $hash: 9001, $index: 11, TraditionType: "TRADITION_A", CultureSlotType: "TRADITION_CULTURE_SLOT", Name: "LOC_TA", Description: "LOC_TA_D" }, { $hash: 9002, $index: 12, TraditionType: "TRADITION_B", CultureSlotType: "TRADITION_CULTURE_SLOT", Name: "LOC_TB", Description: "LOC_TB_D" }];
   g.GameInfo.Traditions = table(rows);
   cu.getNumCultureSlots = (st) => (st === 1 ? slots : 0);
+  cu.getNumAllCultureSlots = () => slots;
   cu.getActiveTraditions = (st) => (st === 1 ? actives.slice() : []);
   cu.getUnlockedTraditions = (st) => (st === 1 ? unlocked.slice() : []);
   cu.isTraditionActive = (h) => actives.includes(h);
@@ -549,7 +550,7 @@ test("tradition offers list unlocked, inactive cards per slot type with slot cou
   const g = withTraditions(world({ log, blocking: true }), { active: [9002] }); g._log = log;
   const r = runOffers(g);
   const trads = r.offers.filter((o) => o.kind === "CHANGE_TRADITION");
-  assert.deepEqual(trads.map((o) => [o.arg, o.arg2, o.pre, o.slot, o.slotsTotal, o.slotsFree, o.typeKey, o.canStart]), [[11, 9001, 1, "TRADITION_CULTURE_SLOT", 1, 0, "TRADITION_A", false]]);
+  assert.deepEqual(trads.map((o) => [o.arg, o.arg2, o.pre, o.slot, o.slotsTotal, o.slotsFree, o.slotsFreeAny, o.typeKey, o.canStart]), [[11, 9001, 1, "TRADITION_CULTURE_SLOT", 1, 0, 0, "TRADITION_A", false]]);
   assert.equal(r.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS").length, 1);
   assert.ok(log.filter((e) => e.startsWith("tcanStart(")).every((e) => e.startsWith("tcanStart(1,") && e.endsWith(",false)")));
   const g2 = withTraditions(world({ log: [] })); g2._log = []; g2.Game.Notifications.getEndTurnBlockingType = () => 0;

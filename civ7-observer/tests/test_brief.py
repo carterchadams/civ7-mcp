@@ -149,6 +149,7 @@ def test_traditions_blocker_is_a_supported_policies_decision_with_activation_and
     assert [d["kind"] for d in required] == ["policies"]
     kinds = [(o["kind"], o.get("displayName"), o.get("slot"), o.get("slotsFree"), o.get("description")) for o in required[0]["options"]]
     assert kinds == [("activate_tradition", "Trial of Time", "TRADITION_CULTURE_SLOT", 1, "+1 culture"), ("confirm_traditions", None, None, None, None)]
+    assert "activate a card into a free slot first" in required[0]["note"]
 
 
 def test_a_notification_named_blocker_for_a_discovery_story_is_a_supported_narrative_decision(tmp_path):

@@ -216,6 +216,10 @@
       // CHANGE_TRADITION {TraditionType: $index, Action: Activate} per card, then
       // CONSIDER_ASSIGN_TRADITIONS {} on confirm, which is what clears the TRADITIONS blocker.
       const cu = player.Culture;
+      // Live: a card typed POLICY_CULTURE_SLOT was activatable (canStart true) with zero policy slots
+      // and one tradition slot, so slot types are not the whole story; the overall free count is given too.
+      let allSlots = null, allActive = 0; try { allSlots = cu.getNumAllCultureSlots(); for (const k of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) { const st0 = CultureSlotTypes[k]; if (isInt(st0)) allActive += cu.getActiveTraditions(st0).length; } } catch (e) { allSlots = null; }
+      const slotsFreeAny = isInt(allSlots) ? allSlots - allActive : null;
       for (const slotName of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) {
         const st = CultureSlotTypes[slotName];
         if (!isInt(st)) continue;
@@ -227,7 +231,7 @@
           if (!row || !isInt(row.$index) || cu.isTraditionActive(hash) === true) continue;
           const targs = { TraditionType: row.$index, Action: PlayerOperationParameters.Activate };
           const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_TRADITION, targs, false);
-          offers.push({ kind: "CHANGE_TRADITION", arg: row.$index, arg2: hash, pre: active.length, slot: slotName, slotsTotal: total, slotsFree: total - active.length,
+          offers.push({ kind: "CHANGE_TRADITION", arg: row.$index, arg2: hash, pre: active.length, slot: slotName, slotsTotal: total, slotsFree: total - active.length, slotsFreeAny: slotsFreeAny,
             typeKey: typeof row.TraditionType === "string" ? row.TraditionType : null, displayName: compose(row.Name), description: compose(row.Description), canStart: !!(check && check.Success === true) });
         }
       }

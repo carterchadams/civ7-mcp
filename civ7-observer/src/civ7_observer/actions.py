@@ -358,7 +358,7 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "tradition offer without a type hash")
                 rec["arg2"] = o["arg2"]
-                for k in ("slot", "slotsTotal", "slotsFree", "description"):
+                for k in ("slot", "slotsTotal", "slotsFree", "slotsFreeAny", "description"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "PRODUCE_UNIT":
@@ -506,8 +506,12 @@ class ActionRegistry:
                     if isinstance(active, list) and offer["arg2"] in active:
                         effect = {"traditionActive": offer["arg2"]}
                 elif kind == "CONSIDER_ASSIGN_TRADITIONS":
-                    if isinstance(rb.get("endTurnBlocking"), str) and rb["endTurnBlocking"] != "TRADITIONS":
-                        effect = {"endTurnBlocking": rb["endTurnBlocking"]}
+                    # live: the operation is accepted but the notification stays while a card can still be
+                    # activated, so the blocker value alone (a category) is not enough evidence
+                    notes = rb.get("blockingNotifications")
+                    if (isinstance(rb.get("endTurnBlocking"), str) and rb["endTurnBlocking"] != "TRADITIONS"
+                            and isinstance(notes, list) and "NOTIFICATION_TRADITIONS_AVAILABLE" not in notes):
+                        effect = {"endTurnBlocking": rb["endTurnBlocking"], "traditionsNotificationCleared": True}
                 elif kind in ("PRODUCE_UNIT", "PRODUCE_CONSTRUCTIBLE"):
                     # BUILD enqueues: the item must now sit at the queue position the offer was made for
                     queues = rb.get("cityQueues")
