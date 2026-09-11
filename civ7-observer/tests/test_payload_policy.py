@@ -52,8 +52,9 @@ MUTATION_ALLOWLIST = (
     'Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs)',
     'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
-    # a read of a second operation type: finishing the legacy deck must first prove no picked card's effect is still usable
+    # taking a legacy card takes its reward in the same action: the engine never reports an effect as spent
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id })',
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false)',
     'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs)',
 )
@@ -142,7 +143,9 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     assert not re.search(MUTATION_FORBIDDEN, src), "mutation payload references a forbidden surface"
     assert "PlayerOperationTypes[OP_KIND]" in src
     # every operation is sent through the host-substituted kind; the one literal type name is a read-only check
-    assert src.count("PlayerOperationTypes.") == src.count("PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)")
+    # every other operation is sent through the host-substituted kind; the one literal type name is the
+    # legacy effect applied alongside its card, which the engine cannot report as already spent
+    assert src.count("PlayerOperationTypes.") == src.count("PlayerOperationTypes.ADVANCED_START_USE_EFFECT")
     stripped = src
     for a in MUTATION_ALLOWLIST:
         stripped = stripped.replace(a, "")

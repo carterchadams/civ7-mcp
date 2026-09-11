@@ -82,7 +82,6 @@ DECISION_OF_KIND = {
     "choose_celebration": "celebration",
     "promote_unit": "promotion",
     "pick_legacy_card": "legacies",
-    "apply_legacy_effect": "legacies",
     "finish_legacy_deck": "legacies",
     "choose_age_civilization": "age_transition",
     "finish_age_transition": "age_transition",
@@ -100,7 +99,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "effectId", "pointsAvailable", "needsPlacement", "amount", "deck", "unappliedEffects", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "
@@ -117,9 +116,8 @@ AGE_TRANSITION_NOTE = ("the age is over: choose the civilization this seat becom
                        "then finish_age_transition. Choosing is reversible; finishing is one-way and starts the new age once every seat "
                        "has finished. Mementos are left as they are")
 
-LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (`cost` each) with pick_legacy_card, then "
-                 "apply_legacy_effect for every effect of every picked card, then finish_legacy_deck. Finishing forfeits unspent "
-                 "points; it is not startable while a picked card's effect is unapplied")
+LEGACIES_NOTE = ("the new age's legacy cards: spend `pointsAvailable` on cards (`cost` each) with pick_legacy_card, which also "
+                 "takes that card's reward, then finish_legacy_deck once. Finishing forfeits any unspent points, so pick first")
 
 MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot")

@@ -439,22 +439,11 @@
         const placement = Array.isArray(c.effects) && c.effects.some((e) => e && e.isPlacementEffect === true);
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MODIFY_DECK, { Type: "ADD", ID: c.id }, false);
         offers.push({ kind: "ADVANCED_START_MODIFY_DECK", arg: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, displayName: compose(c.name), description: compose(c.description),
-          cost: costOf(c), pointsAvailable: points, needsPlacement: placement, canStart: !!(check && check.Success === true) && !placement });
-      }
-      let usable = 0;
-      for (const entry of deck) {
-        const c = cardOf(entry);
-        if (!c || typeof c.id !== "string" || !Array.isArray(c.effects)) continue;
-        for (const e of c.effects) {
-          if (!e || typeof e.id !== "string") continue;
-          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false);
-          const ok = !!(check && check.Success === true) && e.isPlacementEffect !== true;
-          if (ok) usable += 1;
-          if (ok) offers.push({ kind: "ADVANCED_START_USE_EFFECT", arg: Database.makeHash(e.id), arg2: Database.makeHash(c.id), pre: deckIds.length, cardId: c.id, effectId: e.id, displayName: compose(c.name), description: compose(c.description), amount: isInt(e.amount) ? e.amount : 1, canStart: true });
-        }
+          cost: costOf(c), pointsAvailable: points, needsPlacement: placement, effectCount: Array.isArray(c.effects) ? c.effects.length : 0,
+          canStart: !!(check && check.Success === true) && !placement });
       }
       const mcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED, {}, false);
-      offers.push({ kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, pre: deckIds.length, deck: deckIds, pointsAvailable: points, unappliedEffects: usable, canStart: !!(mcheck && mcheck.Success === true) && usable === 0 });
+      offers.push({ kind: "ADVANCED_START_MARK_COMPLETED", arg: 0, pre: deckIds.length, deck: deckIds, pointsAvailable: points, canStart: !!(mcheck && mcheck.Success === true) });
     }
     if (isInt(PlayerOperationTypes.SET_AGE_TRANSITION_DATA) && typeof GameSetup !== "undefined" && typeof GameSetup.findPlayerParameter === "function" && blockingNotifications.indexOf("NOTIFICATION_CHOOSE_CIVILIZATION") !== -1) {
       // Age transition: the shipped in-game screen sets the bound player's AgeTransitionPlayerCivilization
