@@ -143,6 +143,9 @@ DECISION_OF_KIND = {
     "cancel_alliance": "diplomacy",
     "support_diplomatic_action": "diplomacy",
     "join_ally_war": "call_to_arms",
+    "propose_peace": "diplomacy",
+    "accept_peace": "diplomacy",
+    "reject_peace": "diplomacy",
     "keep_captured_city": "capture",
     "raze_captured_city": "capture",
     "liberate_captured_city": "capture",
@@ -164,7 +167,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
                  "eventId", "answer", "proposerPlayerId", "proposerName", "beliefClass",
                  "population", "wonders", "isTown", "cityStatePlayerId", "side", "initiatorPlayerId", "support", "notificationId",
-                 "secondary", "callToArms", "allyPlayerId", "allyName",
+                 "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -219,7 +222,7 @@ CAPTURE_NOTE = ("a settlement was just captured and the turn cannot end until it
                 "(needs confirm=true). The offer shows its population and wonders.")
 CITY_STATE_BONUS_NOTE = ("a city-state you are suzerain of grants a bonus: pick one; the choice is permanent for that "
                          "city-state and the turn cannot end until it is made.")
-DIPLOMACY_NOTE = ("influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
+DIPLOMACY_NOTE = ("a war can be ended with `propose_peace` (a plain peace, no terms), and an incoming peace offer answered with `accept_peace` or `reject_peace`. Otherwise influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
                   "option names the civilization it is aimed at (`targetName`) and its kind (`group`): TREATY and "
                   "ENDEAVOR help both sides, SANCTION and ESPIONAGE work against the target. Influence otherwise "
                   "accumulates unspent. Declaring war and forming alliances are not offered here.")

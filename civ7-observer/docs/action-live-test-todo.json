@@ -103,7 +103,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 524,
+          "confirmed": 526,
           "rejected": 4,
           "unknown": 0
         }
@@ -127,8 +127,8 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2077,
-          "rejected": 8,
+          "confirmed": 2093,
+          "rejected": 12,
           "unknown": 0
         }
       }
@@ -151,8 +151,8 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1691,
-          "rejected": 12,
+          "confirmed": 1711,
+          "rejected": 21,
           "unknown": 1
         }
       }
@@ -176,7 +176,7 @@
       "evidence_refs": {
         "journal": {
           "confirmed": 149,
-          "rejected": 1,
+          "rejected": 2,
           "unknown": 1
         }
       }
@@ -764,7 +764,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "make_trade_route"
@@ -773,7 +773,13 @@
       "consequence_class": "low",
       "procedure": "take a `make_trade_route` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `MAKE_TRADE_ROUTE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-send_merchant",
@@ -793,8 +799,8 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 14,
-          "rejected": 0,
+          "confirmed": 20,
+          "rejected": 5,
           "unknown": 0
         }
       }
@@ -926,6 +932,60 @@
       "evidence_refs": {}
     },
     {
+      "case_id": "LT-propose_peace",
+      "action_family": "propose_peace",
+      "expected_kind": "PROPOSE_PEACE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "propose_peace"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `propose_peace` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PROPOSE_PEACE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-accept_peace",
+      "action_family": "accept_peace",
+      "expected_kind": "ACCEPT_PEACE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "accept_peace"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `accept_peace` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ACCEPT_PEACE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-reject_peace",
+      "action_family": "reject_peace",
+      "expected_kind": "REJECT_PEACE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "reject_peace"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `reject_peace` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REJECT_PEACE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
       "case_id": "LT-unit_order",
       "action_family": "unit_order",
       "expected_kind": "UNIT_ORDER",
@@ -943,9 +1003,9 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 111,
+          "confirmed": 118,
           "rejected": 0,
-          "unknown": 0
+          "unknown": 1
         }
       }
     },

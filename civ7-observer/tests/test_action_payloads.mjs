@@ -1337,6 +1337,73 @@ test("perform DECLARE_WAR for a call to arms declares on the enemy and confirms 
   }
 });
 
+// ---- peace: a plain proposal, and answering an incoming one
+function withPeace(g, { atWar = [0], canPeace = [0], pending = [], incomingItems = 1, drafted = 1, proposeApplies = true, answerApplies = true } = {}) {
+  g._log = g._log || [];
+  withDiplomacy(g, { atWar, met: [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: true, name: "LOC_MEIJI" }] });
+  const me = g.Players.get(1);
+  let pendingNow = new Set(pending);
+  me.Diplomacy.canMakePeaceWith = (id) => ({ Success: canPeace.includes(id) });
+  g.DiplomacyDealDirection = { OUTGOING: 0, INCOMING: 1 };
+  g.DiplomacyDealProposalActions = { PROPOSED: 1, ADJUSTED: 2, INSPECT: 3, ACCEPTED: 4, REJECTED: 5 };
+  g.DiplomacyDealItemTypes = { AGREEMENTS: 9 };
+  g.DiplomacyDealItemAgreementTypes = { MAKE_PEACE: 3 };
+  const drafts = {};
+  g.Game.DiplomacyDeals = {
+    hasPendingDeal: (a, b) => pendingNow.has(b),
+    getWorkingDeal: (id) => id.direction === 1 ? { itemIds: Array.from({ length: incomingItems }, (_, i) => i) } : { itemIds: drafts[id.player2] || [] },
+    clearWorkingDeal: (id) => { g._log.push(`clear(${JSON.stringify(id)})`); drafts[id.player2] = []; },
+    addItemToWorkingDeal: (id, item) => { g._log.push(`add(${JSON.stringify(item)})`); drafts[id.player2] = Array.from({ length: drafted }, (_, i) => i); return 1; },
+    sendWorkingDeal: (id, action) => { g._log.push(`send(${JSON.stringify(id)},${action})`); if (action === 1 && proposeApplies) pendingNow.add(id.player2); if ((action === 4 || action === 5) && answerApplies) { pendingNow.delete(id.player1); if (action === 4) me.Diplomacy.isAtWarWith = () => false; } },
+  };
+  return g;
+}
+
+test("peace is offered as a plain proposal while at war, and as accept or reject once a deal is on the table", () => {
+  const g = withPeace(withUnits(world({ log: [] }), [])); g._log = [];
+  const offers = runOffers(g).offers;
+  assert.deepEqual(offers.filter((o) => o.kind === "PROPOSE_PEACE").map((o) => [o.arg, o.targetName]), [[0, "LOC_ABBASID"]]);
+  assert.deepEqual(offers.filter((o) => ["ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)), []);
+  const table = withPeace(withUnits(world({ log: [] }), []), { pending: [0] }); table._log = [];
+  const to = runOffers(table).offers;
+  assert.deepEqual(to.filter((o) => ["PROPOSE_PEACE", "ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)).map((o) => [o.kind, o.arg, o.dealItems]), [["ACCEPT_PEACE", 0, 1], ["REJECT_PEACE", 0, 1]]);
+  const notyet = withPeace(withUnits(world({ log: [] }), []), { canPeace: [] }); notyet._log = [];
+  assert.deepEqual(runOffers(notyet).offers.filter((o) => o.kind === "PROPOSE_PEACE"), [], "the game decides when peace may be offered");
+  const peace = withPeace(withUnits(world({ log: [] }), []), { atWar: [] }); peace._log = [];
+  assert.deepEqual(runOffers(peace).offers.filter((o) => ["PROPOSE_PEACE", "ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)), []);
+});
+
+test("perform PROPOSE_PEACE runs the shipped workflow step by step and confirms on a deal being on the table", () => {
+  const g = withPeace(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runPerformArgs(g, "PROPOSE_PEACE", 0, 0, 0, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "PROPOSE_PEACE", arg: 0, proposed: true, pending: true, matches: true });
+  const seq = g._log.filter((e) => /^(clear|add|send)\(/.test(e));
+  assert.deepEqual(seq, ['clear({"direction":0,"player1":1,"player2":0})', 'add({"type":9,"agreementType":3})', 'send({"direction":0,"player1":1,"player2":0},1)']);
+  for (const [label, mk, other] of [["not at war", () => withPeace(withUnits(world({ log: [] }), []), { atWar: [] }), 0], ["already on the table", () => withPeace(withUnits(world({ log: [] }), []), { pending: [0] }), 0], ["peace not allowed yet", () => withPeace(withUnits(world({ log: [] }), []), { canPeace: [] }), 0], ["unmet", () => withPeace(withUnits(world({ log: [] }), [])), 9]]) {
+    const h = mk(); h._log = [];
+    assert.ok(runPerformArgs(h, "PROPOSE_PEACE", other, 0, 0, { pre: 0 }).refused, label);
+    assert.ok(!h._log.some((e) => e.startsWith("send(")), label);
+  }
+  const bad = withPeace(withUnits(world({ log: [] }), []), { drafted: 0 }); bad._log = [];
+  assert.ok(runPerformArgs(bad, "PROPOSE_PEACE", 0, 0, 0, { pre: 0 }).refused, "a draft without the agreement is never sent");
+  assert.ok(!bad._log.some((e) => e.startsWith("send(")));
+});
+
+test("perform ACCEPT_PEACE confirms on the war ending and REJECT_PEACE on the table clearing with the war still on", () => {
+  const a = withPeace(withUnits(world({ log: [] }), []), { pending: [0] }); a._log = [];
+  const ra = runPerformArgs(a, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 });
+  assert.deepEqual(ra.readback, { kind: "ACCEPT_PEACE", arg: 0, pending: false, atWar: false, matches: true });
+  assert.ok(a._log.find((e) => e === 'send({"direction":1,"player1":0,"player2":1},4)'));
+  const rj = withPeace(withUnits(world({ log: [] }), []), { pending: [0] }); rj._log = [];
+  const rr = runPerformArgs(rj, "REJECT_PEACE", 0, 0, 0, { pre: 1 });
+  assert.deepEqual(rr.readback, { kind: "REJECT_PEACE", arg: 0, pending: false, atWar: true, matches: true });
+  const none = withPeace(withUnits(world({ log: [] }), [])); none._log = [];
+  assert.ok(runPerformArgs(none, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 }).refused, "nothing on the table");
+  const empty = withPeace(withUnits(world({ log: [] }), []), { pending: [0], incomingItems: 0 }); empty._log = [];
+  assert.ok(runPerformArgs(empty, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 }).refused, "an incoming deal with no terms is not answered");
+});
+
 // ---- specialists (a PLAYER operation taking a plot INDEX, not a city one taking x/y)
 function withSpecialists(g, { slots = null, assignable = [489], applied = true, ready = true } = {}) {
   withCity(g, {});

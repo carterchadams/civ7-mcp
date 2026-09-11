@@ -1386,6 +1386,25 @@ def test_a_secondary_diplomatic_target_is_bound_and_shown(tmp_path):
         assert reg._offers[d["actionId"]]["arg3"] == 65537
 
 
+def test_peace_actions_confirm_on_the_relationship_and_the_table(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "PROPOSE_PEACE", "arg": 0, "pre": 0, "targetPlayerId": 0, "targetName": "Abbasid", "canStart": True},
+        {"kind": "ACCEPT_PEACE", "arg": 7, "pre": 1, "targetPlayerId": 7, "targetName": "Meiji", "dealItems": 1, "canStart": True}]}
+    p1 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROPOSE_PEACE", "arg": 0, "proposed": True, "pending": False, "matches": False}}
+    p2 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "ACCEPT_PEACE", "arg": 7, "pending": True, "atWar": True, "matches": False}}
+    rb1 = {**RB, "diplomaticRelations": {"0": {"atWar": True, "allied": False, "pendingDeal": True}}}
+    rb2 = {**RB, "diplomaticRelations": {"7": {"atWar": False, "allied": False, "pendingDeal": False}}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(p1)), reply(5, json.dumps(rb1)), reply(6, json.dumps(p2)), reply(7, json.dumps(rb2))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        by = {o["kind"]: o for o in out["offers"]}
+        r1 = reg.perform(gs, action_id=by["propose_peace"]["actionId"], request_id="pp-1", player=1, mode="singleplayer")
+        assert r1["confirmedBy"]["effect"] == {"peaceProposed": {"targetPlayerId": 0}}
+        r2 = reg.perform(gs, action_id=by["accept_peace"]["actionId"], request_id="ap-1", player=1, mode="singleplayer")
+        assert r2["confirmedBy"]["effect"] == {"peaceMade": {"targetPlayerId": 7}}
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

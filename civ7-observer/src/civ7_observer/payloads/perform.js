@@ -589,6 +589,47 @@
     result.readback = { kind: KIND, arg: ARG, callToArms: ARG2, wasAtWar: false, atWar: atWarAfter, matches: atWarAfter === true };
     return JSON.stringify(result);
   }
+  if (KIND === "PROPOSE_PEACE" || KIND === "ACCEPT_PEACE" || KIND === "REJECT_PEACE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "peace argument is not an integer");
+    if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot make peace with itself");
+    if (typeof Game.DiplomacyDeals === "undefined" || typeof DiplomacyDealDirection === "undefined" || typeof DiplomacyDealProposalActions === "undefined" ||
+        typeof DiplomacyDealItemTypes === "undefined" || typeof DiplomacyDealItemAgreementTypes === "undefined") return refuse("API_CONTRACT_MISMATCH", "the deal interfaces are unavailable");
+    let metOther = null; try { metOther = player.Diplomacy.hasMet(ARG); } catch (e) { metOther = null; }
+    if (metOther !== true) return refuse("UNKNOWN_ACTION", "the target is not a civilization this seat has met");
+    let warNow = null; try { warNow = player.Diplomacy.isAtWarWith(ARG) === true; } catch (e) { warNow = null; }
+    if (warNow !== true) return refuse("ACTION_EXPIRED", "this seat is not at war with them");
+    let pendingNow = null; try { pendingNow = Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, ARG) === true; } catch (e) { pendingNow = null; }
+    if (KIND === "PROPOSE_PEACE") {
+      if (pendingNow !== false) return refuse("ACTION_EXPIRED", "a deal with them is already on the table");
+      let canPeace = null; try { const r = player.Diplomacy.canMakePeaceWith(ARG); canPeace = r && typeof r === "object" ? r.Success === true : r === true; } catch (e) { canPeace = null; }
+      if (canPeace !== true) return refuse("ACTION_NOT_STARTABLE", "the game does not allow peace with them yet");
+      // The bounded workflow the shipped screen runs for a plain peace, step by step, checked between steps.
+      const outgoing = { direction: DiplomacyDealDirection.OUTGOING, player1: BOUND_PLAYER_ID, player2: ARG };
+      Game.DiplomacyDeals.clearWorkingDeal(outgoing);
+      const peaceItem = { type: DiplomacyDealItemTypes.AGREEMENTS, agreementType: DiplomacyDealItemAgreementTypes.MAKE_PEACE };
+      Game.DiplomacyDeals.addItemToWorkingDeal(outgoing, peaceItem);
+      let draft = null; try { draft = Game.DiplomacyDeals.getWorkingDeal(outgoing); } catch (e) { draft = null; }
+      const drafted = draft && Array.isArray(draft.itemIds) ? draft.itemIds.length : 0;
+      if (drafted !== 1) return refuse("ACTION_NOT_STARTABLE", "the peace agreement could not be placed in the working deal (" + drafted + " items)");
+      Game.DiplomacyDeals.sendWorkingDeal(outgoing, DiplomacyDealProposalActions.PROPOSED);
+      result.outcome = "sent";
+      let pendingAfter = null; try { pendingAfter = Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, ARG) === true; } catch (e) { pendingAfter = null; }
+      result.readback = { kind: KIND, arg: ARG, proposed: true, pending: pendingAfter, matches: pendingAfter === true };
+      return JSON.stringify(result);
+    }
+    if (pendingNow !== true) return refuse("ACTION_EXPIRED", "no deal with them is on the table");
+    const incoming = { direction: DiplomacyDealDirection.INCOMING, player1: ARG, player2: BOUND_PLAYER_ID };
+    let onTable = null; try { const d = Game.DiplomacyDeals.getWorkingDeal(incoming); onTable = d && Array.isArray(d.itemIds) ? d.itemIds.length : null; } catch (e) { onTable = null; }
+    if (!isInt(onTable) || onTable < 1) return refuse("ACTION_EXPIRED", "the incoming deal has no terms to answer");
+    const answer = KIND === "ACCEPT_PEACE" ? DiplomacyDealProposalActions.ACCEPTED : DiplomacyDealProposalActions.REJECTED;
+    Game.DiplomacyDeals.sendWorkingDeal(incoming, answer);
+    result.outcome = "sent";
+    let pendingAfter = null, warAfter = null;
+    try { pendingAfter = Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, ARG) === true; } catch (e) { pendingAfter = null; }
+    try { warAfter = player.Diplomacy.isAtWarWith(ARG) === true; } catch (e) { warAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, pending: pendingAfter, atWar: warAfter, matches: KIND === "ACCEPT_PEACE" ? warAfter === false : pendingAfter === false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CANCEL_ALLIANCE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "alliance argument is not an integer");
     if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");

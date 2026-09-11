@@ -24,7 +24,7 @@ FORBIDDEN_PATTERNS = {
     "seed or hidden setup data": r"\b(gameSeed|mapSeed|getRandom|Game\.Random)\b",
     "resources (excluded in v0.1)": r"\bgetResourceType\s*\(",
     # anchored on Game.* : the GameInfo.* tables of the same name are read-only definition lookups
-    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|Game\.PlayerOperations\.(?!canStart\b)\w+|Game\.UnitOperations\.(?!canStart\b)\w+|Game\.CityOperations\.(?!canStart\b)\w+|Game\.CityCommands\.(?!canStart\b)\w+|Game\.UnitCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
+    "mutating or revealing calls": r"\b(revealTree|revealAll|unlockTradition|sendRequest|sendTurnComplete|Game\.DiplomacyDeals\.(?!hasPendingDeal\b|getWorkingDeal\b|getWorkingDealItem\b|getPossibleWorkingDealItems\b)\w+|Game\.PlayerOperations\.(?!canStart\b)\w+|Game\.UnitOperations\.(?!canStart\b)\w+|Game\.CityOperations\.(?!canStart\b)\w+|Game\.CityCommands\.(?!canStart\b)\w+|Game\.UnitCommands\.(?!canStart\b)\w+|setResearch|purchasePlot|destroy)\b",
     "game setup writes": r"\bGameSetup\.(set\w+|loadCreateGameSettings|resetSavedCreateGameSettings)\s*\(",
     "network / storage / timing": r"\b(fetch|XMLHttpRequest|WebSocket|localStorage|sessionStorage|indexedDB|setTimeout|setInterval|requestAnimationFrame)\b",
     "imports / eval": r"\b(import|require|eval|Function)\s*\(|^\s*import\s",
@@ -67,6 +67,11 @@ MUTATION_ALLOWLIST = (
     # a just-captured settlement's fate: DESTROY with a directive that keeps, razes or liberates
     'Game.CityCommands.canStart(capturedId, CityCommandTypes.DESTROY, dispArgs, false)',
     'Game.CityCommands.sendRequest(capturedId, CityCommandTypes.DESTROY, dispArgs)',
+    # peace: the shipped screen's bounded workflow for a plain peace, and the answer to an incoming one
+    'Game.DiplomacyDeals.clearWorkingDeal(outgoing)',
+    'Game.DiplomacyDeals.addItemToWorkingDeal(outgoing, peaceItem)',
+    'Game.DiplomacyDeals.sendWorkingDeal(outgoing, DiplomacyDealProposalActions.PROPOSED)',
+    'Game.DiplomacyDeals.sendWorkingDeal(incoming, answer)',
     # diplomacy: the operation is not named by the payload at all, it is taken from the engine's own
     # current listing for a project the engine still reports as available against that target
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false)',
@@ -97,7 +102,7 @@ MUTATION_ALLOWLIST = (
     'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )
 MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b|DESTROY\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
-ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
+ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|Game\.DiplomacyDeals\.(?:clearWorkingDeal|addItemToWorkingDeal|removeItemFromWorkingDeal|sendWorkingDeal)\([^)]*\)|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 
 VETTED_MARKERS = (("    // BEGIN VETTED MET-PLAYER SCOPE\n", "    // END VETTED MET-PLAYER SCOPE\n"),
@@ -121,7 +126,7 @@ VETTED_MET_PLAYER_SCOPE_OFFERS = """    const metPlayers = () => {
 # The read-back's own vetted block. It is narrower still: for each met player it reads two booleans
 # about this seat's relationship with them, which is what confirms a war declared or an alliance
 # formed. No name, no units, no cities, nothing about their state.
-VETTED_MET_PLAYER_SCOPE_READBACK = """    diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true }; } return m; }) : null,
+VETTED_MET_PLAYER_SCOPE_READBACK = """    diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true, pendingDeal: (() => { try { return Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, other.id) === true; } catch (e) { return null; } })() }; } return m; }) : null,
 """
 
 # Only these two payloads may carry a vetted block, and only with exactly this text.

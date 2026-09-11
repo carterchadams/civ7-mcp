@@ -813,6 +813,30 @@
         }
       }
     }
+    // Peace. The shipped peace screen builds a working deal, {direction, player1, player2}, clears it,
+    // adds the MAKE_PEACE agreement and sends it PROPOSED; the other side answers ACCEPTED or REJECTED
+    // on the incoming deal. Offered here in its bounded form: a plain peace with no further terms.
+    if (typeof Game.DiplomacyDeals !== "undefined" && typeof DiplomacyDealDirection !== "undefined" && typeof DiplomacyDealProposalActions !== "undefined") {
+      for (const other of metPlayers()) {
+        let atWar = null; try { atWar = player.Diplomacy.isAtWarWith(other.id) === true; } catch (e) { atWar = null; }
+        if (atWar !== true) continue;
+        let pending = null; try { pending = Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, other.id) === true; } catch (e) { pending = null; }
+        if (pending === true) {
+          // Something is on the table already: the incoming deal can be answered.
+          const incoming = { direction: DiplomacyDealDirection.INCOMING, player1: other.id, player2: BOUND_PLAYER_ID };
+          let items = null; try { const d = Game.DiplomacyDeals.getWorkingDeal(incoming); items = d && Array.isArray(d.itemIds) ? d.itemIds.length : null; } catch (e) { items = null; }
+          if (isInt(items) && items > 0) {
+            for (const kind of ["ACCEPT_PEACE", "REJECT_PEACE"]) {
+              offers.push({ kind: kind, arg: other.id, pre: 1, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major, dealItems: items, canStart: true });
+            }
+          }
+          continue;
+        }
+        let can = null; try { const r = player.Diplomacy.canMakePeaceWith(other.id); can = r && typeof r === "object" ? r.Success === true : r === true; } catch (e) { can = null; }
+        if (can !== true) continue;
+        offers.push({ kind: "PROPOSE_PEACE", arg: other.id, pre: 0, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major, canStart: true });
+      }
+    }
     // Ending an alliance has no project row of its own: the shipped diplomacy panel sends the cancel
     // operation carrying the alliance action type, once the seat is already allied.
     if (isInt(PlayerOperationTypes.CANCEL_ALLIANCE) && typeof DiplomacyActionTypes !== "undefined" && isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE)) {
