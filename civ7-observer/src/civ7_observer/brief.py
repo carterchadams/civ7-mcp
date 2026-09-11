@@ -47,6 +47,9 @@ BLOCKER_DECISION = {
     "NOTIFICATION_CHOOSE_CIVILIZATION": "age_transition",
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
+    "DIPLOMATIC_RESPOSE_REQUIRED": "diplomatic_response",
+    "DIPLOMATIC_RESPONSE_REQUIRED": "diplomatic_response",
+    "NOTIFICATION_DIPLOMATIC_RESPONSE_REQUIRED": "diplomatic_response",
     "NOTIFICATION_ASSIGN_NEW_RESOURCES": "resources",
     "NOTIFICATION_CHOOSE_GOLDEN_AGE": "celebration",
     # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
@@ -125,6 +128,7 @@ DECISION_OF_KIND = {
     "consider_resources": "resources",
     "start_diplomatic_action": "diplomacy",
     "cancel_alliance": "diplomacy",
+    "respond_to_proposal": "diplomatic_response",
     "end_turn": "end_turn",
 }
 
@@ -138,6 +142,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "armyId", "isCommander", "ranged", "attacksRemaining", "strength", "rangedStrength", "damage", "maxDamage", "defender", "startsWar",
                  "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
+                 "eventId", "answer", "proposerPlayerId", "proposerName",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -176,6 +181,10 @@ PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`q
                    "settlement are shown: call get_city_options with a cityId for everything it can build. A purchase_unit "
                    "option spends gold (`cost` against `goldBalance`) and delivers the unit at once, rather than queueing it")
 
+DIPLOMATIC_RESPONSE_NOTE = ("another civilization has proposed something to this seat and the turn cannot end until it is "
+                            "answered: each pending proposal is offered twice, once to accept and once to reject "
+                            "(`answer`), with who proposed it (`proposerName`) and what it does (`description`). "
+                            "Treaties and endeavors help both sides; accept them unless the proposer is an enemy.")
 DIPLOMACY_NOTE = ("influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
                   "option names the civilization it is aimed at (`targetName`) and its kind (`group`): TREATY and "
                   "ENDEAVOR help both sides, SANCTION and ESPIONAGE work against the target. Influence otherwise "
@@ -302,6 +311,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = ATTRIBUTES_NOTE
         if decision == "diplomacy":
             group["note"] = DIPLOMACY_NOTE
+        if decision == "diplomatic_response":
+            group["note"] = DIPLOMATIC_RESPONSE_NOTE
         if decision == "resources":
             group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1

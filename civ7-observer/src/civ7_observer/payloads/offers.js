@@ -599,6 +599,30 @@
         }
       }
     }
+    // Answering another civilization's proposal. The pending ones are this seat's own diplomatic
+    // events where it is the target; the shipped reaction panel sends RESPOND_DIPLOMATIC_ACTION with
+    // the event's id and an accept or reject response type. The game will not end the turn until each
+    // is answered, so both answers are always offered when the engine allows them.
+    if (isInt(PlayerOperationTypes.RESPOND_DIPLOMATIC_ACTION) && typeof DiplomaticResponseTypes !== "undefined" &&
+        typeof Game.Diplomacy !== "undefined" && typeof Game.Diplomacy.getPlayerEvents === "function") {
+      let events = null; try { events = Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID); } catch (e) { events = null; }
+      const names = {}; for (const other of metPlayers()) names[other.id] = other.name;
+      if (Array.isArray(events)) for (const ev of events) {
+        if (!ev || !isInt(ev.uniqueID) || ev.targetPlayer !== BOUND_PLAYER_ID) continue;
+        for (const [answer, key] of [["accept", "DIPLOMACY_RESPONSE_ACCEPT"], ["reject", "DIPLOMACY_RESPONSE_REJECT"]]) {
+          const responseType = DiplomaticResponseTypes[key];
+          if (!isInt(responseType)) continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.RESPOND_DIPLOMATIC_ACTION, { ID: ev.uniqueID, Type: responseType }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "RESPOND_DIPLOMATIC_ACTION", arg: ev.uniqueID, arg2: responseType, pre: 1, eventId: ev.uniqueID,
+            answer: answer, typeKey: typeof ev.actionTypeName === "string" ? ev.actionTypeName : null,
+            displayName: typeof ev.name === "string" ? compose(ev.name) : null,
+            description: typeof ev.description === "string" ? compose(ev.description) : null,
+            proposerPlayerId: isInt(ev.initialPlayer) ? ev.initialPlayer : null,
+            proposerName: isInt(ev.initialPlayer) ? (names[ev.initialPlayer] || null) : null, canStart: true });
+        }
+      }
+    }
     // Ending an alliance has no project row of its own: the shipped diplomacy panel sends the cancel
     // operation carrying the alliance action type, once the seat is already allied.
     if (isInt(PlayerOperationTypes.CANCEL_ALLIANCE) && typeof DiplomacyActionTypes !== "undefined" && isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_FORM_ALLIANCE)) {

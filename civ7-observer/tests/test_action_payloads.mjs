@@ -1525,6 +1525,67 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- answering another civilization's proposal
+function withProposal(g, { events = null, answerable = [16], closesAfter = true } = {}) {
+  withDiplomacy(g, {});
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, RESPOND_DIPLOMATIC_ACTION: 9401 };
+  g.DiplomaticResponseTypes = { DIPLOMACY_RESPONSE_ACCEPT: 926305338, DIPLOMACY_RESPONSE_REJECT: 567527351 };
+  const rows = events ?? [
+    { uniqueID: 16, actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", name: "LOC_OPEN_BORDERS", description: "LOC_OB_DESC", initialPlayer: 0, targetPlayer: 1 },
+    { uniqueID: 17, actionType: 9002, actionTypeName: "DIPLOMACY_ACTION_DENOUNCE", name: "LOC_DENOUNCE", description: "LOC_D_DESC", initialPlayer: 1, targetPlayer: 0 },
+  ];
+  let open = new Set(answerable);
+  g.Game.Diplomacy.getPlayerEvents = (pid) => { g._log.push(`events(${pid})`); return rows; };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op !== 9401) return inner.canStart(pid, op, args, show);
+      g._log.push(`rcanStart(${pid},${JSON.stringify(args)},${show})`);
+      return { Success: pid === 1 && open.has(args.ID) };
+    },
+    sendRequest: (pid, op, args) => {
+      if (op !== 9401) return inner.sendRequest(pid, op, args);
+      g._log.push(`rsendRequest(${pid},${JSON.stringify(args)})`);
+      if (closesAfter) open.delete(args.ID);
+    },
+  };
+  return g;
+}
+
+test("each pending proposal aimed at this seat is offered twice, to accept and to reject, naming the proposer; the seat's own proposals are not", () => {
+  const log = [];
+  const g = withProposal(withUnits(world({ log }), [])); g._log = log;
+  const rs = runOffers(g).offers.filter((o) => o.kind === "RESPOND_DIPLOMATIC_ACTION");
+  assert.deepEqual(rs.map((o) => [o.arg, o.arg2, o.answer, o.typeKey, o.proposerPlayerId, o.proposerName, o.pre]),
+    [[16, 926305338, "accept", "DIPLOMACY_ACTION_OPEN_BORDERS", 0, "LOC_ABBASID", 1],
+     [16, 567527351, "reject", "DIPLOMACY_ACTION_OPEN_BORDERS", 0, "LOC_ABBASID", 1]]);
+  assert.ok(!rs.some((o) => o.arg === 17), "an event this seat started is not something it answers");
+  assert.ok(!log.some((e) => e.startsWith("rsendRequest")));
+});
+
+test("perform RESPOND_DIPLOMATIC_ACTION sends the event id and response type, and confirms once the engine will no longer take an answer", () => {
+  const log = [];
+  const g = withProposal(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "RESPOND_DIPLOMATIC_ACTION", 16, 926305338, 0, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "RESPOND_DIPLOMATIC_ACTION", arg: 16, response: 926305338, stillOpen: false, matches: true });
+  assert.ok(log.find((e) => e.startsWith("rsendRequest(") && e.includes('"ID":16,"Type":926305338')));
+  for (const [label, mk, id, type] of [
+    ["not pending", () => withProposal(withUnits(world({ log: [] }), [])), 99, 926305338],
+    ["seat's own event", () => withProposal(withUnits(world({ log: [] }), [])), 17, 926305338],
+    ["not accept or reject", () => withProposal(withUnits(world({ log: [] }), [])), 16, 4242],
+    ["engine refuses", () => withProposal(withUnits(world({ log: [] }), []), { answerable: [] }), 16, 926305338],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    assert.ok(runPerformArgs(h, "RESPOND_DIPLOMATIC_ACTION", id, type, 0, { pre: 1 }).refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("rsendRequest")), `${label}: must not send`);
+  }
+  const stays = withProposal(withUnits(world({ log: [] }), []), { closesAfter: false }); stays._log = [];
+  const rr = runPerformArgs(stays, "RESPOND_DIPLOMATIC_ACTION", 16, 567527351, 0, { pre: 1 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- the six generic unit commands (upgrade, army packing, great person)
 function withUnitCommands(g, { ok = ["UPGRADE"], plots = [1011], typeAfter = 100, armyAfter = null, gone = false } = {}) {
   withMap(g, {});

@@ -235,6 +235,20 @@ def test_new_resources_notification_is_a_supported_resources_decision(tmp_path):
     assert d["required"] is True and d["options"][0]["cityCap"] == 1 and "capacity" in d["note"]
 
 
+def test_a_pending_proposal_is_a_supported_required_decision_not_a_pause(tmp_path):
+    """Live, turn 50: another seat's Open Borders offer paused play as an unsupported decision."""
+    rs = [{"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "arg2": 926305338, "pre": 1, "eventId": 16, "answer": "accept", "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "displayName": "Open Borders", "description": "borders open", "proposerPlayerId": 1, "proposerName": "Abbasid", "canStart": True},
+          {"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "arg2": 567527351, "pre": 1, "eventId": 16, "answer": "reject", "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "displayName": "Open Borders", "description": "borders open", "proposerPlayerId": 1, "proposerName": "Abbasid", "canStart": True}]
+    payload = offers_with(rs, end_can_start=False, blocking="DIPLOMATIC_RESPOSE_REQUIRED")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_DIPLOMATIC_RESPONSE_REQUIRED"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "diplomatic_response")
+    assert d["required"] is True
+    assert [(o["answer"], o["proposerName"]) for o in d["options"]] == [("accept", "Abbasid"), ("reject", "Abbasid")]
+    assert "proposed" in d["note"]
+
+
 def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
     """Live, turn 45: six resource assignments and one confirm; the confirm was the option dropped and
     the seat could not end its turn at all, with nothing left to assign."""

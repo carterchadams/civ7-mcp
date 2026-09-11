@@ -413,6 +413,23 @@
       matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) };
     return JSON.stringify(result);
   }
+  if (KIND === "RESPOND_DIPLOMATIC_ACTION") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "response arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    if (typeof DiplomaticResponseTypes === "undefined" || (ARG2 !== DiplomaticResponseTypes.DIPLOMACY_RESPONSE_ACCEPT && ARG2 !== DiplomaticResponseTypes.DIPLOMACY_RESPONSE_REJECT)) return refuse("UNKNOWN_ACTION", "response is neither accept nor reject");
+    let pending = null;
+    try { for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && ev.uniqueID === ARG && ev.targetPlayer === BOUND_PLAYER_ID) { pending = ev; break; } } } catch (e) { pending = null; }
+    if (!pending) return refuse("ACTION_EXPIRED", "no proposal with that id is pending for this seat");
+    const respArgs = { ID: ARG, Type: ARG2 };
+    const rcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs, false);
+    if (!rcheck || rcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the response");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs);
+    result.outcome = "sent";
+    let stillOpen = null;
+    try { const again = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], respArgs, false); stillOpen = !!(again && again.Success === true); } catch (e) { stillOpen = null; }
+    result.readback = { kind: KIND, arg: ARG, response: ARG2, stillOpen: stillOpen, matches: stillOpen === false };
+    return JSON.stringify(result);
+  }
   if (KIND === "CANCEL_ALLIANCE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "alliance argument is not an integer");
     if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");

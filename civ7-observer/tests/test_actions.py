@@ -1218,6 +1218,21 @@ def test_a_specialist_assignment_confirms_on_the_plot_gaining_a_worker(tmp_path)
     assert res["confirmedBy"]["effect"] == {"specialistAssigned": {"cityId": 65536, "plotIndex": 489, "workers": 1}}
 
 
+def test_answering_a_proposal_confirms_once_it_is_no_longer_pending(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "arg2": 926305338, "pre": 1, "eventId": 16, "answer": "accept", "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "proposerPlayerId": 0, "proposerName": "Abbasid", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "RESPOND_DIPLOMATIC_ACTION", "arg": 16, "response": 926305338, "stillOpen": True, "matches": False}}
+    rb = {**RB, "pendingProposals": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        r = next(o for o in out["offers"] if o["kind"] == "respond_to_proposal")
+        assert r["answer"] == "accept" and r["proposerName"] == "Abbasid" and "arg" not in r
+        res = reg.perform(gs, action_id=r["actionId"], request_id="rp-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"proposalAnswered": {"eventId": 16, "response": 926305338}}
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 
