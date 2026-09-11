@@ -86,11 +86,43 @@ BRIEF_DESCRIPTION = (
     "Start every turn here rather than with get_observation. Takes no arguments."
 )
 LIST_DESCRIPTION = (
-    "Read-only. Every currently legal action for this seat, as opaque `actionId` handles with labels "
-    "(research and civic nodes, per-unit skip and adjacent move, city production, end turn). Options come "
+    "Read-only. The currently legal actions for this seat, as opaque `actionId` handles with labels "
+    "(research and civic nodes, per-unit skip and move, city production, end turn). Options come "
     "from the game's own legality check; `canStart` false means the game refused it. Use get_turn_brief "
-    "first: this is the full list, which can be long. Takes no arguments."
+    "first. This list is capped at a few options per kind and per settlement or unit (`countByKind` and "
+    "`omittedByKind` say what was left out); get_city_options(cityId) and get_unit_options(unitId) list "
+    "everything for one settlement or unit. Takes no arguments."
 )
+# list_actions is a survey, not the catalog: a seat with eight settlements listed 1,073 offers (376 KB),
+# which the client spilled to a file the agent then searched sixteen times, and the turn ran out of
+# budget mid-action. The per-settlement and per-unit tools carry the full set.
+LIST_PER_ENTITY = 3
+LIST_PER_KIND = 12
+
+
+def compact_listing(listing: dict[str, Any]) -> dict[str, Any]:
+    offers = listing.get("offers")
+    if not isinstance(offers, list):
+        return listing
+    kept, by_kind, kept_by_kind, by_entity, omitted = [], {}, {}, {}, {}
+    for o in offers:
+        kind = o.get("kind")
+        entity = (kind, o.get("cityId", o.get("unitId")))
+        by_kind[kind] = by_kind.get(kind, 0) + 1
+        if kept_by_kind.get(kind, 0) < LIST_PER_KIND and by_entity.get(entity, 0) < LIST_PER_ENTITY:
+            kept.append(o)
+            kept_by_kind[kind] = kept_by_kind.get(kind, 0) + 1
+            by_entity[entity] = by_entity.get(entity, 0) + 1
+        else:
+            omitted[kind] = omitted.get(kind, 0) + 1
+    out = dict(listing)
+    out["offers"] = kept
+    out["countByKind"] = by_kind
+    if omitted:
+        out["omittedByKind"] = omitted
+        out["note"] = ("capped at a few options per kind and per settlement or unit; get_city_options(cityId) and "
+                       "get_unit_options(unitId) list everything for one settlement or unit")
+    return out
 PERFORM_DESCRIPTION = (
     "Performs ONE previously offered action for this seat. `action_id` must come from get_turn_brief or "
     "list_actions; `request_id` is a short id you choose (1-64 chars of A-Za-z0-9._-) that makes the call "
@@ -221,7 +253,7 @@ def build_server(
 
     @mcp.tool(name="list_actions", description=LIST_DESCRIPTION, annotations=READ_ONLY)
     def list_actions() -> dict[str, Any]:
-        return _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
+        return _with_session(lambda gs: compact_listing(registry.list_offers(gs, player=bound, mode=mode)))
 
     @mcp.tool(name="get_unit_options", description=UNIT_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
     def get_unit_options(unit_id: int) -> dict[str, Any]:

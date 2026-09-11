@@ -252,7 +252,8 @@ def main() -> int:
     ap.add_argument("--rounds", type=int, default=1)
     ap.add_argument("--mode", default="local-hotseat")
     ap.add_argument("--model", default="sonnet")
-    ap.add_argument("--budget-usd", type=float, default=1.5, help="per seat-turn spend cap passed to claude")
+    # a turn cut off by the cap wastes everything it spent (live: $1.56 on turn 85, aborted mid-action)
+    ap.add_argument("--budget-usd", type=float, default=2.0, help="per seat-turn spend cap passed to claude")
     ap.add_argument("--timeout", type=float, default=1200.0, help="per seat-turn wall clock cap in seconds")
     ap.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max", "default"],
                     help="reasoning effort passed to claude for each seat turn; 'default' omits the flag and takes the client's own setting")

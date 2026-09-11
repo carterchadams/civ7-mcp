@@ -293,3 +293,18 @@ def test_per_entity_options_are_bounded_and_show_every_distinct_choice_first(tmp
     assert len(json.dumps(out)) < 30000
     kinds = {o["kind"] for o in out["options"]}
     assert kinds == {"produce_constructible", "produce_unit"}, "the single unit option must not be crowded out"
+
+
+def test_list_actions_is_a_capped_survey_that_says_what_it_left_out():
+    from civ7_observer.server import compact_listing
+    offers = [{"kind": "produce_constructible", "cityId": c, "actionId": f"a{c}-{i}"} for c in range(1, 4) for i in range(10)]
+    offers += [{"kind": "move_unit", "unitId": 5, "actionId": f"m{i}"} for i in range(6)] + [{"kind": "end_turn", "actionId": "e"}]
+    out = compact_listing({"offers": offers, "context": {"turn": 1}})
+    kinds = [o["kind"] for o in out["offers"]]
+    assert kinds.count("produce_constructible") == 9 and kinds.count("move_unit") == 3 and kinds.count("end_turn") == 1
+    assert all(sum(1 for o in out["offers"] if o.get("cityId") == c) == 3 for c in range(1, 4)), "a few per settlement, not the first settlement's whole list"
+    assert out["countByKind"] == {"produce_constructible": 30, "move_unit": 6, "end_turn": 1}
+    assert out["omittedByKind"] == {"produce_constructible": 21, "move_unit": 3} and "get_city_options" in out["note"]
+    assert out["context"] == {"turn": 1}
+    small = compact_listing({"offers": offers[:2]})
+    assert "omittedByKind" not in small and small["offers"] == offers[:2]
