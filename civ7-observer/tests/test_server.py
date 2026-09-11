@@ -308,10 +308,12 @@ def test_list_actions_is_a_capped_survey_that_says_what_it_left_out():
     offers += [{"kind": "move_unit", "unitId": 5, "actionId": f"m{i}"} for i in range(6)] + [{"kind": "end_turn", "actionId": "e"}]
     out = compact_listing({"offers": offers, "context": {"turn": 1}})
     kinds = [o["kind"] for o in out["offers"]]
-    assert kinds.count("produce_constructible") == 9 and kinds.count("move_unit") == 3 and kinds.count("end_turn") == 1
-    assert all(sum(1 for o in out["offers"] if o.get("cityId") == c) == 3 for c in range(1, 4)), "a few per settlement, not the first settlement's whole list"
+    assert kinds.count("produce_constructible") == 6 and kinds.count("move_unit") == 2 and kinds.count("end_turn") == 1
+    assert all(sum(1 for o in out["offers"] if o.get("cityId") == c) == 2 for c in range(1, 4)), "a few per settlement, not the first settlement's whole list"
     assert out["countByKind"] == {"produce_constructible": 30, "move_unit": 6, "end_turn": 1}
-    assert out["omittedByKind"] == {"produce_constructible": 21, "move_unit": 3} and "get_city_options" in out["note"]
+    assert out["omittedByKind"] == {"produce_constructible": 24, "move_unit": 4} and "get_city_options" in out["note"]
+    guided = compact_listing({"offers": [{"kind": "disband_unit", "unitId": 1, "actionId": "d", "guidance": "long text"}]})
+    assert "guidance" not in guided["offers"][0] and guided["offers"][0]["actionId"] == "d"
     assert out["context"] == {"turn": 1}
     small = compact_listing({"offers": offers[:2]})
     assert "omittedByKind" not in small and small["offers"] == offers[:2]

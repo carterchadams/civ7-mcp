@@ -97,8 +97,9 @@ LIST_DESCRIPTION = (
 # list_actions is a survey, not the catalog: a seat with eight settlements listed 1,073 offers (376 KB),
 # which the client spilled to a file the agent then searched sixteen times, and the turn ran out of
 # budget mid-action. The per-settlement and per-unit tools carry the full set.
-LIST_PER_ENTITY = 3
-LIST_PER_KIND = 12
+# 12 per kind and 3 per entity still made 183 offers and 59 KB, which the client spilled to a file
+LIST_PER_ENTITY = 2
+LIST_PER_KIND = 6
 
 
 def compact_listing(listing: dict[str, Any]) -> dict[str, Any]:
@@ -111,7 +112,8 @@ def compact_listing(listing: dict[str, Any]) -> dict[str, Any]:
         entity = (kind, o.get("cityId", o.get("unitId")))
         by_kind[kind] = by_kind.get(kind, 0) + 1
         if kept_by_kind.get(kind, 0) < LIST_PER_KIND and by_entity.get(entity, 0) < LIST_PER_ENTITY:
-            kept.append(o)
+            # the guidance paragraph rides on the brief and on the confirmation refusal, not on every row
+            kept.append({k: v for k, v in o.items() if k != "guidance"} if "guidance" in o else o)
             kept_by_kind[kind] = kept_by_kind.get(kind, 0) + 1
             by_entity[entity] = by_entity.get(entity, 0) + 1
         else:
