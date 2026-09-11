@@ -1371,3 +1371,63 @@ test("picking a legacy card adds it and applies its own effects once each, then 
   assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 }).refused.code, "ACTION_EXPIRED", "stale deck size");
   assert.equal(runPerform(g, "ADVANCED_START_MODIFY_DECK", 4242, { pre: 1 }).refused.code, "UNKNOWN_ACTION");
 });
+
+// ---- first contact (the other player's id comes from the seat's own notification text)
+function withFirstMeet(g, { summary = "You have met [PlayerName:2] of Abbasid Empire.", blocks = true, allow = true, notifId = 108 } = {}) {
+  g.PlayerOperationTypes.RESPOND_DIPLOMATIC_FIRST_MEET = -1386024947;
+  g.DiplomacyPlayerFirstMeets = { PLAYER_REALATIONSHIP_FIRSTMEET_UNKNOWN: -1, PLAYER_REALATIONSHIP_FIRSTMEET_UNFRIENDLY: -152793613, PLAYER_REALATIONSHIP_FIRSTMEET_NEUTRAL: 673478009, PLAYER_REALATIONSHIP_FIRSTMEET_FRIENDLY: 2135616342 };
+  g.Players.get(1).DiplomacyTreasury = { diplomacyBalance: 796.4 };
+  g.Game.Diplomacy = { getFirstMeetResponseCostAndRelDelta: () => [13, -20], getFM_RevealCapitalsString: () => "LOC_REVEAL" };
+  g.Game.Notifications.getEndTurnBlockingType = () => 781;
+  g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: notifId, type: 20 }];
+  g.Game.Notifications.find = () => ({ Type: 77, BlocksTurnAdvancement: blocks });
+  g.Game.Notifications.getTypeName = () => "NOTIFICATION_PLAYER_MET";
+  g.Game.Notifications.getBlocksTurnAdvancement = () => blocks;
+  g.Game.Notifications.getSummary = () => summary;
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== -1386024947) return inner.canStart(pid, op, args, show); g._log.push(`mcanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: allow }; },
+    sendRequest: (pid, op, args) => { if (op !== -1386024947) return inner.sendRequest(pid, op, args); g._log.push(`msendRequest(${pid},${JSON.stringify(args)})`); },
+  };
+  return g;
+}
+
+test("first contact offers the three greetings for the player the seat's own notification names", () => {
+  const log = [];
+  const g = withFirstMeet(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const greet = r.offers.filter((o) => o.kind === "RESPOND_DIPLOMATIC_FIRST_MEET");
+  assert.deepEqual(greet.map((o) => [o.greeting, o.arg, o.arg2, o.arg3, o.pre, o.influenceCost, o.influenceBalance, o.note, o.canStart]),
+    [["FRIENDLY", 2135616342, 2, 108, 108, 13, 796, "LOC_REVEAL", true],
+     ["NEUTRAL", 673478009, 2, 108, 108, 13, 796, "LOC_REVEAL", true],
+     ["UNFRIENDLY", -152793613, 2, 108, 108, 13, 796, "LOC_REVEAL", true]]);
+  assert.ok(log.filter((e) => e.startsWith("mcanStart(")).every((e) => e.includes('"Player1":1,"Player2":2')));
+  assert.ok(!log.some((e) => e.startsWith("msendRequest")));
+  const none = withFirstMeet(world({ log: [] }), { summary: "You have met a new Civilization." }); none._log = [];
+  assert.equal(runOffers(none).offers.filter((o) => o.kind === "RESPOND_DIPLOMATIC_FIRST_MEET").length, 0, "no id in the text means no offer");
+  const done = withFirstMeet(world({ log: [] }), { blocks: false }); done._log = [];
+  assert.equal(runOffers(done).offers.filter((o) => o.kind === "RESPOND_DIPLOMATIC_FIRST_MEET").length, 0, "answered contacts are not re-offered");
+});
+
+test("perform the greeting only after re-deriving the player from the still-blocking notification", () => {
+  const log = [];
+  const g = withFirstMeet(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "RESPOND_DIPLOMATIC_FIRST_MEET", 2135616342, 2, 108, { pre: 108 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  const send = log.find((e) => e.startsWith("msendRequest("));
+  assert.ok(send && send.includes('"Player1":1,"Player2":2,"Type":2135616342'));
+  for (const [label, mk, t, other, nid] of [
+    ["not a greeting", () => withFirstMeet(world({ log: [] })), 4242, 2, 108],
+    ["player mismatch", () => withFirstMeet(world({ log: [] })), 2135616342, 3, 108],
+    ["notification gone", () => withFirstMeet(world({ log: [] }), { notifId: 999 }), 2135616342, 2, 108],
+    ["no longer blocking", () => withFirstMeet(world({ log: [] }), { blocks: false }), 2135616342, 2, 108],
+    ["canStart false", () => withFirstMeet(world({ log: [] }), { allow: false }), 2135616342, 2, 108],
+    ["greeting the seat itself", () => withFirstMeet(world({ log: [] }), { summary: "You have met [PlayerName:1] of X." }), 2135616342, 1, 108],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "RESPOND_DIPLOMATIC_FIRST_MEET", t, other, nid, { pre: 108 });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("msendRequest")), `${label}: must not send`);
+  }
+});

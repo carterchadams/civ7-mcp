@@ -451,6 +451,34 @@
     result.readback = { kind: KIND, arg: ARG, government: ARG2, observed: isInt(gafter) ? gafter : null, matches: gafter === ARG2 || gafter === ARG };
     return JSON.stringify(result);
   }
+  if (KIND === "RESPOND_DIPLOMATIC_FIRST_MEET") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "first meet arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof DiplomacyPlayerFirstMeets === "undefined") return refuse("API_CONTRACT_MISMATCH", "first meet contract unavailable");
+    let known = false; for (const k of Object.keys(DiplomacyPlayerFirstMeets)) { if (DiplomacyPlayerFirstMeets[k] === ARG && k !== "PLAYER_REALATIONSHIP_FIRSTMEET_UNKNOWN") { known = true; break; } }
+    if (!known) return refuse("UNKNOWN_ACTION", "greeting is not a first meet relationship type");
+    if (ARG2 === BOUND_PLAYER_ID || ARG2 < 0) return refuse("UNKNOWN_ACTION", "the other player is not valid");
+    // re-derive the player from the seat's own still-blocking notification rather than trusting the offer
+    let match = false;
+    try {
+      for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) {
+        if (nid.id !== ARG3) continue;
+        const n = Game.Notifications.find(nid);
+        if (!n || Game.Notifications.getTypeName(n.Type) !== "NOTIFICATION_PLAYER_MET" || Game.Notifications.getBlocksTurnAdvancement(nid) !== true) break;
+        const s = Game.Notifications.getSummary(nid);
+        const m = typeof s === "string" ? s.match(/\[PlayerName:(\d+)\]/) : null;
+        if (m && parseInt(m[1], 10) === ARG2) match = true;
+        break;
+      }
+    } catch (e) { match = false; }
+    if (!match) return refuse("ACTION_EXPIRED", "that first meet is no longer pending for this seat");
+    const args = { Player1: BOUND_PLAYER_ID, Player2: ARG2, Type: ARG };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that greeting");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    result.readback = { kind: KIND, arg: ARG, otherPlayer: ARG2, matches: false };
+    return JSON.stringify(result);
+  }
   if (KIND === "FOUND_PANTHEON") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "belief argument is not an integer");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Religion || typeof player.Religion.getNumPantheons !== "function") return refuse("API_CONTRACT_MISMATCH", "pantheon operation contract unavailable");

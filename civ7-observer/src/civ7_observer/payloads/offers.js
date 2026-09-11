@@ -505,6 +505,31 @@
         offers.push({ kind: "CHANGE_GOVERNMENT", arg: g.$index, arg2: g.$hash, pre: gpre, typeKey: g.GovernmentType, displayName: compose(g.Name), description: compose(g.Description), celebration: compose(g.CelebrationName), effects: effects, unlocksTraditions: unlocks, canStart: true });
       }
     }
+    if (isInt(PlayerOperationTypes.RESPOND_DIPLOMATIC_FIRST_MEET) && typeof DiplomacyPlayerFirstMeets !== "undefined" && blocked) {
+      // First contact: the seat's own NOTIFICATION_PLAYER_MET names the other player in its summary
+      // ("You have met [PlayerName:N] of ..."), which is the only place the id is offered to this seat;
+      // it cannot be dismissed, so a greeting is required. No roster is read and no other player object
+      // is looked up: the id travels from the notification into the operation and back out again.
+      for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) {
+        const n = Game.Notifications.find(nid);
+        if (!n || Game.Notifications.getTypeName(n.Type) !== "NOTIFICATION_PLAYER_MET" || !blocksNow(nid, n)) continue;
+        let summary = null; try { summary = Game.Notifications.getSummary(nid); } catch (e) { summary = null; }
+        const m = typeof summary === "string" ? summary.match(/\[PlayerName:(\d+)\]/) : null;
+        if (!m) continue;
+        const other = parseInt(m[1], 10);
+        if (!isInt(other) || other < 0 || other === BOUND_PLAYER_ID) continue;
+        let influence = null; try { influence = Math.floor(player.DiplomacyTreasury.diplomacyBalance); } catch (e) { influence = null; }
+        let reveal = null; try { reveal = compose(Game.Diplomacy.getFM_RevealCapitalsString(BOUND_PLAYER_ID, other)); } catch (e) { reveal = null; }
+        for (const key of ["PLAYER_REALATIONSHIP_FIRSTMEET_FRIENDLY", "PLAYER_REALATIONSHIP_FIRSTMEET_NEUTRAL", "PLAYER_REALATIONSHIP_FIRSTMEET_UNFRIENDLY"]) {
+          const t = DiplomacyPlayerFirstMeets[key];
+          if (!isInt(t)) continue;
+          let cost = null; try { const cd = Game.Diplomacy.getFirstMeetResponseCostAndRelDelta(BOUND_PLAYER_ID, other, t); if (Array.isArray(cd) && isInt(cd[0])) cost = cd[0]; } catch (e) { cost = null; }
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.RESPOND_DIPLOMATIC_FIRST_MEET, { Player1: BOUND_PLAYER_ID, Player2: other, Type: t }, false);
+          offers.push({ kind: "RESPOND_DIPLOMATIC_FIRST_MEET", arg: t, arg2: other, arg3: nid.id, pre: nid.id, greeting: key.replace("PLAYER_REALATIONSHIP_FIRSTMEET_", ""),
+            otherPlayer: other, influenceCost: cost, influenceBalance: influence, note: reveal, canStart: !!(check && check.Success === true) });
+        }
+      }
+    }
     if (isInt(PlayerOperationTypes.FOUND_PANTHEON) && player.Religion && typeof player.Religion.getNumPantheons === "function" && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {
       // Pantheon: the shipped chooser lists every BELIEF_CLASS_PANTHEON belief and gates each on
       // canStart(FOUND_PANTHEON, {BeliefType}); only the ones the game accepts are offered.

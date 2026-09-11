@@ -39,6 +39,7 @@ def test_local_friction_card_is_available_and_not_generated():
     (["crisis"], ["civ7-turn-management", "civ7-ages-and-crises"]),
     (["age_transition"], ["civ7-turn-management", "civ7-ages-and-crises"]),
     (["legacies"], ["civ7-turn-management", "civ7-triumphs-and-dedications"]),
+    (["first_meet"], ["civ7-turn-management", "civ7-diplomacy-and-independents"]),
     (["narrative"], ["civ7-turn-management"]),
     (["pantheon"], ["civ7-turn-management", "civ7-religion-and-great-works"]),
     (["government"], ["civ7-turn-management", "civ7-happiness-and-government"]),

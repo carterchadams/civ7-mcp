@@ -1107,3 +1107,17 @@ def test_legacy_card_pick_takes_the_reward_and_the_finish_clears_the_notificatio
         assert r1["status"] == "confirmed" and r1["confirmedBy"]["effect"] == {"legacyCardAdded": 1875644328}
         r2 = reg.perform(gs, action_id=by["finish_legacy_deck"]["actionId"], request_id="lc-2", player=1, mode="singleplayer")
     assert r2["status"] == "confirmed" and r2["confirmedBy"]["effect"] == {"legacyDeckCompleted": True}
+
+
+def test_first_meet_greeting_confirms_when_the_met_notification_stops_blocking(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "RESPOND_DIPLOMATIC_FIRST_MEET", "arg": 2135616342, "arg2": 1, "arg3": 108, "pre": 108, "greeting": "FRIENDLY", "otherPlayer": 1, "influenceCost": 13, "influenceBalance": 796, "note": "Your capital will be revealed.", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "RESPOND_DIPLOMATIC_FIRST_MEET", "arg": 2135616342, "otherPlayer": 1, "matches": False}}
+    rb = {**RB, "blockingNotifications": ["NOTIFICATION_COMMAND_UNITS"]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        gr = next(o for o in out["offers"] if o["kind"] == "greet_new_civilization")
+        assert gr["greeting"] == "FRIENDLY" and gr["influenceCost"] == 13 and gr["otherPlayer"] == 1 and "arg" not in gr
+        res = reg.perform(gs, action_id=gr["actionId"], request_id="fm-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"firstMeetAnswered": 1}

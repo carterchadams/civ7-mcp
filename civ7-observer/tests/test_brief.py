@@ -315,3 +315,13 @@ def test_age_transition_notification_in_the_new_age_is_the_legacies_decision(tmp
     assert b["pause"] is None
     d = next(d for d in b["decisions"] if d["kind"] == "legacies")
     assert d["required"] is True and d["options"][0]["pointsAvailable"] == 3 and "forfeits any unspent" in d["note"]
+
+
+def test_player_met_notification_is_a_supported_first_meet_decision(tmp_path):
+    fm = [{"kind": "RESPOND_DIPLOMATIC_FIRST_MEET", "arg": 2135616342, "arg2": 1, "arg3": 108, "pre": 108, "greeting": "FRIENDLY", "otherPlayer": 1, "influenceCost": 13, "influenceBalance": 796, "note": "Your capital will be revealed.", "canStart": True}]
+    payload = offers_with(fm, end_can_start=False, blocking="NOTIFICATION_PLAYER_MET")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_PLAYER_MET"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "first_meet")
+    assert d["required"] is True and d["options"][0]["greeting"] == "FRIENDLY" and "greets it" in d["note"]
