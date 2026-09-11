@@ -2132,7 +2132,8 @@ function withPolicyAndResources(g, { active = [-305844099], deactOk = true, assi
   g.GameplayMap = { ...(g.GameplayMap || {}), getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
   const me = g.Players.get(1);
   let act = active.slice();
-  me.Culture = { ...me.Culture, getActiveTraditions: (slot) => (slot === 0 ? act : []), isTraditionActive: (h) => act.includes(h) };
+  me.Culture = { ...me.Culture, getActiveTraditions: (slot) => (slot === 0 ? act : []), isTraditionActive: (h) => act.includes(h),
+                 getNumCultureSlots: () => 0, getUnlockedTraditions: () => [], getGoldenAgeChoices: () => [], getGovernmentType: () => -1 };
   const cities = { 65536: me.Cities.getCities()[0], 131073: { id: { owner: 1, id: 131073, type: 1 }, name: "LOC_D", location: { x: 5, y: 5 }, isTown: false, BuildQueue: { getQueue: () => [], currentProductionTypeHash: -1 } } };
   let homes = Object.fromEntries(assigned);
   for (const c of Object.values(cities)) c.Resources = { getAssignedResources: () => Object.entries(homes).filter(([v, cid]) => cid === c.id.id).map(([v]) => ({ value: Number(v) })) };
