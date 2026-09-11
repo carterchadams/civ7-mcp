@@ -1,0 +1,61 @@
+"""The agent-game driver's command construction and turn instructions.
+
+The driver is a demo script rather than a package module, so it is loaded by path. Nothing here
+starts a model, opens a game session or touches live state: it inspects the command that would be
+run and the instructions that would be sent.
+"""
+import importlib.util
+import sys
+from pathlib import Path
+
+import pytest
+
+DRIVER = Path(__file__).resolve().parents[1] / "demo" / "agent-game.py"
+
+
+@pytest.fixture(scope="module")
+def driver():
+    spec = importlib.util.spec_from_file_location("agent_game_driver", DRIVER)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_the_seat_prompt_replaces_the_coding_prompt_rather_than_appending_to_it(driver):
+    """Appending left the seat being Claude Code first and a player second: asked to follow an
+    appended instruction it disagreed with, the client said so and ignored it."""
+    source = DRIVER.read_text(encoding="utf-8")
+    assert '"--system-prompt-file", str(system_path)' in source
+    assert "--append-system-prompt-file" not in source
+    # exactly one system-prompt mechanism reaches the client
+    assert source.count("system-prompt") == 1
+
+
+def test_the_driver_names_an_effort_level_and_can_be_told_to_omit_it(driver):
+    parser_source = DRIVER.read_text(encoding="utf-8")
+    assert '"--effort", default="medium"' in parser_source
+    assert '*(("--effort", effort) if effort else ())' in parser_source
+    assert '"low", "medium", "high", "xhigh", "max", "default"' in parser_source
+
+
+def test_the_turn_instructions_ask_for_one_bounded_opportunity_check_not_bare_minimum_play(driver):
+    text = driver.INSTRUCTIONS
+    assert "one bounded check" in text
+    for topic in ("scouting", "Independent Power", "Influence"):
+        assert topic in text, f"the opportunity check must name {topic}"
+    # the pause and offered-id rules survive the rewrite
+    assert "`pause`" in text and "Never invent one" in text
+    # and the seat is told the reconsideration bar, so it does not churn its plan
+    assert "not merely because alternatives exist" in text
+
+
+def test_the_instructions_stand_alone_now_that_the_default_prompt_is_gone(driver):
+    text = driver.INSTRUCTIONS
+    assert "no filesystem, no shell and no network" in text
+
+
+def test_the_denied_tool_list_still_covers_the_file_and_shell_surface(driver):
+    """Replacing the prompt is not permission enforcement; the flags still are."""
+    for tool in ("Read", "Grep", "Glob", "Bash", "Edit", "Write", "WebFetch", "WebSearch"):
+        assert tool in driver.DENIED

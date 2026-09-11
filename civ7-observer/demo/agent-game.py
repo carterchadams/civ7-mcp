@@ -50,6 +50,14 @@ Play this turn: read the brief, resolve the decision it marks required, read the
 repeat until endTurn.canStart is true, then perform the end_turn action. Stop immediately if the \
 brief sets `pause` and report it.
 
+Resolve mandatory choices and follow the commitments already in your plan. Before ending, make one \
+bounded check for useful scouting, known reward tiles, Independent Power threats or opportunities, \
+and worthwhile Influence spending. Reconsider the plan when a threat, discovery, unlock, completed \
+project, diplomatic event or Age transition changes it, not merely because alternatives exist. \
+Choose a satisfactory routine action after a short comparison, and spend your attention instead on \
+combat, settlement placement, major spending and diplomacy. Read the brief again when the facts \
+relevant to your next choice have changed.
+
 Choose only action ids the host has offered you in this turn. Never invent one, and never repeat an \
 action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \
 report_friction rather than guessing, then continue with the least committal legal option if you \
@@ -57,9 +65,13 @@ can. get_observation is large: call it only when a specific decision needs map d
 get_unit_options(unit_id) or get_city_options(city_id) rather than list_actions when you need one \
 unit's or one settlement's choices.
 
-Keep a short plan across turns with get_plan / update_plan (at most three commitments). Keep your \
-visible output short: a line per decision saying what you chose and why, and a closing summary under \
-150 words. The skill cards below are your procedures; the rest of the catalog can be loaded on demand."""
+Keep a short plan across turns with get_plan / update_plan (at most three commitments); update it \
+when its contents change. Report strategic changes, missing capabilities and exceptions, and do not \
+narrate routine moves. Finish with at most three short bullets. The skill cards below are your \
+procedures; the rest of the catalog can be loaded on demand.
+
+These instructions are your whole brief. You have no filesystem, no shell and no network: the civ7 \
+tools are everything you can reach, and nothing outside this turn is yours to change."""
 
 
 def context(attempts: int = 40):
@@ -113,7 +125,8 @@ def tidy_curtains(*, raise_curtain: bool) -> dict:
         return tidy(gs, mode="raise" if raise_curtain else "prune")
 
 
-def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float, raise_curtain: bool = False) -> dict:
+def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float, raise_curtain: bool = False,
+              effort: str | None = None) -> dict:
     ctx = context()
     turn = ctx["turn"]
     tag = f"t{turn}-seat{seat}"
@@ -145,8 +158,12 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
            "--mcp-config", str(mcp_config(seat, mode)), "--strict-mcp-config",
            "--allowedTools", *[f"mcp__{SERVER}__{t}" for t in TOOLS],
            "--disallowedTools", *DENIED,
-           "--append-system-prompt-file", str(system_path),
+           # Replaces the default coding prompt instead of appending to it. Appending left the seat
+           # being Claude Code first and a player second: asked to follow an appended instruction it
+           # conflicted with, the model said so and ignored it (verified against this client).
+           "--system-prompt-file", str(system_path),
            "--max-budget-usd", str(budget),
+           *(("--effort", effort) if effort else ()),
            "--output-format", "stream-json", "--verbose"]
     t0 = time.monotonic()
     with open(transcript, "w", encoding="utf-8") as out:
@@ -213,8 +230,12 @@ def main() -> int:
     ap.add_argument("--model", default="sonnet")
     ap.add_argument("--budget-usd", type=float, default=1.5, help="per seat-turn spend cap passed to claude")
     ap.add_argument("--timeout", type=float, default=1200.0, help="per seat-turn wall clock cap in seconds")
+    ap.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max", "default"],
+                    help="reasoning effort passed to claude for each seat turn; 'default' omits the flag and takes the client's own setting")
     ap.add_argument("--raise-curtain", action="store_true", help="remove the hotseat curtain before each seat turn so play can be watched (default: only stale curtains are pruned)")
     args = ap.parse_args()
+    if args.effort == "default":
+        args.effort = None
     RUNS.mkdir(parents=True, exist_ok=True)
     log = RUNS / "log.jsonl"
     seats = list(args.seats)
@@ -229,7 +250,8 @@ def main() -> int:
             return 1
         seat = live
         if True:
-            res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout, raise_curtain=args.raise_curtain)
+            res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout,
+                            raise_curtain=args.raise_curtain, effort=args.effort)
             played[seat] = played.get(seat, 0) + 1
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
