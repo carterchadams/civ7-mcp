@@ -201,3 +201,15 @@ Also added during the game without a live blocker yet: `produce_constructible` (
 build units), `activate_tradition` / `confirm_traditions` (TRADITIONS, from the shipped policies
 screen and a live read of the culture API). The curtain lifecycle across consecutive agent seats
 held for every seat handoff so far.
+
+### Turns 5–18 (continued)
+
+| turn / seat | result |
+|---|---|
+| t5 seat 1 | **unknown outcome** on a production choice: BUILD had appended a Scout behind three queued Warriors; production is now an enqueue (queue shown, precondition = queue length) |
+| t5 | 17 stale curtain instances found in the DOM; `curtain prune/raise` added; the game has been played with the curtain raised since, with the advisor council popup confirmed with nothing followed |
+| t8 seat 0 | **stop**: the civic blocker was named `NOTIFICATION_CHOOSE_CULTURE_NODE` (raw value); aliases added. Then **stop** again: blocker value `CULTURE` while the blocking notifications were CHOOSE_GOVERNMENT, COMMAND_UNITS and TRADITIONS_AVAILABLE; `change_government` added and required decisions now come from the blocking notifications. Then **unknown outcome** on `confirm_traditions`: the operation was accepted but the notification stays until a card is activated; confirmation tightened |
+| t8 seat 1 | **stop**: `NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL` after a narrative reward of wildcard points; `buy_attribute` / `consider_attributes` added |
+| t8–t18 | 43 consecutive seat turns with no stop; `found_pantheon` used live (3 times), `change_government` 4, traditions 3+8, narrative 8, buildings 4 |
+| totals | 72 seat turns ended by turn 18, about $12.3 in Sonnet usage, 44 s per seat turn on average; action mix led by moves (107) and skips (95) |
+| friction | t15 seat 2: governments had only boilerplate descriptions; effect text and unlocked traditions added to the offers |
