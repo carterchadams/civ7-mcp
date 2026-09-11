@@ -1064,6 +1064,36 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_diplomatic_action_confirms_on_influence_spent_and_names_its_target(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9001, "pre": 1256, "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "displayName": "Open Borders", "targetPlayerId": 0, "targetName": "Abbasid", "targetIsMajor": True, "group": "TREATY", "cost": 33, "costYield": "influence", "influenceBalance": 1256, "affordable": True, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9001, "influenceBefore": 1256, "influence": 1256, "matches": False}}
+    rb = {**RB, "influenceBalance": 1223}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "start_diplomatic_action")
+        assert d["targetName"] == "Abbasid" and d["cost"] == 33 and d["costYield"] == "influence" and d["group"] == "TREATY"
+        assert "arg" not in d and "arg2" not in d
+        res = reg.perform(gs, action_id=d["actionId"], request_id="dip-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"diplomaticActionStarted": {"targetPlayerId": 0, "actionType": 9001, "influenceSpent": 33}}
+
+
+def test_a_diplomatic_action_that_spends_no_influence_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9001, "pre": 1256, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9001, "influenceBefore": 1256, "influence": 1256, "matches": False}}
+    rb = {**RB, "influenceBalance": 1256}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "start_diplomatic_action")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=d["actionId"], request_id="dip-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
 def test_building_purchase_confirms_on_a_lighter_treasury(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "cityId": 65536, "cityName": "Pārsa", "constructibleKey": "BUILDING_GRANARY", "constructibleClass": "BUILDING", "displayName": "Granary", "cost": 144, "goldBalance": 2792, "affordable": True, "plotIndex": 403, "placement": "urban", "x": 3, "y": 4, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2792, "matches": False}}

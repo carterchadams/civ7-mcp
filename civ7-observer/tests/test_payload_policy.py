@@ -61,6 +61,10 @@ MUTATION_ALLOWLIST = (
     # promoting a town to a city: the same command carries the upgrade directive instead of a thing to buy
     'Game.CityCommands.canStart(townId, CityCommandTypes.PURCHASE, upArgs, false)',
     'Game.CityCommands.sendRequest(townId, CityCommandTypes.PURCHASE, upArgs)',
+    # diplomacy: the operation is not named by the payload at all, it is taken from the engine's own
+    # current listing for a project the engine still reports as available against that target
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, project.operationType, diploArgs)',
     'GameSetup.setPlayerParameterValue(BOUND_PLAYER_ID, "AgeTransitionPlayerCivilization", civKey)',
     # taking a legacy card takes its reward in the same action: the engine never reports an effect as spent
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ADVANCED_START_USE_EFFECT, { ID: e.id }, false)',
@@ -74,7 +78,56 @@ MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 
+VETTED_BEGIN = "    // BEGIN VETTED MET-PLAYER SCOPE\n"
+VETTED_END = "    // END VETTED MET-PLAYER SCOPE\n"
+
+# Diplomacy is the one decision a seat cannot make from its own state alone: choosing whom to
+# denounce or trade maps with means knowing who it has met. This block, and only this block, may look
+# past the bound player, and it may take only the three fields below. It is pinned here character for
+# character, so any edit to it -- widening the scope, reading a unit, a city or a yield -- fails the
+# test rather than passing unnoticed.
+VETTED_MET_PLAYER_SCOPE = """    const metPlayers = () => {
+      const out = [];
+      try {
+        for (const other of Players.getEverAlive()) {
+          if (!other || !isInt(other.id) || other.id === BOUND_PLAYER_ID) continue;
+          if (player.Diplomacy.hasMet(other.id) !== true) continue;
+          out.push({ id: other.id, name: compose(other.civilizationName), major: other.isMajor === true });
+        }
+      } catch (e) { return []; }
+      return out;
+    };
+"""
+
+
+def strip_vetted(source: str) -> str:
+    """Replace the vetted met-player block with blank lines, keeping every other line number intact."""
+    start = source.find(VETTED_BEGIN)
+    if start == -1:
+        return source
+    body = start + len(VETTED_BEGIN)
+    end = source.index(VETTED_END, body)
+    assert source[body:end] == VETTED_MET_PLAYER_SCOPE, (
+        "the vetted met-player scope has been edited; review it against the diplomacy policy before "
+        "updating VETTED_MET_PLAYER_SCOPE"
+    )
+    return source[:body] + "\n" * source.count("\n", body, end) + source[end:]
+
+
+def test_the_vetted_met_player_scope_is_present_and_unchanged():
+    offers = (PAYLOAD_DIR / "offers.js").read_text(encoding="utf-8")
+    assert VETTED_BEGIN in offers, "offers.js must delimit its met-player scope"
+    strip_vetted(offers)   # asserts the block matches character for character
+
+
+def test_only_offers_js_may_carry_a_vetted_scope():
+    for payload in PAYLOAD_DIR.iterdir():
+        if payload.name.endswith(".js") and payload.name != "offers.js":
+            assert VETTED_BEGIN not in payload.read_text(encoding="utf-8"), f"{payload.name} may not exempt itself"
+
+
 def violations(source: str) -> list[str]:
+    source = strip_vetted(source)
     found = []
     for label, pattern in FORBIDDEN_PATTERNS.items():
         for m in re.finditer(pattern, source, flags=re.MULTILINE):

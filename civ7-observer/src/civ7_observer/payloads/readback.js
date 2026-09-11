@@ -23,6 +23,7 @@
     activeTraditions: player ? t(() => { const out = []; for (const k of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) { const st = CultureSlotTypes[k]; if (Number.isInteger(st)) for (const h of player.Culture.getActiveTraditions(st)) out.push(h); } return out; }) : null,
     tradeRoutes: player ? t(() => player.Trade.countPlayerTradeRoutes()) : null,
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
+    influenceBalance: player ? t(() => Math.floor(player.DiplomacyTreasury.diplomacyBalance)) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
     // Neither getNumPromotions nor getTotalPromotionsEarned moves when a promotion is taken (both were
     // tried live and stayed put), so the held set is the only positive signal. hasPromotion takes the

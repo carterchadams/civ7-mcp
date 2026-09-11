@@ -258,6 +258,39 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "START_DIPLOMATIC_ACTION") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "diplomacy arguments are not integers");
+    if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");
+    if (typeof Game.Diplomacy === "undefined" || typeof Game.Diplomacy.getProjectDataForUI !== "function" ||
+        typeof DiplomacyProjectStatus === "undefined" || typeof DiplomacyActionTargetTypes === "undefined" || typeof DiplomacyActionGroups === "undefined") {
+      return refuse("API_CONTRACT_MISMATCH", "the diplomacy project listing is unavailable");
+    }
+    let hasMet = null; try { hasMet = player.Diplomacy.hasMet(ARG); } catch (e) { hasMet = null; }
+    if (hasMet !== true) return refuse("UNKNOWN_ACTION", "the target is not a civilization this seat has met");
+    let influenceBefore = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceBefore = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceBefore = null; }
+    if (influenceBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's influence changed since the action was offered");
+    // The operation is never named by the caller: it is read back out of the engine's own current
+    // listing for this target, and only for a project the engine still reports as available.
+    let listing = null;
+    try { listing = Game.Diplomacy.getProjectDataForUI(BOUND_PLAYER_ID, ARG, DiplomacyActionTargetTypes.NO_DIPLOMACY_TARGET, DiplomacyActionGroups.NO_DIPLOMACY_ACTION_GROUP, -1, DiplomacyActionTargetTypes.NO_DIPLOMACY_TARGET); } catch (e) { listing = null; }
+    if (!Array.isArray(listing)) return refuse("API_CONTRACT_MISMATCH", "the diplomacy project listing did not return an array");
+    let project = null;
+    for (const d of listing) { if (d && d.actionType === ARG2 && d.projectStatus === DiplomacyProjectStatus.PROJECT_AVAILABLE) { project = d; break; } }
+    if (!project) return refuse("ACTION_EXPIRED", "the action is no longer available against this target");
+    const dTarget = Array.isArray(project.targetList1) ? project.targetList1.find((t) => t && t.targetID === ARG) : null;
+    if (!dTarget || typeof dTarget.costYieldD !== "number" || !(dTarget.costYieldD > 0)) return refuse("ACTION_EXPIRED", "the action no longer costs influence against this target");
+    let diploArgs = null;
+    for (const shape of [{ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, Player2: ARG }, { Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, ID: ARG }]) {
+      const probe = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false);
+      if (probe && probe.Success === true) { diploArgs = shape; break; }
+    }
+    if (!diploArgs) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the diplomatic action");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, project.operationType, diploArgs);
+    result.outcome = "sent";
+    let influenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, actionType: ARG2, influenceBefore: PRE, influence: influenceAfter, matches: isInt(influenceAfter) && influenceAfter < PRE };
+    return JSON.stringify(result);
+  }
   if (KIND === "PURCHASE_CONSTRUCTIBLE") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "purchase arguments are not integers");
     if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.PURCHASE)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.PURCHASE unavailable");

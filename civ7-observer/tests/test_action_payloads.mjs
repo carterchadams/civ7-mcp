@@ -1212,6 +1212,116 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- diplomacy (the only place the payload looks past the bound seat, and only at met players)
+function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2" } = {}) {
+  const me = g.Players.get(1);
+  me.DiplomacyTreasury = { diplomacyBalance: influence };
+  me.Diplomacy = { hasMet: (id) => met.some((m) => m.id === id) };
+  me.Units = me.Units || { getUnits: () => [] };
+  g.DiplomacyProjectStatus = { PROJECT_AVAILABLE: 1, PROJECT_BLOCKED: 2, PROJECT_NO_VIABLE_TARGETS: 3, PROJECT_NOT_UNLOCKED: 4, PROJECT_ACTIVE: 5 };
+  g.DiplomacyActionTargetTypes = { NO_DIPLOMACY_TARGET: -1 };
+  g.DiplomacyActionGroups = { NO_DIPLOMACY_ACTION_GROUP: -1, DIPLOMACY_ACTION_GROUP_TREATY: 4, DIPLOMACY_ACTION_GROUP_SANCTION: 5 };
+  const rows = projects ?? [
+    { actionType: 9001, actionTypeName: "DIPLOMACY_ACTION_OPEN_BORDERS", actionDisplayName: "LOC_OPEN_BORDERS", operationType: 555, actionGroup: 4, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 33 }] },
+    { actionType: 9002, actionTypeName: "DIPLOMACY_ACTION_DENOUNCE", actionDisplayName: "LOC_DENOUNCE", operationType: 556, actionGroup: 5, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 80 }] },
+    { actionType: 9003, actionTypeName: "DIPLOMACY_ACTION_DECLARE_WAR", actionDisplayName: "LOC_WAR", operationType: 557, actionGroup: 5, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 0 }] },
+    { actionType: 9004, actionTypeName: "DIPLOMACY_ACTION_BLOCKED", actionDisplayName: "LOC_BLOCKED", operationType: 558, actionGroup: 5, projectStatus: 2, targetList1: [{ targetID: 0, costYieldD: 40 }] },
+  ];
+  g.Game.Diplomacy = {
+    getProjectDataForUI: (pid, target) => { g._log.push(`projects(${pid},${target})`); return rows.map((r) => ({ ...r, targetList1: r.targetList1.map((t) => ({ ...t, targetID: target })) })); },
+  };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (args && args.Type !== undefined && args.Amount === 1) {
+        g._log.push(`dcanStart(${pid},${op},${JSON.stringify(args)},${show})`);
+        return { Success: pid === 1 && args[acceptShape] !== undefined };
+      }
+      return inner.canStart(pid, op, args, show);
+    },
+    sendRequest: (pid, op, args) => {
+      if (args && args.Type !== undefined && args.Amount === 1) { g._log.push(`dsendRequest(${pid},${op},${JSON.stringify(args)})`); me.DiplomacyTreasury = { diplomacyBalance: influence - spend }; return; }
+      return inner.sendRequest(pid, op, args);
+    },
+  };
+  g.Players = { get: (id) => { g._log.push(`Players.get(${id})`); if (id === 1) return me; const m = met.find((x) => x.id === id); return m ? { id: m.id, isMajor: m.major, civilizationName: m.name } : undefined; } };
+  g.Players.getEverAlive = () => [me, ...met.map((m) => ({ id: m.id, isMajor: m.major, civilizationName: m.name }))];
+  return g;
+}
+
+test("diplomacy offers name each met civilization and the influence each available action costs", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
+  const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
+  assert.deepEqual(dips.map((o) => [o.arg, o.arg2, o.typeKey, o.targetName, o.targetIsMajor, o.cost, o.pre, o.affordable, o.group]),
+    [[0, 9001, "DIPLOMACY_ACTION_OPEN_BORDERS", "LOC_ABBASID", true, 33, 500, true, "TREATY"],
+     [0, 9002, "DIPLOMACY_ACTION_DENOUNCE", "LOC_ABBASID", true, 80, 500, true, "SANCTION"]]);
+  assert.ok(dips.every((o) => o.costYield === "influence" && o.influenceBalance === 500));
+  assert.ok(!log.some((e) => e.startsWith("dsendRequest")), "enumeration must never start an action");
+});
+
+test("a free action, a blocked one and an unmet civilization are all withheld", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
+  const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
+  assert.ok(!dips.some((o) => o.arg2 === 9003), "a zero-cost action has no signal to confirm it and is not offered");
+  assert.ok(!dips.some((o) => o.arg2 === 9004), "a blocked project is not offered");
+  const unmet = withDiplomacy(withUnits(world({ log: [] }), []), { met: [] }); unmet._log = [];
+  assert.deepEqual(runOffers(unmet).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION"), []);
+});
+
+test("diplomacy offers never carry anything about a met civilization beyond its id, name and major flag", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
+  const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
+  for (const o of dips) {
+    for (const k of Object.keys(o)) {
+      assert.ok(!["units", "cities", "location", "yields", "gold", "techs", "visibility"].includes(k), `leaked field ${k}`);
+    }
+  }
+});
+
+test("perform START_DIPLOMATIC_ACTION takes the operation from the engine's own listing and confirms on influence spent", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, influenceBefore: 500, influence: 467, matches: true });
+  const send = log.find((e) => e.startsWith("dsendRequest("));
+  assert.ok(send.includes(",555,"), "the operation must be the one the listing gave for that project");
+  assert.ok(send.includes('"Type":9001') && send.includes('"Player2":0'));
+});
+
+test("perform START_DIPLOMATIC_ACTION addresses an independent power by ID when Player2 is refused", () => {
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), []), { acceptShape: "ID" }); g._log = log;
+  const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 7, 9001, 0, { pre: 500 });
+  assert.equal(r.refused, null);
+  assert.ok(log.find((e) => e.startsWith("dsendRequest(") && e.includes('"ID":7')));
+});
+
+test("perform START_DIPLOMATIC_ACTION refuses an unmet target, itself, a stale influence balance, a withdrawn project and a refused check", () => {
+  for (const [label, mk, target, at, pre] of [
+    ["unmet civilization", () => withDiplomacy(withUnits(world({ log: [] }), []), { met: [] }), 0, 9001, 500],
+    ["the seat itself", () => withDiplomacy(withUnits(world({ log: [] }), [])), 1, 9001, 500],
+    ["influence moved", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9001, 400],
+    ["project withdrawn", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9004, 500],
+    ["unknown action type", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 4242, 500],
+    ["free action", () => withDiplomacy(withUnits(world({ log: [] }), [])), 0, 9003, 500],
+    ["canStart false", () => withDiplomacy(withUnits(world({ log: [] }), []), { acceptShape: "nothing" }), 0, 9001, 500],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "START_DIPLOMATIC_ACTION", target, at, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("dsendRequest")), `${label}: must not send`);
+  }
+  const none = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0 }); none._log = [];
+  const rr = runPerformArgs(none, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- buying a building with gold, and promoting a town into a city
 // Both ride CityCommandTypes.PURCHASE: one carries a constructible and its plot, the other the
 // ORDER_TOWN_UPGRADE directive. Gold is the precondition for both, since the treasury only moves on a

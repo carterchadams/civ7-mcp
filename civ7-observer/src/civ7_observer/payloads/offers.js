@@ -335,6 +335,57 @@
         }
       }
     }
+    // ---- diplomacy
+    // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
+    // this is the one place the payload looks past the bound player. The scope is exactly the shipped
+    // diplomacy ribbon's and no wider: players this seat has MET, and of each only the id, the
+    // civilization's display name and whether it is a major power. No units, no cities, no yields, no
+    // visibility, no map position. The policy test pins this block byte-for-byte.
+    // BEGIN VETTED MET-PLAYER SCOPE
+    const metPlayers = () => {
+      const out = [];
+      try {
+        for (const other of Players.getEverAlive()) {
+          if (!other || !isInt(other.id) || other.id === BOUND_PLAYER_ID) continue;
+          if (player.Diplomacy.hasMet(other.id) !== true) continue;
+          out.push({ id: other.id, name: compose(other.civilizationName), major: other.isMajor === true });
+        }
+      } catch (e) { return []; }
+      return out;
+    };
+    // END VETTED MET-PLAYER SCOPE
+    if (typeof Game.Diplomacy !== "undefined" && typeof Game.Diplomacy.getProjectDataForUI === "function" &&
+        typeof DiplomacyProjectStatus !== "undefined" && typeof DiplomacyActionTargetTypes !== "undefined" && typeof DiplomacyActionGroups !== "undefined") {
+      let influence = null;
+      try { const v = player.DiplomacyTreasury.diplomacyBalance; influence = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influence = null; }
+      const groupName = (v) => { try { for (const k of Object.keys(DiplomacyActionGroups)) if (DiplomacyActionGroups[k] === v) return k.replace("DIPLOMACY_ACTION_GROUP_", ""); } catch (e) {} return null; };
+      if (isInt(influence)) {
+        for (const other of metPlayers()) {
+          let data = null;
+          try { data = Game.Diplomacy.getProjectDataForUI(BOUND_PLAYER_ID, other.id, DiplomacyActionTargetTypes.NO_DIPLOMACY_TARGET, DiplomacyActionGroups.NO_DIPLOMACY_ACTION_GROUP, -1, DiplomacyActionTargetTypes.NO_DIPLOMACY_TARGET); } catch (e) { data = null; }
+          if (!Array.isArray(data)) continue;
+          for (const d of data) {
+            if (!d || !isInt(d.actionType) || d.projectStatus !== DiplomacyProjectStatus.PROJECT_AVAILABLE) continue;
+            const t1 = Array.isArray(d.targetList1) ? d.targetList1.find((t) => t && t.targetID === other.id) : null;
+            // Only the actions influence pays for. The free ones (declaring war, forming an alliance)
+            // leave the treasury untouched, so nothing here could confirm them, and they are withheld.
+            if (!t1 || typeof t1.costYieldD !== "number" || !(t1.costYieldD > 0)) continue;
+            // The engine's own listing supplies the operation; the seat only ever names the pair.
+            const diploArgs = { Amount: 1, Player1: BOUND_PLAYER_ID, Type: d.actionType };
+            if (other.major) diploArgs.Player2 = other.id; else diploArgs.ID = other.id;
+            const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, d.operationType, diploArgs, false);
+            if (!check || check.Success !== true) continue;
+            const cost = Math.floor(t1.costYieldD);
+            offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence,
+              typeKey: typeof d.actionTypeName === "string" ? d.actionTypeName : null,
+              displayName: typeof d.actionDisplayName === "string" ? compose(d.actionDisplayName) : null,
+              targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major,
+              group: groupName(d.actionGroup), cost: cost, costYield: "influence", influenceBalance: influence,
+              affordable: influence >= cost, canStart: true });
+          }
+        }
+      }
+    }
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {
       const cities = player.Cities.getCities();
       if (!Array.isArray(cities)) throw new Error("getCities() is not an array");

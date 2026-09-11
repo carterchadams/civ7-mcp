@@ -100,6 +100,7 @@ DECISION_OF_KIND = {
     "town_project": "town_project",
     "assign_resource": "resources",
     "consider_resources": "resources",
+    "start_diplomatic_action": "diplomacy",
     "end_turn": "end_turn",
 }
 
@@ -110,6 +111,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
+                 "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -148,6 +150,10 @@ PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`q
                    "settlement are shown: call get_city_options with a cityId for everything it can build. A purchase_unit "
                    "option spends gold (`cost` against `goldBalance`) and delivers the unit at once, rather than queueing it")
 
+DIPLOMACY_NOTE = ("influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
+                  "option names the civilization it is aimed at (`targetName`) and its kind (`group`): TREATY and "
+                  "ENDEAVOR help both sides, SANCTION and ESPIONAGE work against the target. Influence otherwise "
+                  "accumulates unspent. Declaring war and forming alliances are not offered here.")
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "
                         "appears; call get_unit_options with its unitId to see where it can go. Each move option carries "
@@ -268,6 +274,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = POLICIES_NOTE
         if decision == "attributes":
             group["note"] = ATTRIBUTES_NOTE
+        if decision == "diplomacy":
+            group["note"] = DIPLOMACY_NOTE
         if decision == "resources":
             group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1
