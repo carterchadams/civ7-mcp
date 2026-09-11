@@ -48,6 +48,10 @@ BLOCKER_DECISION = {
     "CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_RELIGION": "religion",
+    "NOTIFICATION_CONSIDER_RAZE_CITY": "capture",
+    "CONSIDER_RAZE_CITY": "capture",
+    "NOTIFICATION_CHOOSE_CITY_STATE_BONUS": "city_state_bonus",
+    "CHOOSE_CITY_STATE_BONUS": "city_state_bonus",
     "NOTIFICATION_CHOOSE_BELIEF": "religion",
     "CHOOSE_BELIEF": "religion",
     "CHOOSE_RELIGION": "religion",
@@ -135,6 +139,12 @@ DECISION_OF_KIND = {
     "consider_resources": "resources",
     "start_diplomatic_action": "diplomacy",
     "cancel_alliance": "diplomacy",
+    "support_diplomatic_action": "diplomacy",
+    "keep_captured_city": "capture",
+    "raze_captured_city": "capture",
+    "liberate_captured_city": "capture",
+    "choose_city_state_bonus": "city_state_bonus",
+    "acknowledge_advisor_warning": "advisor",
     "respond_to_proposal": "diplomatic_response",
     "end_turn": "end_turn",
 }
@@ -150,6 +160,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "cityName", "targetPlayerId", "domain", "routeLength", "activeRoutes", "inRange", "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
                  "eventId", "answer", "proposerPlayerId", "proposerName", "beliefClass",
+                 "population", "wonders", "isTown", "cityStatePlayerId", "side", "initiatorPlayerId", "support", "notificationId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -196,6 +207,11 @@ DIPLOMATIC_RESPONSE_NOTE = ("another civilization has proposed something to this
 RELIGION_NOTE = ("found a religion: pick any of the named ones still open (the engine refuses those another civilization "
                  "holds), then add beliefs one at a time as `add_belief` options appear, each with its `beliefClass`. "
                  "The turn cannot end until the religion is founded.")
+CAPTURE_NOTE = ("a settlement was just captured and the turn cannot end until its fate is chosen: keep it (usual), "
+                "raze it (destroys it over several turns; needs confirm=true) or liberate it back to its founder "
+                "(needs confirm=true). The offer shows its population and wonders.")
+CITY_STATE_BONUS_NOTE = ("a city-state you are suzerain of grants a bonus: pick one; the choice is permanent for that "
+                         "city-state and the turn cannot end until it is made.")
 DIPLOMACY_NOTE = ("influence buys these; `cost` is in influence and `influenceBalance` is what the seat holds. Each "
                   "option names the civilization it is aimed at (`targetName`) and its kind (`group`): TREATY and "
                   "ENDEAVOR help both sides, SANCTION and ESPIONAGE work against the target. Influence otherwise "
@@ -326,6 +342,10 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = DIPLOMATIC_RESPONSE_NOTE
         if decision == "religion":
             group["note"] = RELIGION_NOTE
+        if decision == "capture":
+            group["note"] = CAPTURE_NOTE
+        if decision == "city_state_bonus":
+            group["note"] = CITY_STATE_BONUS_NOTE
         if decision == "resources":
             group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1

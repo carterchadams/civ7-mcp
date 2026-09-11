@@ -432,6 +432,74 @@
     result.readback = { kind: KIND, arg: ARG, beliefsBefore: PRE, held: heldNow, matches: Array.isArray(heldNow) && heldNow.indexOf(ARG) !== -1 };
     return JSON.stringify(result);
   }
+  if (KIND === "KEEP_CITY" || KIND === "RAZE_CITY" || KIND === "LIBERATE_CITY") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "settlement argument is not an integer");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.DESTROY)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.DESTROY unavailable");
+    let captured = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { captured = c; break; } } } catch (e) { captured = null; }
+    if (!captured) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    if (!captured.isJustConqueredFrom) return refuse("ACTION_EXPIRED", "the settlement's capture has already been decided");
+    const capturedId = captured.id;
+    const dispArgs = { Directive: KIND === "KEEP_CITY" ? 2 : (KIND === "RAZE_CITY" ? 3 : 0) };
+    const dcheck = Game.CityCommands.canStart(capturedId, CityCommandTypes.DESTROY, dispArgs, false);
+    if (!dcheck || dcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that disposition");
+    Game.CityCommands.sendRequest(capturedId, CityCommandTypes.DESTROY, dispArgs);
+    result.outcome = "sent";
+    let stillPending = null, razing = null, stillOwned = null;
+    try { stillOwned = player.Cities.getCities().some((c) => c && c.id && c.id.id === ARG); stillPending = stillOwned ? !!captured.isJustConqueredFrom : null; razing = stillOwned ? captured.isBeingRazed === true : null; } catch (e) { /* unknown */ }
+    result.readback = { kind: KIND, arg: ARG, directive: dispArgs.Directive, stillPending: stillPending, razing: razing, stillOwned: stillOwned,
+      matches: KIND === "KEEP_CITY" ? stillPending === false && razing === false : (KIND === "RAZE_CITY" ? razing === true : stillOwned === false) };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CHOOSE_CITY_STATE_BONUS") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "bonus arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    if (typeof Game.CityStates === "undefined") return refuse("API_CONTRACT_MISMATCH", "Game.CityStates unavailable");
+    let pendingCs = null; try { pendingCs = Game.CityStates.getCityStateBonusToSelect(BOUND_PLAYER_ID); } catch (e) { pendingCs = null; }
+    if (pendingCs !== PRE || pendingCs !== ARG2) return refuse("ACTION_EXPIRED", "that city-state's bonus is no longer the one pending");
+    const brow = GameInfo.CityStateBonuses.lookup(ARG);
+    if (!brow || typeof brow.CityStateBonusType !== "string") return refuse("UNKNOWN_ACTION", "not a city-state bonus definition");
+    const bonusArgs = { OtherPlayer: ARG2, CityStateBonusType: ARG };
+    const bcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], bonusArgs, false);
+    if (!bcheck || bcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that bonus");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], bonusArgs);
+    result.outcome = "sent";
+    let after = null; try { after = Game.CityStates.getCityStateBonusToSelect(BOUND_PLAYER_ID); } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, cityState: ARG2, pendingAfter: isInt(after) ? after : null, matches: isInt(after) && after !== ARG2 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "SUPPORT_DIPLOMATIC_ACTION") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "support arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    if (typeof DiplomacyTokenTypes === "undefined" || !isInt(DiplomacyTokenTypes.DIPLOMACY_TOKEN_GLOBAL)) return refuse("API_CONTRACT_MISMATCH", "diplomacy token types unavailable");
+    let sInfluenceBefore = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; sInfluenceBefore = typeof v === "number" ? Math.floor(v) : null; } catch (e) { sInfluenceBefore = null; }
+    if (sInfluenceBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's influence changed since the offer was made");
+    let sEvent = null; try { for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && ev.uniqueID === ARG) { sEvent = ev; break; } } } catch (e) { sEvent = null; }
+    if (!sEvent) return refuse("ACTION_EXPIRED", "that diplomatic action is no longer among this seat's events");
+    const supportArgs = { ID: ARG, Type: DiplomacyTokenTypes.DIPLOMACY_TOKEN_GLOBAL, Amount: 1, SubType: ARG2 === 1 };
+    const scheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], supportArgs, false);
+    if (!scheck2 || scheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the support");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], supportArgs);
+    result.outcome = "sent";
+    let sInfluenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; sInfluenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { sInfluenceAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, side: ARG2 === 1 ? "initiator" : "target", influenceBefore: PRE, influence: sInfluenceAfter, matches: isInt(sInfluenceAfter) && sInfluenceAfter < PRE };
+    return JSON.stringify(result);
+  }
+  if (KIND === "VIEWED_ADVISOR_WARNING") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "notification arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    let warning = null;
+    try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { if (nid && nid.id === ARG && nid.type === ARG2) { warning = nid; break; } } } catch (e) { warning = null; }
+    if (!warning) return refuse("ACTION_EXPIRED", "that warning is no longer pending");
+    const ackArgs = { Target: warning };
+    const acheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], ackArgs, false);
+    if (!acheck || acheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the acknowledgement");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], ackArgs);
+    result.outcome = "sent";
+    let gone = null; try { gone = !Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID).some((nid) => nid && nid.id === ARG && nid.type === ARG2); } catch (e) { gone = null; }
+    result.readback = { kind: KIND, arg: ARG, gone: gone, matches: gone === true };
+    return JSON.stringify(result);
+  }
   if (KIND === "START_DIPLOMATIC_ACTION") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "diplomacy arguments are not integers");
     if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot target itself");

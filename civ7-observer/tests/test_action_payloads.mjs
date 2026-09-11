@@ -1671,6 +1671,148 @@ test("perform RESPOND_DIPLOMATIC_ACTION sends the event id and response type, an
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- a just-captured settlement: keep, raze or liberate
+function withCapture(g, { pending = true, allowed = [0, 2, 3], after = "keep" } = {}) {
+  withCity(g, {});
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.isJustConqueredFrom = pending; city.isBeingRazed = false; city.population = 7;
+  city.Constructibles = { getNumWonders: () => 1 };
+  g.CityCommandTypes = { ...(g.CityCommandTypes || {}), DESTROY: 7770 };
+  const me = g.Players.get(1);
+  g.Game.CityCommands = {
+    canStart: (cid, cmd, args, show) => { g._log.push(`dcanStart(${cmd},${JSON.stringify(args)})`); return { Success: cmd === 7770 && cid.owner === 1 && allowed.includes(args.Directive) }; },
+    sendRequest: (cid, cmd, args) => {
+      g._log.push(`dsendRequest(${cmd},${JSON.stringify(args)})`);
+      if (after === "keep") { city.isJustConqueredFrom = false; }
+      if (after === "raze") { city.isJustConqueredFrom = false; city.isBeingRazed = true; }
+      if (after === "liberate") { me.Cities = { getCities: () => [] }; }
+    },
+  };
+  return g;
+}
+
+test("a just-captured settlement is offered keep, raze and liberate, the last two needing confirmation", () => {
+  const g = withCapture(withUnits(world({ log: [] }), [])); g._log = [];
+  const caps = runOffers(g).offers.filter((o) => ["KEEP_CITY", "RAZE_CITY", "LIBERATE_CITY"].includes(o.kind));
+  assert.deepEqual(caps.map((o) => [o.kind, o.arg, o.population, o.wonders, o.requiresConfirmation]), [["KEEP_CITY", 65536, 7, 1, undefined], ["RAZE_CITY", 65536, 7, 1, true], ["LIBERATE_CITY", 65536, 7, 1, true]]);
+  const settled = withCapture(withUnits(world({ log: [] }), []), { pending: false }); settled._log = [];
+  assert.deepEqual(runOffers(settled).offers.filter((o) => ["KEEP_CITY", "RAZE_CITY", "LIBERATE_CITY"].includes(o.kind)), []);
+  const noRaze = withCapture(withUnits(world({ log: [] }), []), { allowed: [0, 2] }); noRaze._log = [];
+  assert.ok(!runOffers(noRaze).offers.some((o) => o.kind === "RAZE_CITY"), "a directive the engine refuses is not offered");
+});
+
+test("perform of each disposition sends DESTROY with its directive and reads back the city's fate", () => {
+  for (const [kind, directive, after, expect] of [["KEEP_CITY", 2, "keep", { stillPending: false, razing: false, stillOwned: true }], ["RAZE_CITY", 3, "raze", { stillPending: false, razing: true, stillOwned: true }], ["LIBERATE_CITY", 0, "liberate", { stillPending: null, razing: null, stillOwned: false }]]) {
+    const g = withCapture(withUnits(world({ log: [] }), []), { after }); g._log = [];
+    const r = runPerformArgs(g, kind, 65536, 0, 0, { pre: 1 });
+    assert.equal(r.refused, null, kind);
+    assert.deepEqual(r.readback, { kind, arg: 65536, directive, ...expect, matches: true }, kind);
+    assert.ok(g._log.find((e) => e.startsWith("dsendRequest(") && e.includes(`"Directive":${directive}`)));
+  }
+  for (const [label, mk, cid] of [["unknown city", () => withCapture(withUnits(world({ log: [] }), [])), 7], ["already decided", () => withCapture(withUnits(world({ log: [] }), []), { pending: false }), 65536], ["engine refuses", () => withCapture(withUnits(world({ log: [] }), []), { allowed: [] }), 65536]]) {
+    const h = mk(); h._log = [];
+    assert.ok(runPerformArgs(h, "RAZE_CITY", cid, 0, 0, { pre: 1 }).refused, label);
+    assert.ok(!h._log.some((e) => e.startsWith("dsendRequest")), label);
+  }
+});
+
+// ---- a city-state bonus
+function withCityStateBonus(g, { pending = 12, bonuses = ["CITY_STATE_BONUS_A", "CITY_STATE_BONUS_B"], canHave = ["CITY_STATE_BONUS_A"], applied = true } = {}) {
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, CHOOSE_CITY_STATE_BONUS: 9601 };
+  const rows = bonuses.map((b, i) => ({ $hash: 5000 + i, CityStateBonusType: b, Name: "LOC_" + b, Description: "LOC_" + b + "_D" }));
+  g.GameInfo.CityStateBonuses = table(rows); g.GameInfo.CityStateBonuses[Symbol.iterator] = function* () { yield* rows; };
+  let pend = pending;
+  g.Game.CityStates = { getCityStateBonusToSelect: (pid) => pend, canHaveBonus: (pid, cs, type) => canHave.includes(type) };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 9601) return inner.canStart(pid, op, args, show); g._log.push(`bcanStart(${JSON.stringify(args)})`); return { Success: pid === 1 && args.OtherPlayer === pend }; },
+    sendRequest: (pid, op, args) => { if (op !== 9601) return inner.sendRequest(pid, op, args); g._log.push(`bsendRequest(${JSON.stringify(args)})`); if (applied) pend = -1; },
+  };
+  return g;
+}
+
+test("a pending city-state bonus offers only the bonuses the engine says this seat can have", () => {
+  const g = withCityStateBonus(withUnits(world({ log: [] }), [])); g._log = [];
+  const bs = runOffers(g).offers.filter((o) => o.kind === "CHOOSE_CITY_STATE_BONUS");
+  assert.deepEqual(bs.map((o) => [o.arg, o.arg2, o.pre, o.typeKey, o.cityStatePlayerId]), [[5000, 12, 12, "CITY_STATE_BONUS_A", 12]]);
+  const none = withCityStateBonus(withUnits(world({ log: [] }), []), { pending: -1 }); none._log = [];
+  assert.deepEqual(runOffers(none).offers.filter((o) => o.kind === "CHOOSE_CITY_STATE_BONUS"), []);
+});
+
+test("perform CHOOSE_CITY_STATE_BONUS sends the city-state and the bonus hash and confirms when nothing is pending for it", () => {
+  const g = withCityStateBonus(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runPerformArgs(g, "CHOOSE_CITY_STATE_BONUS", 5000, 12, 0, { pre: 12 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CHOOSE_CITY_STATE_BONUS", arg: 5000, cityState: 12, pendingAfter: -1, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("bsendRequest(") && e.includes('"OtherPlayer":12,"CityStateBonusType":5000')));
+  const stale = withCityStateBonus(withUnits(world({ log: [] }), []), { pending: 13 }); stale._log = [];
+  assert.ok(runPerformArgs(stale, "CHOOSE_CITY_STATE_BONUS", 5000, 12, 0, { pre: 12 }).refused);
+  const bogus = withCityStateBonus(withUnits(world({ log: [] }), [])); bogus._log = [];
+  assert.ok(runPerformArgs(bogus, "CHOOSE_CITY_STATE_BONUS", 4242, 12, 0, { pre: 12 }).refused);
+});
+
+// ---- supporting a side of an ongoing diplomatic action
+function withSupport(g, { events = [{ uniqueID: 16, actionTypeName: "DIPLOMACY_ACTION_GIVE_INFLUENCE_TOKEN", name: "LOC_BEFRIEND", initialPlayer: 1, targetPlayer: 40, support: 1 }], sides = [true], influence = 300, spend = 60 } = {}) {
+  const me = g.Players.get(1);
+  me.DiplomacyTreasury = { diplomacyBalance: influence };
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, SUPPORT_DIPLOMATIC_ACTION: 9701 };
+  g.DiplomacyTokenTypes = { DIPLOMACY_TOKEN_GLOBAL: 77 };
+  g.Game.Diplomacy = { ...(g.Game.Diplomacy || {}), getPlayerEvents: (pid) => events, getInfluenceForNextSupport: (id, pid, side) => 60 };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 9701) return inner.canStart(pid, op, args, show); g._log.push(`scanStart(${JSON.stringify(args)})`); return { Success: pid === 1 && sides.includes(args.SubType) }; },
+    sendRequest: (pid, op, args) => { if (op !== 9701) return inner.sendRequest(pid, op, args); g._log.push(`ssendRequest(${JSON.stringify(args)})`); me.DiplomacyTreasury = { diplomacyBalance: influence - spend }; },
+  };
+  return g;
+}
+
+test("support offers list each side the engine allows for the seat's own events, with the token's influence cost", () => {
+  const g = withSupport(withUnits(world({ log: [] }), [])); g._log = [];
+  const sp = runOffers(g).offers.filter((o) => o.kind === "SUPPORT_DIPLOMATIC_ACTION");
+  assert.deepEqual(sp.map((o) => [o.arg, o.arg2, o.side, o.cost, o.pre, o.affordable, o.initiatorPlayerId, o.targetPlayerId]), [[16, 1, "initiator", 60, 300, true, 1, 40]]);
+  const both = withSupport(withUnits(world({ log: [] }), []), { sides: [true, false] }); both._log = [];
+  assert.deepEqual(runOffers(both).offers.filter((o) => o.kind === "SUPPORT_DIPLOMATIC_ACTION").map((o) => o.side), ["initiator", "target"]);
+});
+
+test("perform SUPPORT_DIPLOMATIC_ACTION sends one global token for the chosen side and confirms on influence spent", () => {
+  const g = withSupport(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runPerformArgs(g, "SUPPORT_DIPLOMATIC_ACTION", 16, 1, 0, { pre: 300 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "SUPPORT_DIPLOMATIC_ACTION", arg: 16, side: "initiator", influenceBefore: 300, influence: 240, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("ssendRequest(") && e.includes('"ID":16,"Type":77,"Amount":1,"SubType":true')));
+  for (const [label, mk, id, side, pre] of [["event gone", () => withSupport(withUnits(world({ log: [] }), []), { events: [] }), 16, 1, 300], ["influence moved", () => withSupport(withUnits(world({ log: [] }), [])), 16, 1, 200], ["side refused", () => withSupport(withUnits(world({ log: [] }), [])), 16, 0, 300]]) {
+    const h = mk(); h._log = [];
+    assert.ok(runPerformArgs(h, "SUPPORT_DIPLOMATIC_ACTION", id, side, 0, { pre }).refused, label);
+    assert.ok(!h._log.some((e) => e.startsWith("ssendRequest")), label);
+  }
+});
+
+// ---- acknowledging an advisor warning
+function withAdvisorWarning(g, { ids = [[900, 3]], ok = true, clears = true } = {}) {
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, VIEWED_ADVISOR_WARNING: 9801 };
+  let live = ids.map(([id, type]) => ({ owner: 1, id, type }));
+  g.Game.Notifications = { ...g.Game.Notifications, getIdsForPlayer: () => live, find: (nid) => ({ Type: nid.type }), getTypeName: (t) => (t === 3 ? "NOTIFICATION_ADVISOR_WARNING_MILITARY" : "NOTIFICATION_OTHER"), getEndTurnBlockingType: () => 0 };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 9801) return inner.canStart(pid, op, args, show); g._log.push(`acanStart(${JSON.stringify(args)})`); return { Success: ok && pid === 1 }; },
+    sendRequest: (pid, op, args) => { if (op !== 9801) return inner.sendRequest(pid, op, args); g._log.push(`asendRequest(${JSON.stringify(args)})`); if (clears) live = live.filter((n) => n.id !== args.Target.id); },
+  };
+  return g;
+}
+
+test("an advisor warning is offered for acknowledgement and confirmed by its notification leaving", () => {
+  const g = withAdvisorWarning(withUnits(world({ log: [] }), [])); g._log = [];
+  const w = runOffers(g).offers.filter((o) => o.kind === "VIEWED_ADVISOR_WARNING");
+  assert.deepEqual(w.map((o) => [o.arg, o.arg2, o.typeKey]), [[900, 3, "NOTIFICATION_ADVISOR_WARNING_MILITARY"]]);
+  const r = runPerformArgs(g, "VIEWED_ADVISOR_WARNING", 900, 3, 0, { pre: 1 });
+  assert.deepEqual(r.readback, { kind: "VIEWED_ADVISOR_WARNING", arg: 900, gone: true, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("asendRequest(") && e.includes('"Target":{"owner":1,"id":900,"type":3}')));
+  const other = withAdvisorWarning(withUnits(world({ log: [] }), []), { ids: [[901, 4]] }); other._log = [];
+  assert.deepEqual(runOffers(other).offers.filter((o) => o.kind === "VIEWED_ADVISOR_WARNING"), [], "only advisor warnings");
+  const gone = withAdvisorWarning(withUnits(world({ log: [] }), [])); gone._log = [];
+  assert.ok(runPerformArgs(gone, "VIEWED_ADVISOR_WARNING", 999, 3, 0, { pre: 1 }).refused);
+});
+
 // ---- the six generic unit commands (upgrade, army packing, great person)
 function withUnitCommands(g, { ok = ["UPGRADE"], plots = [1011], typeAfter = 100, armyAfter = null, gone = false } = {}) {
   withMap(g, {});

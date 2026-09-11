@@ -49,6 +49,11 @@
     townProjects: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Growth) m[String(c.id.id)] = Number.isInteger(c.Growth.projectType) ? c.Growth.projectType : -1; } return m; }) : null,
     expandPlots: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) { const r = Game.CityCommands.canStart(c.id, CityCommandTypes.EXPAND, {}, false); m[String(c.id.id)] = r && Array.isArray(r.Plots) ? r.Plots : []; } } return m; }) : null,
     townFlags: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) m[String(c.id.id)] = c.isTown === true; } return m; }) : null,
+    capturedPending: player ? t(() => player.Cities.getCities().filter((c) => c && c.id && c.isJustConqueredFrom).map((c) => c.id.id)) : null,
+    razing: player ? t(() => player.Cities.getCities().filter((c) => c && c.id && c.isBeingRazed === true).map((c) => c.id.id)) : null,
+    cityIds: player ? t(() => player.Cities.getCities().filter((c) => c && c.id).map((c) => c.id.id)) : null,
+    cityStateBonusPending: t(() => Game.CityStates.getCityStateBonusToSelect(BOUND_PLAYER_ID)),
+    advisorWarnings: t(() => { const out = []; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); const name = n ? Game.Notifications.getTypeName(n.Type) : ""; if (typeof name === "string" && name.indexOf("NOTIFICATION_ADVISOR_WARNING") === 0 && nid && Number.isInteger(nid.id)) out.push(nid.id); } return out; }),
     cityLocations: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.location) m[String(c.id.id)] = [c.location.x, c.location.y]; } return m; }) : null,
     unitLocations: player ? t(() => { const m = {}; for (const u of player.Units.getUnits()) { if (u && u.id && u.location) m[String(u.id.id)] = [u.location.x, u.location.y]; } return m; }) : null,
     curtainDisplayed: t(() => typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null)

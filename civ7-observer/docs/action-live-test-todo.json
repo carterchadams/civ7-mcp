@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 171,
+          "confirmed": 172,
           "rejected": 0,
           "unknown": 0
         }
@@ -43,7 +43,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 157,
+          "confirmed": 158,
           "rejected": 0,
           "unknown": 0
         }
@@ -103,7 +103,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 517,
+          "confirmed": 521,
           "rejected": 4,
           "unknown": 0
         }
@@ -127,7 +127,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2033,
+          "confirmed": 2064,
           "rejected": 8,
           "unknown": 0
         }
@@ -151,7 +151,7 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1647,
+          "confirmed": 1669,
           "rejected": 10,
           "unknown": 1
         }
@@ -175,7 +175,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 148,
+          "confirmed": 149,
           "rejected": 1,
           "unknown": 1
         }
@@ -223,7 +223,7 @@
       "expected_evidence": "a confirmed `FOUND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 36,
+          "confirmed": 37,
           "rejected": 5,
           "unknown": 5
         }
@@ -247,7 +247,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 213,
+          "confirmed": 217,
           "rejected": 0,
           "unknown": 0
         }
@@ -271,7 +271,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 79,
+          "confirmed": 80,
           "rejected": 0,
           "unknown": 0
         }
@@ -487,7 +487,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 68,
+          "confirmed": 69,
           "rejected": 8,
           "unknown": 1
         }
@@ -511,7 +511,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 28,
+          "confirmed": 29,
           "rejected": 0,
           "unknown": 0
         }
@@ -745,7 +745,7 @@
       "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_FIRST_MEET` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 0
         }
@@ -776,7 +776,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "send_merchant"
@@ -785,6 +785,120 @@
       "consequence_class": "low",
       "procedure": "take a `send_merchant` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 8,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
+    },
+    {
+      "case_id": "LT-keep_captured_city",
+      "action_family": "keep_captured_city",
+      "expected_kind": "KEEP_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "keep_captured_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `keep_captured_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `KEEP_CITY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-raze_captured_city",
+      "action_family": "raze_captured_city",
+      "expected_kind": "RAZE_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "raze_captured_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `raze_captured_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `RAZE_CITY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-liberate_captured_city",
+      "action_family": "liberate_captured_city",
+      "expected_kind": "LIBERATE_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "liberate_captured_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `liberate_captured_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `LIBERATE_CITY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-choose_city_state_bonus",
+      "action_family": "choose_city_state_bonus",
+      "expected_kind": "CHOOSE_CITY_STATE_BONUS",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "choose_city_state_bonus"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `choose_city_state_bonus` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CHOOSE_CITY_STATE_BONUS` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-support_diplomatic_action",
+      "action_family": "support_diplomatic_action",
+      "expected_kind": "SUPPORT_DIPLOMATIC_ACTION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "support_diplomatic_action"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `support_diplomatic_action` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SUPPORT_DIPLOMATIC_ACTION` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-acknowledge_advisor_warning",
+      "action_family": "acknowledge_advisor_warning",
+      "expected_kind": "VIEWED_ADVISOR_WARNING",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "acknowledge_advisor_warning"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `acknowledge_advisor_warning` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `VIEWED_ADVISOR_WARNING` receipt in the seat journal",
       "evidence_refs": {}
     },
     {
@@ -805,7 +919,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 101,
+          "confirmed": 109,
           "rejected": 0,
           "unknown": 0
         }

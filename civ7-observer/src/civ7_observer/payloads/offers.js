@@ -609,6 +609,73 @@
         }
       }
     }
+    // ---- a just-captured settlement: keep, raze or liberate
+    // The shipped capture chooser sends CityCommands.DESTROY with a Directive: 0 liberates to the
+    // founder, 2 keeps, 3 razes. The city reports isJustConqueredFrom while the choice is pending and
+    // isBeingRazed once razing was chosen; the notification blocks the turn until one is made.
+    if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.DESTROY)) {
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || !c.isJustConqueredFrom) continue;
+        let wonders = null; try { const v = c.Constructibles && typeof c.Constructibles.getNumWonders === "function" ? c.Constructibles.getNumWonders() : null; wonders = isInt(v) ? v : null; } catch (e) { wonders = null; }
+        for (const [kind, directive] of [["KEEP_CITY", 2], ["RAZE_CITY", 3], ["LIBERATE_CITY", 0]]) {
+          const check = Game.CityCommands.canStart(c.id, CityCommandTypes.DESTROY, { Directive: directive }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: kind, arg: c.id.id, pre: 1, cityId: c.id.id, cityName: compose(c.name), population: isInt(c.population) ? c.population : null,
+            wonders: wonders, isTown: c.isTown === true, destructive: kind !== "KEEP_CITY" || undefined, requiresConfirmation: kind !== "KEEP_CITY" || undefined, canStart: true });
+        }
+      }
+    }
+    // ---- a city-state bonus to choose
+    if (isInt(PlayerOperationTypes.CHOOSE_CITY_STATE_BONUS) && typeof Game.CityStates !== "undefined" && GameInfo.CityStateBonuses && typeof GameInfo.CityStateBonuses[Symbol.iterator] === "function") {
+      let pendingCs = null; try { pendingCs = Game.CityStates.getCityStateBonusToSelect(BOUND_PLAYER_ID); } catch (e) { pendingCs = null; }
+      if (isInt(pendingCs) && pendingCs >= 0) {
+        for (const row of GameInfo.CityStateBonuses) {
+          if (!row || !isInt(row.$hash) || typeof row.CityStateBonusType !== "string") continue;
+          let can = false; try { can = Game.CityStates.canHaveBonus(BOUND_PLAYER_ID, pendingCs, row.CityStateBonusType) === true; } catch (e) { can = false; }
+          if (!can) continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHOOSE_CITY_STATE_BONUS, { OtherPlayer: pendingCs, CityStateBonusType: row.$hash }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "CHOOSE_CITY_STATE_BONUS", arg: row.$hash, arg2: pendingCs, pre: pendingCs, typeKey: row.CityStateBonusType,
+            displayName: typeof row.Name === "string" ? compose(row.Name) : null, description: typeof row.Description === "string" ? compose(row.Description) : null,
+            cityStatePlayerId: pendingCs, canStart: true });
+        }
+      }
+    }
+    // ---- supporting one side of an ongoing diplomatic action with an influence token
+    // The shipped details screen sends SUPPORT_DIPLOMATIC_ACTION with one global token; SubType true
+    // backs the initiator, false the target. Opposing is supporting the other side; there is no
+    // shipped operation to withdraw support. Only the seat's own events are read here.
+    if (isInt(PlayerOperationTypes.SUPPORT_DIPLOMATIC_ACTION) && typeof DiplomacyTokenTypes !== "undefined" && isInt(DiplomacyTokenTypes.DIPLOMACY_TOKEN_GLOBAL) &&
+        typeof Game.Diplomacy !== "undefined" && typeof Game.Diplomacy.getPlayerEvents === "function") {
+      let influenceNow = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceNow = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceNow = null; }
+      let events = null; try { events = Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID); } catch (e) { events = null; }
+      if (isInt(influenceNow) && Array.isArray(events)) for (const ev of events) {
+        if (!ev || !isInt(ev.uniqueID)) continue;
+        for (const [side, label] of [[true, "initiator"], [false, "target"]]) {
+          const supportArgs = { ID: ev.uniqueID, Type: DiplomacyTokenTypes.DIPLOMACY_TOKEN_GLOBAL, Amount: 1, SubType: side };
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.SUPPORT_DIPLOMATIC_ACTION, supportArgs, false);
+          if (!check || check.Success !== true) continue;
+          let cost = null; try { const v = Game.Diplomacy.getInfluenceForNextSupport(ev.uniqueID, BOUND_PLAYER_ID, side); cost = typeof v === "number" ? Math.floor(v) : null; } catch (e) { cost = null; }
+          offers.push({ kind: "SUPPORT_DIPLOMATIC_ACTION", arg: ev.uniqueID, arg2: side ? 1 : 0, pre: influenceNow, eventId: ev.uniqueID, side: label,
+            typeKey: typeof ev.actionTypeName === "string" ? ev.actionTypeName : null, displayName: typeof ev.name === "string" ? compose(ev.name) : null,
+            initiatorPlayerId: isInt(ev.initialPlayer) ? ev.initialPlayer : null, targetPlayerId: isInt(ev.targetPlayer) ? ev.targetPlayer : null,
+            support: isInt(ev.support) ? ev.support : null, cost: cost, costYield: "influence", influenceBalance: influenceNow,
+            affordable: isInt(cost) ? influenceNow >= cost : null, canStart: true });
+        }
+      }
+    }
+    // ---- acknowledging an advisor warning (it expires at end of turn on its own; acknowledging it
+    // records the warning as seen and clears it now)
+    if (isInt(PlayerOperationTypes.VIEWED_ADVISOR_WARNING)) {
+      for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) {
+        const n = Game.Notifications.find(nid);
+        const name = n ? Game.Notifications.getTypeName(n.Type) : null;
+        if (typeof name !== "string" || name.indexOf("NOTIFICATION_ADVISOR_WARNING") !== 0 || !nid || !isInt(nid.id) || !isInt(nid.type)) continue;
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.VIEWED_ADVISOR_WARNING, { Target: nid }, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "VIEWED_ADVISOR_WARNING", arg: nid.id, arg2: nid.type, pre: 1, typeKey: name, notificationId: nid.id, canStart: true });
+      }
+    }
     // ---- diplomacy
     // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
     // this is the one place the payload looks past the bound player. The scope is exactly the shipped

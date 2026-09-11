@@ -1312,6 +1312,52 @@ def test_the_quarantine_keys_on_the_bound_arguments_so_a_plot_action_is_caught(t
         assert [(o["unitId"], o["canStart"], o.get("quarantined", False)) for o in fc] == [(5, False, True), (6, True, False)]
 
 
+def test_capture_dispositions_confirm_on_the_citys_fate_and_the_destructive_ones_need_confirmation(tmp_path):
+    caps = [{"kind": "KEEP_CITY", "arg": 65536, "pre": 1, "cityId": 65536, "cityName": "Ur", "canStart": True},
+            {"kind": "RAZE_CITY", "arg": 65536, "pre": 1, "cityId": 65536, "cityName": "Ur", "destructive": True, "requiresConfirmation": True, "canStart": True}]
+    offers = {**OFFERS, "offers": OFFERS["offers"] + caps}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "KEEP_CITY", "arg": 65536, "directive": 2, "stillPending": True, "razing": False, "stillOwned": True, "matches": False}}
+    rb = {**RB, "capturedPending": [], "razing": [], "cityIds": [65536]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb)), ctx_reply(6)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        raze = next(o for o in out["offers"] if o["kind"] == "raze_captured_city")
+        assert raze["requiresConfirmation"] is True and "lost for good" in raze["guidance"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=raze["actionId"], request_id="rz-0", player=1, mode="singleplayer")
+        assert info.value.code == "CONFIRMATION_REQUIRED"
+        keep = next(o for o in out["offers"] if o["kind"] == "keep_captured_city")
+        assert "requiresConfirmation" not in keep
+        res = reg.perform(gs, action_id=keep["actionId"], request_id="kp-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"cityKept": {"cityId": 65536}}
+
+
+def test_city_state_bonus_support_and_advisor_acknowledgement_confirm_on_their_own_signals(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "CHOOSE_CITY_STATE_BONUS", "arg": 5000, "arg2": 12, "pre": 12, "typeKey": "CITY_STATE_BONUS_A", "cityStatePlayerId": 12, "canStart": True},
+        {"kind": "SUPPORT_DIPLOMATIC_ACTION", "arg": 16, "arg2": 1, "pre": 300, "eventId": 16, "side": "initiator", "cost": 60, "costYield": "influence", "canStart": True},
+        {"kind": "VIEWED_ADVISOR_WARNING", "arg": 900, "arg2": 3, "pre": 1, "typeKey": "NOTIFICATION_ADVISOR_WARNING_MILITARY", "notificationId": 900, "canStart": True}]}
+    p_b = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHOOSE_CITY_STATE_BONUS", "arg": 5000, "cityState": 12, "pendingAfter": 12, "matches": False}}
+    p_s = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SUPPORT_DIPLOMATIC_ACTION", "arg": 16, "side": "initiator", "influenceBefore": 300, "influence": 300, "matches": False}}
+    p_a = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "VIEWED_ADVISOR_WARNING", "arg": 900, "gone": False, "matches": False}}
+    rb_b = {**RB, "cityStateBonusPending": -1}
+    rb_s = {**RB, "influenceBalance": 240}
+    rb_a = {**RB, "advisorWarnings": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(p_b)), reply(5, json.dumps(rb_b)),
+                                reply(6, json.dumps(p_s)), reply(7, json.dumps(rb_s)), reply(8, json.dumps(p_a)), reply(9, json.dumps(rb_a))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        by = {o["kind"]: o for o in out["offers"]}
+        r1 = reg.perform(gs, action_id=by["choose_city_state_bonus"]["actionId"], request_id="csb-1", player=1, mode="singleplayer")
+        assert r1["confirmedBy"]["effect"] == {"cityStateBonusChosen": {"cityStatePlayerId": 12, "bonus": 5000}}
+        r2 = reg.perform(gs, action_id=by["support_diplomatic_action"]["actionId"], request_id="sup-1", player=1, mode="singleplayer")
+        assert r2["confirmedBy"]["effect"] == {"diplomaticActionSupported": {"eventId": 16, "side": "initiator", "influenceSpent": 60}}
+        r3 = reg.perform(gs, action_id=by["acknowledge_advisor_warning"]["actionId"], request_id="adv-1", player=1, mode="singleplayer")
+        assert r3["confirmedBy"]["effect"] == {"advisorWarningAcknowledged": {"notificationId": 900}}
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

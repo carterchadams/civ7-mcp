@@ -64,6 +64,9 @@ MUTATION_ALLOWLIST = (
     # promoting a town to a city: the same command carries the upgrade directive instead of a thing to buy
     'Game.CityCommands.canStart(townId, CityCommandTypes.PURCHASE, upArgs, false)',
     'Game.CityCommands.sendRequest(townId, CityCommandTypes.PURCHASE, upArgs)',
+    # a just-captured settlement's fate: DESTROY with a directive that keeps, razes or liberates
+    'Game.CityCommands.canStart(capturedId, CityCommandTypes.DESTROY, dispArgs, false)',
+    'Game.CityCommands.sendRequest(capturedId, CityCommandTypes.DESTROY, dispArgs)',
     # diplomacy: the operation is not named by the payload at all, it is taken from the engine's own
     # current listing for a project the engine still reports as available against that target
     'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false)',
@@ -93,7 +96,7 @@ MUTATION_ALLOWLIST = (
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
     'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b|DESTROY\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 

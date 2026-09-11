@@ -271,6 +271,23 @@ def test_choosing_a_belief_is_the_same_religion_decision(tmp_path):
     assert d["required"] is True and d["options"][0]["kind"] == "add_belief"
 
 
+def test_a_captured_settlement_and_a_city_state_bonus_are_supported_required_decisions(tmp_path):
+    caps = [{"kind": "KEEP_CITY", "arg": 65536, "pre": 1, "cityId": 65536, "cityName": "Ur", "population": 5, "wonders": 0, "isTown": False, "canStart": True},
+            {"kind": "RAZE_CITY", "arg": 65536, "pre": 1, "cityId": 65536, "cityName": "Ur", "population": 5, "wonders": 0, "isTown": False, "destructive": True, "requiresConfirmation": True, "canStart": True}]
+    payload = offers_with(caps, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CONSIDER_RAZE_CITY"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "capture")
+    assert d["required"] is True and [o["kind"] for o in d["options"]] == ["keep_captured_city", "raze_captured_city"] and "raze" in d["note"]
+    assert d["options"][1]["requiresConfirmation"] is True and "guidance" in d["options"][1]
+    bonus = [{"kind": "CHOOSE_CITY_STATE_BONUS", "arg": 5000, "arg2": 12, "pre": 12, "typeKey": "CITY_STATE_BONUS_A", "displayName": "A", "cityStatePlayerId": 12, "canStart": True}]
+    payload = offers_with(bonus, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_CITY_STATE_BONUS"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None and next(d for d in b["decisions"] if d["kind"] == "city_state_bonus")["required"] is True
+
+
 def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
     """Live, turn 45: six resource assignments and one confirm; the confirm was the option dropped and
     the seat could not end its turn at all, with nothing left to assign."""
