@@ -50,7 +50,7 @@ DISBAND_GUIDANCE = CONFIRMATION_GUIDANCE["disband_unit"]
 UNIT_COMMAND_KINDS = {"UPGRADE": False, "PACK_ARMY": False, "ADD_TO_ARMY": True,
                       "REMOVE_FROM_ARMY": True, "UNPACK_ARMY": True, "ACTIVATE_GREAT_PERSON": True}
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "SEND_MERCHANT": "send_merchant", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
                "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
@@ -447,12 +447,15 @@ class ActionRegistry:
                 for k in ("orderKey", "description", "damage", "maxDamage"):
                     if k in o:
                         entry[k] = o[k]
-            if kind == "MAKE_TRADE_ROUTE":
+            if kind in ("MAKE_TRADE_ROUTE", "SEND_MERCHANT"):
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
-                    raise ObserverError("API_CONTRACT_MISMATCH", "trade route offer without a destination")
+                    raise ObserverError("API_CONTRACT_MISMATCH", "trade offer without a target plot")
                 rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
-                for k in ("to", "cityName", "activeRoutes"):
-                    if k in o:
+                if isinstance(o.get("from"), dict):
+                    rec["fromXY"] = [o["from"].get("x"), o["from"].get("y")]
+                for k in ("unitId", "from", "to", "unitTypeKey", "cityName", "targetPlayerId", "domain",
+                          "routeLength", "activeRoutes", "inRange", "pathTurns"):
+                    if o.get(k) is not None:
                         entry[k] = o[k]
             if kind == "RESPOND_DIPLOMATIC_FIRST_MEET":
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
@@ -794,6 +797,13 @@ class ActionRegistry:
                         if isinstance(now, int) and not isinstance(now, bool) and now != offer["pre"]:
                             effect = {"unitCommand": {"unitId": offer["arg"], "command": PUBLIC_KIND[kind],
                                                       "was": offer["pre"], "now": now}}
+                elif kind == "SEND_MERCHANT":
+                    # The merchant set off: it is somewhere other than where it stood. Arrival is a
+                    # later turn's business; the route itself is made on arrival by make_trade_route.
+                    locs = rb.get("unitLocations")
+                    now = locs.get(str(offer["arg"])) if isinstance(locs, dict) else None
+                    if isinstance(now, list) and now != offer.get("fromXY"):
+                        effect = {"merchantSent": {"unitId": offer["arg"], "toward": [offer["arg2"], offer["arg3"]], "now": now}}
                 elif kind == "ATTACK":
                     # A strike spends the unit's attack for the turn whatever the outcome, and nothing
                     # else spends it, so the counter falling is the proof the blow was actually thrown.

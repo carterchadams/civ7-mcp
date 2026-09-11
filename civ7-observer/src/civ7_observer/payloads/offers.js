@@ -308,36 +308,66 @@
         }
       }
     }
-    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.MAKE_TRADE_ROUTE) && player.Trade && typeof player.Trade.projectPossibleTradeRoutes === "function" && typeof TradeRouteStatus !== "undefined") {
-      // Trade routes: the seat's own Trade component projects where it may trade. Each entry names a
-      // target city, which is resolved only for the plot the command needs; nothing about its owner is
-      // exposed. The shipped chooser sends MAKE_TRADE_ROUTE with that city's plot.
-      let routes = null; try { routes = player.Trade.projectPossibleTradeRoutes(); } catch (e) { routes = null; }
-      let capacity = null; try { capacity = player.Trade.countPlayerTradeRoutes(); } catch (e) { capacity = null; }
-      const merchants = [];
-      for (const u of player.Units.getUnits()) {
-        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID || u.isOnMap !== true) continue;
-        if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
-        const probe = Game.UnitCommands.canStart(u.id, UnitCommandTypes.MAKE_TRADE_ROUTE, { X: -9999, Y: -9999 }, true);
-        if (probe && probe.Success === true) merchants.push(u);
-      }
-      result.context.tradeRoutes = { possible: Array.isArray(routes) ? routes.length : null, merchants: merchants.length, active: capacity };
-      if (Array.isArray(routes)) {
-        for (const u of merchants) {
-          const unitId = u.id;
-          for (const r of routes) {
-            if (!r || !r.targetCityId) continue;
-            const status = Array.isArray(r.status) ? r.status[0] : r.status;
-            if (status !== TradeRouteStatus.SUCCESS) continue;
-            let city = null; try { city = Cities.get(r.targetCityId); } catch (e) { city = null; }
-            if (!city || !city.location || !isInt(city.location.x) || city.location.x < 0) continue;
-            const tradeArgs = { X: city.location.x, Y: city.location.y };
-            const check = Game.UnitCommands.canStart(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs, false);
-            if (!check || check.Success !== true) continue;
-            offers.push({ kind: "MAKE_TRADE_ROUTE", arg: u.id.id, arg2: city.location.x, arg3: city.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y),
-              unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
-              to: { x: city.location.x, y: city.location.y }, cityName: compose(city.name), activeRoutes: capacity, canStart: true });
+    // ---- trade routes
+    // The route list says which routes are legal in principle; the command itself succeeds only once
+    // the merchant stands in range of the target city (live: four routes marked SUCCESS, every check
+    // false, so nothing was ever offered). The shipped chooser then sends the merchant walking to the
+    // nearest plot of that city, an ordinary multi-turn move, and the player confirms on arrival. Both
+    // halves are offered: make the route when in range, otherwise send the merchant.
+    // A seat cannot aim at a city it cannot see. This block may read, for each city the engine itself
+    // names as a route target for this seat, only its name, location and plots. Nothing else about it.
+    // BEGIN VETTED TRADE TARGET SCOPE
+    const tradeTargets = () => {
+      const out = [];
+      try {
+        for (const rt of player.Trade.projectPossibleTradeRoutes()) {
+          if (!rt || !rt.targetCityId || !Array.isArray(rt.status) || rt.status.indexOf(TradeRouteStatus.SUCCESS) === -1) continue;
+          const city = Cities.get(rt.targetCityId);
+          if (!city || !city.location || !isInt(city.location.x)) continue;
+          let plots = []; try { const v = city.getPurchasedPlots(); if (Array.isArray(v)) plots = v.filter(isInt); } catch (e) { plots = []; }
+          out.push({ cityId: rt.targetCityId.id, owner: rt.targetCityId.owner, name: compose(city.name), x: city.location.x, y: city.location.y,
+                     plots: plots, domain: isInt(rt.domain) ? rt.domain : null, pathLength: Array.isArray(rt.pathPlots) ? rt.pathPlots.length : null });
+        }
+      } catch (e) { return []; }
+      return out;
+    };
+    // END VETTED TRADE TARGET SCOPE
+    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.MAKE_TRADE_ROUTE) && player.Trade && typeof player.Trade.projectPossibleTradeRoutes === "function" &&
+        typeof TradeRouteStatus !== "undefined" && typeof Cities !== "undefined" && typeof Units !== "undefined" &&
+        typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.MOVE_TO) &&
+        typeof UnitOperationMoveModifiers !== "undefined" && isInt(UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION)) {
+      const targets = tradeTargets();
+      let activeRoutes = null; try { const v = player.Trade.countPlayerTradeRoutes(); activeRoutes = isInt(v) ? v : null; } catch (e) { activeRoutes = null; }
+      let merchants = 0; try { for (const u of player.Units.getUnits()) { const r = u && GameInfo.Units.lookup(u.type); if (r && r.MakeTradeRoute === true) merchants++; } } catch (e) { merchants = 0; }
+      result.context.tradeRoutes = { possible: targets.length, merchants: merchants, active: activeRoutes };
+      if (targets.length) for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const urow = GameInfo.Units.lookup(u.type);
+        if (!urow || urow.MakeTradeRoute !== true) continue;
+        if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || u.location.x < 0) continue;
+        const unitId = u.id;
+        const here = GameplayMap.getIndexFromXY(u.location.x, u.location.y);
+        const moves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0;
+        for (const t of targets) {
+          const common = { unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, unitTypeKey: typeof urow.UnitType === "string" ? urow.UnitType : null,
+            to: { x: t.x, y: t.y }, cityName: t.name, targetPlayerId: t.owner, domain: t.domain === 0 ? "land" : (t.domain === 2 ? "sea" : t.domain),
+            routeLength: t.pathLength, activeRoutes: activeRoutes };
+          const tradeArgs = { X: t.x, Y: t.y };
+          const check = Game.UnitCommands.canStart(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, tradeArgs, false);
+          if (check && check.Success === true) { offers.push({ kind: "MAKE_TRADE_ROUTE", arg: u.id.id, arg2: t.x, arg3: t.y, pre: here, ...common, inRange: true, canStart: true }); continue; }
+          if (moves < 1) continue;
+          // Out of range: the nearest plot of that city a path reaches, as the shipped chooser picks it.
+          const ranked = t.plots.map((pi) => { const loc = GameplayMap.getLocationFromIndex(pi); return loc && isInt(loc.x) && loc.x >= 0 ? { pi: pi, loc: loc, d: GameplayMap.getPlotDistance(u.location.x, u.location.y, loc.x, loc.y) } : null; }).filter((r) => r && isInt(r.d)).sort((a, b) => a.d - b.d);
+          let dest = null, turns = null;
+          for (const r of ranked) {
+            const path = Units.getPathTo(unitId, { x: r.loc.x, y: r.loc.y });
+            if (path && Array.isArray(path.plots) && path.plots.length > 0) { dest = r; turns = Array.isArray(path.turns) && path.turns.length ? path.turns[path.turns.length - 1] : null; break; }
           }
+          if (!dest) continue;
+          const sendArgs = { X: dest.loc.x, Y: dest.loc.y, Modifiers: UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION };
+          const scheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, sendArgs, false);
+          if (!scheck || scheck.Success !== true) continue;
+          offers.push({ kind: "SEND_MERCHANT", arg: u.id.id, arg2: dest.loc.x, arg3: dest.loc.y, pre: here, ...common, inRange: false, pathTurns: turns, canStart: true });
         }
       }
     }

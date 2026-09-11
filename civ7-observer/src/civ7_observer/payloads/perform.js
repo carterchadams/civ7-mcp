@@ -295,6 +295,31 @@
       matches: expect === "gone" ? still === null : (after !== null && after !== PRE) };
     return JSON.stringify(result);
   }
+  if (KIND === "SEND_MERCHANT") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "send arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.MOVE_TO)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.MOVE_TO unavailable");
+    if (typeof UnitOperationMoveModifiers === "undefined" || !isInt(UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION)) return refuse("API_CONTRACT_MISMATCH", "the move modifier is unavailable");
+    let merchant = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { merchant = u; break; } } } catch (e) { merchant = null; }
+    if (!merchant) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const mrow = GameInfo.Units.lookup(merchant.type);
+    if (!mrow || mrow.MakeTradeRoute !== true) return refuse("UNKNOWN_ACTION", "unit cannot make trade routes");
+    if (merchant.isOnMap !== true || !merchant.location || !isInt(merchant.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
+    if (GameplayMap.getIndexFromXY(merchant.location.x, merchant.location.y) !== PRE) return refuse("ACTION_EXPIRED", "unit is no longer where it was when the send was offered");
+    const mUnitId = merchant.id;
+    const mpath = Units.getPathTo(mUnitId, { x: ARG2, y: ARG3 });
+    if (!mpath || !Array.isArray(mpath.plots) || mpath.plots.length === 0) return refuse("ACTION_NOT_STARTABLE", "no native path to the target plot");
+    // Sent the way the shipped chooser sends it: a plain move to the city's plot, allowed to end in
+    // unexplored ground, which the engine carries on over following turns.
+    const sendArgs = { X: ARG2, Y: ARG3, Modifiers: UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION };
+    const scheck = Game.UnitOperations.canStart(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs, false);
+    if (!scheck || scheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the move");
+    Game.UnitOperations.sendRequest(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs);
+    result.outcome = "sent";
+    const now = merchant.location && isInt(merchant.location.x) ? GameplayMap.getIndexFromXY(merchant.location.x, merchant.location.y) : null;
+    result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, from: PRE, at: now, matches: isInt(now) && now !== PRE };
+    return JSON.stringify(result);
+  }
   if (KIND === "ATTACK") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "attack arguments are not integers");
     if (!isInt(UnitOperationTypes.MOVE_TO) || !isInt(UnitOperationTypes.RANGE_ATTACK)) return refuse("API_CONTRACT_MISMATCH", "the attack operations are unavailable");

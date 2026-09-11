@@ -85,6 +85,9 @@ MUTATION_ALLOWLIST = (
     'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs)',
     'Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs, false)',
     'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs)',
+    # sending a merchant: the shipped chooser's own fallback, a plain move to the target city's plot
+    'Game.UnitOperations.canStart(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs, false)',
+    'Game.UnitOperations.sendRequest(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs)',
     # the six generic unit commands: the kind IS the engine's command name, validated host-side
     # against the catalog, so no caller text ever reaches UnitCommandTypes
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
@@ -95,7 +98,8 @@ ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperati
 
 
 VETTED_MARKERS = (("    // BEGIN VETTED MET-PLAYER SCOPE\n", "    // END VETTED MET-PLAYER SCOPE\n"),
-                  ("    // BEGIN VETTED DEFENDER SCOPE\n", "    // END VETTED DEFENDER SCOPE\n"))
+                  ("    // BEGIN VETTED DEFENDER SCOPE\n", "    // END VETTED DEFENDER SCOPE\n"),
+                  ("    // BEGIN VETTED TRADE TARGET SCOPE\n", "    // END VETTED TRADE TARGET SCOPE\n"))
 
 VETTED_MET_PLAYER_SCOPE_OFFERS = """    const metPlayers = () => {
       const out = [];
@@ -137,12 +141,31 @@ VETTED_DEFENDER_SCOPE = """    const defenderOn = (unitId, x, y) => {
     };
 """
 
+# A merchant cannot be aimed at a city the seat cannot see. This block may read, for each city the
+# engine itself names as a trade-route target for this seat, only its name, location and plots.
+VETTED_TRADE_TARGET_SCOPE = """    const tradeTargets = () => {
+      const out = [];
+      try {
+        for (const rt of player.Trade.projectPossibleTradeRoutes()) {
+          if (!rt || !rt.targetCityId || !Array.isArray(rt.status) || rt.status.indexOf(TradeRouteStatus.SUCCESS) === -1) continue;
+          const city = Cities.get(rt.targetCityId);
+          if (!city || !city.location || !isInt(city.location.x)) continue;
+          let plots = []; try { const v = city.getPurchasedPlots(); if (Array.isArray(v)) plots = v.filter(isInt); } catch (e) { plots = []; }
+          out.push({ cityId: rt.targetCityId.id, owner: rt.targetCityId.owner, name: compose(city.name), x: city.location.x, y: city.location.y,
+                     plots: plots, domain: isInt(rt.domain) ? rt.domain : null, pathLength: Array.isArray(rt.pathPlots) ? rt.pathPlots.length : null });
+        }
+      } catch (e) { return []; }
+      return out;
+    };
+"""
+
 # Only these payloads may carry a vetted block, and only with exactly this text. The key is the
 # payload and which marker pair the block sits between.
 VETTED_SCOPES = {
     ("offers.js", 0): VETTED_MET_PLAYER_SCOPE_OFFERS,
     ("readback.js", 0): VETTED_MET_PLAYER_SCOPE_READBACK,
     ("offers.js", 1): VETTED_DEFENDER_SCOPE,
+    ("offers.js", 2): VETTED_TRADE_TARGET_SCOPE,
 }
 VETTED_PAYLOADS = {name for name, _ in VETTED_SCOPES}
 
@@ -291,9 +314,13 @@ def test_an_ordinary_move_never_sets_an_attack_or_unexplored_modifier():
 def test_the_attack_modifiers_appear_only_in_the_attack_branch_and_never_declare_war_by_flag():
     src = (PAYLOAD_DIR / "perform.js").read_text(encoding="utf-8")
     attack = _perform_branch("ATTACK")
-    # every mention of an attack modifier lives in the attack branch (a guard and the argument)
-    for flag in ("UnitOperationMoveModifiers.ATTACK", "UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION"):
-        assert src.count(flag) == attack.count(flag) == 2, f"{flag} appears outside the attack branch"
+    # the attack modifier lives only in the attack branch (a guard and the argument); the ignore-
+    # unexplored modifier also serves the merchant send, the shipped chooser's own fallback
+    send = _perform_branch("SEND_MERCHANT")
+    assert src.count("UnitOperationMoveModifiers.ATTACK") == attack.count("UnitOperationMoveModifiers.ATTACK") == 2
+    flag = "UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION"
+    assert src.count(flag) == attack.count(flag) + send.count(flag) and attack.count(flag) == 2 and send.count(flag) == 2
+    assert "UnitOperationMoveModifiers.ATTACK" not in send
     # and exactly one set of arguments is ever built from them
     assert attack.count("const meleeArgs") == 1
     assert not re.search(r"UnitOperationMoveModifiers\.(DECLARE_WAR|ROUTE_ALLOW_UNEXPLORED)", src)

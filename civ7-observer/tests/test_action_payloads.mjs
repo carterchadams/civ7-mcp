@@ -2313,38 +2313,57 @@ test("perform the greeting only after re-deriving the player from the still-bloc
   }
 });
 
-// ---- trade routes (the seat's own component projects where it may trade)
-function withTrade(g, { routes = [[{ owner: 2, id: 5, type: 1 }, "SUCCESS"]], merchant = true, allow = true, active = 0 } = {}) {
-  const units = [unit(5, { location: { x: 10, y: 10 } })];
+// ---- trade routes: make the route in range, otherwise send the merchant walking to the city
+function withTrade(g, { routes = [[{ owner: 2, id: 5, type: 1 }, "SUCCESS"]], merchant = true, inRange = true, moves = 2, active = 0, path = true, moveOk = true, moved = true } = {}) {
+  const units = [unit(5, { location: { x: 10, y: 10 }, Movement: { movementMovesRemaining: moves } })];
   withUnits(g, units);
+  g.GameInfo.Units = table([{ $hash: 99, UnitType: "UNIT_MERCHANT", MakeTradeRoute: merchant }]);
   g.UnitCommandTypes = { MAKE_TRADE_ROUTE: 472083904, PROMOTE: -1259482049 };
+  g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), MOVE_TO: 1477390184, SKIP_TURN: 745019656 };
+  g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
   g.TradeRouteStatus = { INVALID: 0, SUCCESS: -327245337, DISTANCE: -1224148699 };
-  const cities = { 5: { id: { owner: 2, id: 5, type: 1 }, name: "LOC_FAR", location: { x: 30, y: 30 } } };
+  const cities = { 5: { id: { owner: 2, id: 5, type: 1 }, name: "LOC_FAR", location: { x: 30, y: 30 }, getPurchasedPlots: () => [3030, 2929, 3131] } };
   g.Cities = { get: (cid) => cities[cid.id] ?? null };
-  g.GameplayMap = g.GameplayMap || {}; g.GameplayMap.getIndexFromXY = (x, y) => y * 100 + x;
-  g.Players.get(1).Trade = { projectPossibleTradeRoutes: () => routes.map(([cid, st]) => ({ targetCityId: cid, status: [g.TradeRouteStatus[st]], domain: 1 })), countPlayerTradeRoutes: () => active };
+  g.GameplayMap = { ...(g.GameplayMap || {}), getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }),
+    getPlotDistance: (x1, y1, x2, y2) => Math.max(Math.abs(x1 - x2), Math.abs(y1 - y2)) };
+  g.Units = { ...(g.Units || {}), getPathTo: (uid, loc) => { g._log.push(`path(${loc.x},${loc.y})`); return path ? { plots: [1, 2, 3], turns: [1, 2, 3] } : { plots: [], turns: [] }; } };
+  const me = g.Players.get(1);
+  me.Trade = { projectPossibleTradeRoutes: () => routes.map(([cid, st]) => ({ targetCityId: cid, status: [g.TradeRouteStatus[st]], domain: 0, pathPlots: [1, 2, 3, 4, 5] })), countPlayerTradeRoutes: () => active };
   g.Game.UnitCommands = {
-    canStart: (uid, cmd, args, show) => { g._log.push(`tcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`); if (cmd !== 472083904) return { Success: false }; if (show === true) return { Success: merchant }; return { Success: allow && args.X === 30 && args.Y === 30 }; },
+    canStart: (uid, cmd, args, show) => { g._log.push(`tcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`); return { Success: cmd === 472083904 && inRange && args.X === 30 && args.Y === 30 }; },
     sendRequest: (uid, cmd, args) => { g._log.push(`tsendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`); },
+  };
+  const prev = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => { if (op !== 1477390184) return prev ? prev.canStart(uid, op, args, show) : { Success: true }; g._log.push(`mcanStart(${JSON.stringify(args)})`); return { Success: moveOk }; },
+    sendRequest: (uid, op, args) => { if (op !== 1477390184) return prev ? prev.sendRequest(uid, op, args) : undefined; g._log.push(`msendRequest(${JSON.stringify(args)})`); if (moved) units[0].location = { x: 11, y: 11 }; },
   };
   return g;
 }
 
-test("trade route offers pair a merchant with every destination the seat's own component projects as successful", () => {
+test("a merchant in range is offered the route; one out of range is offered a walk to the nearest city plot a path reaches", () => {
   const log = [];
   const g = withTrade(world({ log })); g._log = log;
   const r = runOffers(g);
   const tr = r.offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE");
-  assert.deepEqual(tr.map((o) => [o.arg, o.arg2, o.arg3, o.unitId, o.cityName, o.activeRoutes, o.canStart]), [[5, 30, 30, 5, "LOC_FAR", 0, true]]);
-  assert.deepEqual(tr[0].to, { x: 30, y: 30 });
+  assert.deepEqual(tr.map((o) => [o.arg, o.arg2, o.arg3, o.cityName, o.targetPlayerId, o.domain, o.routeLength, o.inRange, o.activeRoutes]), [[5, 30, 30, "LOC_FAR", 2, "land", 5, true, 0]]);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "SEND_MERCHANT"), []);
   assert.deepEqual(r.context.tradeRoutes, { possible: 1, merchants: 1, active: 0 });
-  assert.ok(!log.some((e) => e.startsWith("tsendRequest")));
-  const far = withTrade(world({ log: [] }), { routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }); far._log = [];
+  const far = withTrade(world({ log: [] }), { inRange: false }); far._log = [];
   const fr = runOffers(far);
-  assert.equal(fr.offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE").length, 0, "only successful routes are offered");
-  assert.deepEqual(fr.context.tradeRoutes, { possible: 1, merchants: 1, active: 0 }, "the seat still learns a route was projected but rejected");
-  const none = withTrade(world({ log: [] }), { merchant: false }); none._log = [];
-  assert.equal(runOffers(none).offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE").length, 0, "a unit that cannot trade is never paired");
+  assert.deepEqual(fr.offers.filter((o) => o.kind === "MAKE_TRADE_ROUTE"), []);
+  const send = fr.offers.filter((o) => o.kind === "SEND_MERCHANT");
+  assert.deepEqual(send.map((o) => [o.arg, o.arg2, o.arg3, o.cityName, o.inRange, o.pathTurns, o.pre]), [[5, 29, 29, "LOC_FAR", false, 3, 1010]], "the nearest plot of the city, by distance");
+  assert.ok(!far._log.some((e) => e.startsWith("tsendRequest") || e.startsWith("msendRequest")));
+});
+
+test("no send without moves, without a path, past a distance-refused route, or for a unit that cannot trade", () => {
+  for (const [label, opts] of [["no moves", { inRange: false, moves: 0 }], ["no path", { inRange: false, path: false }], ["engine refuses the move", { inRange: false, moveOk: false }],
+                               ["route refused", { inRange: false, routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }], ["not a merchant", { inRange: false, merchant: false }]]) {
+    const g = withTrade(world({ log: [] }), opts); g._log = [];
+    const r = runOffers(g);
+    assert.deepEqual(r.offers.filter((o) => o.kind === "SEND_MERCHANT" || o.kind === "MAKE_TRADE_ROUTE"), [], label);
+  }
 });
 
 test("perform MAKE_TRADE_ROUTE re-checks the projection and the unit's plot, then sends the destination", () => {
@@ -2358,14 +2377,39 @@ test("perform MAKE_TRADE_ROUTE re-checks the projection and the unit's plot, the
     ["unknown unit", () => withTrade(world({ log: [] })), 9, 30, 30, 1010],
     ["unit moved", () => withTrade(world({ log: [] })), 5, 30, 30, 7],
     ["destination not projected", () => withTrade(world({ log: [] })), 5, 31, 31, 1010],
-    ["route now out of range", () => withTrade(world({ log: [] }), { routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }), 5, 30, 30, 1010],
-    ["canStart false", () => withTrade(world({ log: [] }), { allow: false }), 5, 30, 30, 1010],
+    ["route now refused", () => withTrade(world({ log: [] }), { routes: [[{ owner: 2, id: 5, type: 1 }, "DISTANCE"]] }), 5, 30, 30, 1010],
+    ["out of range", () => withTrade(world({ log: [] }), { inRange: false }), 5, 30, 30, 1010],
   ]) {
     const h = mk(); const l = []; h._log = l;
     const rr = runPerformArgs(h, "MAKE_TRADE_ROUTE", uid, x, y, { pre });
     assert.ok(rr.refused, `${label}: expected refusal`);
     assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
   }
+});
+
+test("perform SEND_MERCHANT sends a plain move with the ignore-unexplored modifier and confirms on the merchant having set off", () => {
+  const log = [];
+  const g = withTrade(world({ log }), { inRange: false }); g._log = log;
+  const r = runPerformArgs(g, "SEND_MERCHANT", 5, 29, 29, { pre: 1010 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "SEND_MERCHANT", arg: 5, target: { x: 29, y: 29 }, from: 1010, at: 1111, matches: true });
+  const send = log.find((e) => e.startsWith("msendRequest("));
+  assert.ok(send.includes('"X":29,"Y":29,"Modifiers":16384') && !send.includes("16400"), "never the attack modifier");
+  for (const [label, mk, uid, x, y, pre] of [
+    ["unknown unit", () => withTrade(world({ log: [] }), { inRange: false }), 9, 29, 29, 1010],
+    ["unit moved", () => withTrade(world({ log: [] }), { inRange: false }), 5, 29, 29, 7],
+    ["no path", () => withTrade(world({ log: [] }), { inRange: false, path: false }), 5, 29, 29, 1010],
+    ["engine refuses", () => withTrade(world({ log: [] }), { inRange: false, moveOk: false }), 5, 29, 29, 1010],
+    ["not a merchant", () => withTrade(world({ log: [] }), { inRange: false, merchant: false }), 5, 29, 29, 1010],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    assert.ok(runPerformArgs(h, "SEND_MERCHANT", uid, x, y, { pre }).refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("msendRequest")), `${label}: must not send`);
+  }
+  const stuck = withTrade(world({ log: [] }), { inRange: false, moved: false }); stuck._log = [];
+  const rr = runPerformArgs(stuck, "SEND_MERCHANT", 5, 29, 29, { pre: 1010 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
 });
 
 // ---- standing unit orders (fortify / alert / sleep / heal)

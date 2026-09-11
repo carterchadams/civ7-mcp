@@ -97,6 +97,7 @@ DECISION_OF_KIND = {
     "skip_unit": "unit",
     "move_unit": "unit",
     "make_trade_route": "unit",
+    "send_merchant": "unit",
     "unit_order": "unit",
     # An attack is a unit order too, but it is the one that starts wars, so it reads with the others.
     "attack": "unit",
@@ -146,7 +147,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "destructive", "requiresConfirmation", "warning", "guidance", "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
                  "armyId", "isCommander", "ranged", "attacksRemaining", "strength", "rangedStrength", "damage", "maxDamage", "defender", "startsWar",
-                 "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
+                 "cityName", "targetPlayerId", "domain", "routeLength", "activeRoutes", "inRange", "yieldsNext", "upkeep", "upkeepNext", "workers", "maxWorkers", "cityWorkers", "cityWorkerCap",
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
                  "eventId", "answer", "proposerPlayerId", "proposerName", "beliefClass",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
@@ -180,7 +181,8 @@ MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
                   "standing order that also ends the unit's turn: Heal rests a damaged unit until full, Fortify and Alert hold "
                   "ground, Sleep waits. A unit carrying `damage` is wounded. A move option's `steps` is how far away the "
-                  "destination is: every one listed is reachable this turn, so a fast unit can cross several tiles at once")
+                  "destination is: every one listed is reachable this turn, so a fast unit can cross several tiles at once"
+                  " A merchant's `make_trade_route` appears only once it stands in range of the target city; until then `send_merchant` walks it there over the coming turns, and the route is made on arrival.")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
