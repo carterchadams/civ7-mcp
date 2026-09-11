@@ -227,7 +227,7 @@
     if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused assigning that resource there");
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
     result.outcome = "sent";
-    let now = -1; try { const a = player.Resources.getCityIDAssigned(ARG); now = a && isInt(a.id) ? a.id : (isInt(a) ? a : -1); } catch (e) { now = -1; }
+    let now = -1; try { for (const ar of rcity.Resources.getAssignedResources()) { if (ar && ar.value === ARG) { now = ARG2; break; } } } catch (e) { now = -1; }
     result.readback = { kind: KIND, arg: ARG, city: ARG2, assignedTo: now, matches: now === ARG2 };
     return JSON.stringify(result);
   }

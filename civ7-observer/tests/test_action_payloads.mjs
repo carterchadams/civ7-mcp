@@ -904,9 +904,10 @@ test("perform CHOOSE_GOLDEN_AGE re-checks the choice list and canStart, sends th
 function withResources(g, { toAssign = 1, legal = { "1637:131073": true, "1752:65536": true }, blocked = true } = {}) {
   const me = g.Players.get(1);
   const assigned = { 1698: 65536 };
-  const cities = [{ id: { owner: 1, id: 65536, type: 1 }, name: "LOC_C", isTown: false, Resources: { getAssignedResourcesCap: () => 4, getTotalCountAssignedResources: () => 1 } }, { id: { owner: 1, id: 131073, type: 1 }, name: "LOC_B", isTown: true, Resources: { getAssignedResourcesCap: () => 1, getTotalCountAssignedResources: () => 0 } }];
+  const listFor = (cid) => Object.entries(assigned).filter(([, c]) => c === cid).map(([v]) => ({ uniqueResource: { resource: 0 }, value: Number(v) }));
+  const cities = [{ id: { owner: 1, id: 65536, type: 1 }, name: "LOC_C", isTown: false, Resources: { getAssignedResourcesCap: () => 4, getTotalCountAssignedResources: () => 1, getAssignedResources: () => listFor(65536) } }, { id: { owner: 1, id: 131073, type: 1 }, name: "LOC_B", isTown: true, Resources: { getAssignedResourcesCap: () => 1, getTotalCountAssignedResources: () => 0, getAssignedResources: () => listFor(131073) } }];
   me.Cities = { getCities: () => cities };
-  me.Resources = { getResources: () => [{ uniqueResource: { resource: 601 }, value: 1637 }, { uniqueResource: { resource: 602 }, value: 1698 }, { uniqueResource: { resource: 603 }, value: 1752 }], getCountResourcesToAssign: () => toAssign, getCityIDAssigned: (v) => (assigned[v] !== undefined ? { owner: 1, id: assigned[v], type: 1 } : { owner: -1, id: -1, type: 0 }) };
+  me.Resources = { getResources: () => [{ uniqueResource: { resource: 601 }, value: 1637 }, { uniqueResource: { resource: 602 }, value: 1698 }, { uniqueResource: { resource: 603 }, value: 1752 }], getCountResourcesToAssign: () => toAssign, getCityIDAssigned: () => undefined };
   g.Game.Resources = { getOriginCity: () => ({ owner: 1, id: 65536, type: 1 }) };
   g.GameInfo.Resources = table([{ $hash: 601, ResourceType: "RESOURCE_RUBIES", Name: "LOC_RUBIES", ResourceClassType: "RESOURCECLASS_BONUS", Tooltip: "LOC_RUBIES_T" }, { $hash: 602, ResourceType: "RESOURCE_IVORY", Name: "LOC_IVORY", ResourceClassType: "RESOURCECLASS_EMPIRE", Tooltip: "LOC_IVORY_T" }, { $hash: 603, ResourceType: "RESOURCE_PEARLS", Name: "LOC_PEARLS", ResourceClassType: "RESOURCECLASS_CITY", Tooltip: "LOC_PEARLS_T" }]);
   g.GameplayMap = { getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getIndexFromXY: (x, y) => y * 100 + x };

@@ -276,6 +276,8 @@
       const cities = player.Cities.getCities();
       const cityInfo = cities.filter((c) => c && c.id && isInt(c.id.id) && c.id.owner === BOUND_PLAYER_ID).map((c) => { let cap = null, cnt = null; try { cap = c.Resources.getAssignedResourcesCap(); cnt = c.Resources.getTotalCountAssignedResources(); } catch (e) { /* unknown */ } return { c: c, cap: isInt(cap) ? cap : null, cnt: isInt(cnt) ? cnt : null }; });
       const cityName = (cid) => { for (const ci of cityInfo) if (ci.c.id.id === cid) return compose(ci.c.name); return null; };
+      // live: Resources.getCityIDAssigned returns nothing usable; each city's own assigned list is the truth
+      const assignedMap = {}; for (const ci of cityInfo) { try { for (const ar of ci.c.Resources.getAssignedResources()) { if (ar && isInt(ar.value)) assignedMap[ar.value] = ci.c.id.id; } } catch (e) { /* none */ } }
       let assignable = 0;
       const all = R.getResources();
       if (Array.isArray(all)) for (const r of all) {
@@ -283,7 +285,7 @@
         const def = GameInfo.Resources.lookup(r.uniqueResource.resource);
         const loc = GameplayMap.getLocationFromIndex(r.value);
         if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0) continue;
-        let assignedTo = -1; try { const a = R.getCityIDAssigned(r.value); assignedTo = a && isInt(a.id) ? a.id : (isInt(a) ? a : -1); } catch (e) { assignedTo = -1; }
+        const assignedTo = isInt(assignedMap[r.value]) ? assignedMap[r.value] : -1;
         let originName = null; try { const o = Game.Resources.getOriginCity(r.value); originName = o && isInt(o.id) ? cityName(o.id) : null; } catch (e) { originName = null; }
         for (const ci of cityInfo) {
           if (assignedTo === ci.c.id.id) continue;
