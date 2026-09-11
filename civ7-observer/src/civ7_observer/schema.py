@@ -261,19 +261,41 @@ def _completed_node(v: Any, path: str) -> dict[str, Any]:
     return rec
 
 
+def _in_progress_node(v: Any, path: str) -> dict[str, Any]:
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "progress", "cost", "depthUnlocked", "maxDepth"))
+    rec = {
+        "type": _int(o["type"], path + ".type"),
+        "typeKey": _opt(_str, o["typeKey"], path + ".typeKey"),
+        "displayName": _opt(_str, o["displayName"], path + ".displayName"),
+        "tree": _opt(_str, o["tree"], path + ".tree"),
+        "progress": _int(o["progress"], path + ".progress", minimum=1),
+        "cost": _int(o["cost"], path + ".cost", minimum=0),
+        "depthUnlocked": _int(o["depthUnlocked"], path + ".depthUnlocked", minimum=0),
+        "maxDepth": _int(o["maxDepth"], path + ".maxDepth", minimum=0),
+    }
+    if rec["depthUnlocked"] != 0:
+        _fail(path, "inProgress nodes have no earned depth (earned nodes belong in completed)")
+    return rec
+
+
 def _progression(v: Any, path: str, *, civics: bool) -> dict[str, Any]:
-    keys = ("status", "current", "queuedTarget", "completed") + (("trees",) if civics else ("tree",))
+    keys = ("status", "current", "queuedTarget", "inProgress", "completed") + (("trees",) if civics else ("tree",))
     o = _obj(v, path, keys)
     if o["status"] != "supported":
         _fail(path + ".status", "core progression must be supported")
-    if not isinstance(o["completed"], list) or len(o["completed"]) > MAX_NODES:
-        _fail(path + ".completed", f"expected a list of at most {MAX_NODES}")
+    for name in ("completed", "inProgress"):
+        if not isinstance(o[name], list) or len(o[name]) > MAX_NODES:
+            _fail(f"{path}.{name}", f"expected a list of at most {MAX_NODES}")
     out = {
         "status": "supported",
         "current": _opt(_current_node, o["current"], path + ".current"),
         "queuedTarget": _opt(_tree_ref, o["queuedTarget"], path + ".queuedTarget"),
+        "inProgress": [_in_progress_node(n, f"{path}.inProgress[{i}]") for i, n in enumerate(o["inProgress"])],
         "completed": [_completed_node(n, f"{path}.completed[{i}]") for i, n in enumerate(o["completed"])],
     }
+    cur = out["current"]["type"] if out["current"] else None
+    if any(n["type"] == cur for n in out["inProgress"]):
+        _fail(path + ".inProgress", "current node must not be repeated in inProgress")
     if civics:
         t = _obj(o["trees"], path + ".trees", ("active", "available"))
         if not isinstance(t["available"], list) or not t["available"] or len(t["available"]) > MAX_TREES:

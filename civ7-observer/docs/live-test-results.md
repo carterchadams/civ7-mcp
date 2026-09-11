@@ -194,6 +194,7 @@ Ekklesia) between the turn-14 probe and this capture.
 |---|---|
 | `doctor --json` context now carries `age` | `{"turn":16,"age":2077444219,"localPlayerId":1,"localObserverId":1}` |
 | `snapshot --mode local-hotseat` with enum validation, earned-depth completed list, age check, map bound | PASS: 0 warnings; Masonry current 18/83 depth 0/2; 4 completed techs; Chiefdom 1/1 and Discipline UNLOCKED 1/2 in completed civics; 112 visible tiles |
-| active next-depth research (mastery in progress) | pending: select Discipline's second depth as the current civic, capture, expect Discipline in `completed` with state IN_PROGRESS and depthUnlocked 1 |
-| queued target (non-null) | pending: queue a farther tech as target, capture, expect `queuedTarget` set while `current` differs |
-| UI comparison of an advancing value | pending: read the research panel's Masonry progress and compare with `progress 18 / cost 83`, 7 turns |
+| active next-depth research (mastery selected) | PASS: Discipline is `current` (depth 1 of 2, progress 0, cost 62, 5 turns) **and** stays in `completed` with depthUnlocked 1; its live state is UNLOCKED (4) because no points have accrued yet, so IN_PROGRESS is not the state of a freshly selected node |
+| queued target (non-null) | PASS: target `NODE_TECH_AQ_WHEEL` (raw node state CLOSED, not in `getResearched()`), and the game switched `current` to `NODE_TECH_AQ_IRRIGATION` (state OPEN, 0/83, 9 turns) on the path to it |
+| UI comparison of an advancing value | PASS for turns: the panel showed 7 turns for Masonry, matching `turnsLeft 7`; the UI exposes no numeric progress/cost, only a bar, so 18/83 is corroborated by the dock's `1 − progress/cost` formula rather than a displayed number |
+| banked progress on a deselected node | Masonry kept `progress 18` with state IN_PROGRESS after Irrigation became current; the observation now lists it under `technology.inProgress` (18/83) and Ekklesia under `civics.inProgress` (16/100) |

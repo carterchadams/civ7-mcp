@@ -167,12 +167,19 @@ FULLY_UNLOCKED node.
 | `current.turnsLeft` | game's own estimate; `null` when nothing is selected (raw -1) | `getTurnsLeft()` |
 | `depthUnlocked` / `maxDepth` | depths already earned / total depths (mastery = depth 2) | `getNode()` |
 | `repeatedDepth` | repeat count for repeatable nodes (depth resets to 0) | `getNode().repeatedDepth`; `tree-grid.js:342` |
+| `inProgress[]` | nodes that are neither current nor earned but hold banked points (state IN_PROGRESS); the game keeps a deselected node's progress (Masonry kept 18/83 after Irrigation became current) | `getNode().progress` on `getResearched()` entries |
 | `completed[]` | every node with an **earned depth** (`depthUnlocked > 0` or `repeatedDepth > 0`), regardless of whether its next depth is currently being researched; `state` is the node's real state (3 while the next depth is in progress, 4 with mastery remaining, 5 fully unlocked) | `tree-grid.js:294-296` computes completed levels from `depthUnlocked` independently of the current research |
 
 Consistency rules enforced in the payload and the schema: FULLY_UNLOCKED requires
 `depthUnlocked == maxDepth` (or a repeat count), UNLOCKED requires `0 < depthUnlocked < maxDepth`,
 and INVALID/CLOSED/OPEN require no earned depth. Any other combination, an unknown state
 value, or an enum missing any of its six members refuses the capture.
+
+State of the **current** node right after selection: OPEN (2) for a fresh node, UNLOCKED (4)
+for a mastery selection; it becomes IN_PROGRESS (3) once points accrue. IN_PROGRESS therefore
+means "has banked points", not "is currently selected". A queued target may be a CLOSED node
+that is absent from `getResearched()`; selecting a target makes the game switch the current
+node to the next prerequisite on the path (Wheel → Irrigation observed).
 
 ## Progression state matrix (observed)
 

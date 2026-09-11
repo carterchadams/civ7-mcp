@@ -247,17 +247,26 @@
     const researched = comp.getResearched();
     need(Array.isArray(researched), label + ".getResearched() did not return an array");
     const completed = [];
+    const inProgress = [];
     for (const r of researched) {
       need(r && isInt(r.type), label + ".getResearched() entry is malformed");
       const ln = liveNode(r.type), n = ln.node;
-      if (!ln.earned) continue;   // known OPEN / CLOSED / INVALID nodes with nothing earned
-      const d = nodeDef(r.type);
-      completed.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state), depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth, repeatedDepth: ln.repeatedDepth });
+      if (ln.earned) {
+        const d = nodeDef(r.type);
+        completed.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state), depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth, repeatedDepth: ln.repeatedDepth });
+      } else if (n.state === S.NODE_STATE_IN_PROGRESS && r.type !== rec.type) {
+        // banked points on a node that is neither current nor earned (the game keeps them)
+        const d = nodeDef(r.type);
+        const cost = comp.getNodeCost(r.type);
+        need(isInt(cost), label + " cost is not an integer for node " + r.type);
+        inProgress.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, progress: n.progress, cost: cost, depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth });
+      }
+      // known OPEN / CLOSED / INVALID nodes with nothing earned and nothing banked are excluded
     }
     const target = comp.getTargetNode();
     need(isInt(target), label + ".getTargetNode() is not an integer");
     const queuedTarget = target === -1 ? null : { type: target, typeKey: nodeDef(target).typeKey };
-    const out = { status: "supported", current: current, queuedTarget: queuedTarget, completed: completed };
+    const out = { status: "supported", current: current, queuedTarget: queuedTarget, inProgress: inProgress, completed: completed };
     Object.assign(out, extraTrees(treeRef));
     return out;
   };

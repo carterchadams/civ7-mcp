@@ -223,3 +223,21 @@ test("age change during extraction refuses with CONTEXT_CHANGED", () => {
   g.GameplayMap.getRevealedState = () => { age = 5555; return 0; };
   assert.equal(run(g).refused?.code, "CONTEXT_CHANGED");
 });
+
+test("nodes with banked progress that are neither current nor earned appear in inProgress", () => {
+  const nodes = { ...NODES, 702: { state: 3, depthUnlocked: 0, maxDepth: 2, progress: 18 } };  // Writing: banked, not current (701 is current)
+  const r = run(game({ nodes }));
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.technology.inProgress.map((n) => [n.typeKey, n.progress, n.cost, n.depthUnlocked, n.maxDepth]), [["NODE_TECH_AQ_WRITING", 18, 100, 0, 2]]);
+  assert.ok(!r.technology.completed.some((n) => n.typeKey === "NODE_TECH_AQ_WRITING"));
+  assert.equal(r.technology.current.typeKey, "NODE_TECH_AQ_POTTERY");
+  assert.ok(!r.technology.inProgress.some((n) => n.typeKey === "NODE_TECH_AQ_POTTERY"), "current node is not repeated in inProgress");
+  assert.deepEqual(r.civics.inProgress, []);
+});
+
+test("a just-selected current node may still be OPEN or UNLOCKED with zero progress", () => {
+  const nodes = { ...NODES, 701: { state: 2, depthUnlocked: 0, maxDepth: 1, progress: 0 } };
+  const r = run(game({ nodes }));
+  assert.equal(r.refused, null);
+  assert.equal(r.technology.current.stateName, "NODE_STATE_OPEN");
+});

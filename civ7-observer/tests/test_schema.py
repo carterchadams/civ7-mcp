@@ -25,6 +25,7 @@ GOOD = {
         "tree": {"type": 500, "typeKey": "TREE_TECHS_AQ"},
         "current": {"type": 701, "typeKey": "NODE_TECH_AQ_POTTERY", "displayName": "Pottery", "tree": "TREE_TECHS_AQ", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 45, "cost": 60, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 1, "repeatedDepth": 0},
         "queuedTarget": {"type": 702, "typeKey": "NODE_TECH_AQ_WRITING"},
+        "inProgress": [{"type": 702, "typeKey": "NODE_TECH_AQ_WRITING", "displayName": "Writing", "tree": "TREE_TECHS_AQ", "progress": 18, "cost": 100, "depthUnlocked": 0, "maxDepth": 2}],
         "completed": [{"type": 700, "typeKey": "NODE_TECH_AQ_AGRICULTURE", "displayName": "Agriculture", "tree": "TREE_TECHS_AQ", "state": 5, "stateName": "NODE_STATE_FULLY_UNLOCKED", "depthUnlocked": 1, "maxDepth": 1, "repeatedDepth": 0}],
     },
     "civics": {
@@ -32,6 +33,7 @@ GOOD = {
         "trees": {"active": {"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, "available": [{"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, {"type": 601, "typeKey": "TREE_CIVICS_AQ_GREECE"}]},
         "current": {"type": 801, "typeKey": "NODE_CIVIC_AQ_MAIN_DISCIPLINE", "displayName": "Discipline", "tree": "TREE_CIVICS_AQ_MAIN", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 72, "cost": 125, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 2, "repeatedDepth": 0},
         "queuedTarget": None,
+        "inProgress": [],
         "completed": [],
     },
     "map": {
@@ -100,6 +102,10 @@ def mutate(path, value):
     (["civics", "trees", "active"], 600),
     (["civics", "trees", "available"], []),
     (["civics", "current", "depthUnlocked"], 3),
+    (["technology", "inProgress"], schema.DELETE),
+    (["technology", "inProgress", 0, "progress"], 0),
+    (["technology", "inProgress", 0, "depthUnlocked"], 1),
+    (["technology", "inProgress", 0, "state"], 3),
     (["map"], schema.DELETE),
     (["map", "status"], "unsupported"),
     (["map", "coverage"], "full"),
