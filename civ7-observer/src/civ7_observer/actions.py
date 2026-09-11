@@ -53,10 +53,24 @@ class ActionRegistry:
 
     def __init__(self, journal_path: Path) -> None:
         self.journal_path = Path(journal_path)
+        self.offers_path = self.journal_path.with_name(self.journal_path.stem + ".offers.json")
         self._offers: dict[str, dict[str, Any]] = {}
         self._results: dict[str, dict[str, Any]] = {}
         self._pending: set[str] = set()
         self._load_journal()
+        self._load_offers()
+
+    def _load_offers(self) -> None:
+        if self.offers_path.exists():
+            try:
+                data = json.loads(self.offers_path.read_text(encoding="utf-8"))
+            except ValueError:
+                data = {}
+            if isinstance(data, dict):
+                self._offers = {k: v for k, v in data.items() if isinstance(v, dict)}
+
+    def _save_offers(self) -> None:
+        write_atomic(self.offers_path, json.dumps(self._offers))
 
     # ---- journal
     def _load_journal(self) -> None:
@@ -118,12 +132,15 @@ class ActionRegistry:
                 raise ObserverError("API_CONTRACT_MISMATCH", "offer entry malformed")
             action_id = secrets.token_urlsafe(18)
             self._offers[action_id] = {"kind": kind, "arg": o["arg"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
-                                       "session": gs.doctor.selected["id"], "canStart": o["canStart"], "sessionKey": id(gs.session)}
+                                       "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
             for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent"):
                 if k in o:
                     entry[k] = o[k]
             public.append(entry)
+        # offers from earlier turns can never be performed; drop them so the file stays small
+        self._offers = {k: v for k, v in self._offers.items() if (v["turn"], v["age"]) == (gs.context.turn, gs.context.age)}
+        self._save_offers()
         return {"context": ctx, "offers": public, "reconciliationRequired": self.needs_reconciliation()}
 
     # ---- perform

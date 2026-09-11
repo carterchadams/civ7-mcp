@@ -58,10 +58,11 @@
     }
     const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
     const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
+    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
     if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
     const blocked = blockingType !== none;
     const alreadySent = GameContext.hasSentTurnComplete() === true;
-    offers.push({ kind: "END_TURN", arg: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? (Game.Notifications.getTypeName(blockingType) || String(blockingType)) : null, alreadySent: alreadySent });
+    offers.push({ kind: "END_TURN", arg: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? blockerName(blockingType) : null, alreadySent: alreadySent });
   } catch (e) {
     return refuse("API_CONTRACT_MISMATCH", "offer enumeration failed: " + String(e && e.message ? e.message : e).slice(0, 160));
   }

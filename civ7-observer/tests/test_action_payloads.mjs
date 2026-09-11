@@ -26,8 +26,8 @@ function world({ log = [], local = 1, turnActive = true, curtain = false, blocki
   };
   return {
     UI: { isInGame: () => true },
-    Game: { turn: 10, age: 4242, PlayerOperations: ops, Notifications: { getEndTurnBlockingType: (pid) => { log.push(`blocking(${pid})`); return blocking ? 111 : 23669119; }, getTypeName: (t) => (t === 111 ? "NOTIFICATION_CHOOSE_TECH" : "NONE") }, ProgressionTrees: { getNodeState: () => 2 } },
-    EndTurnBlockingTypes: { NONE: 23669119 },
+    Game: { turn: 10, age: 4242, PlayerOperations: ops, Notifications: { getEndTurnBlockingType: (pid) => { log.push(`blocking(${pid})`); return blocking ? 23669119 : 0; }, getTypeName: () => undefined }, ProgressionTrees: { getNodeState: () => 2 } },
+    EndTurnBlockingTypes: { NONE: 0, UNITS: 23669119, RESEARCH: -286188551 },
     GameContext: { localPlayerID: local, localObserverID: local, _sent: sentComplete, hasSentTurnComplete() { log.push("hasSentTurnComplete"); return this._sent; }, sendTurnComplete() { log.push("sendTurnComplete"); this._sent = true; } },
     Players: { get: (id) => { log.push(`Players.get(${id})`); return id === local ? me : other; } },
     Configuration: { getGame: () => SP },
@@ -63,7 +63,7 @@ test("offers enumerate research/civic choices with native canStart and an end-tu
 test("offers report blocked end turn and unavailable research honestly", () => {
   const r = runOffers(world({ blocking: true, canStartFail: true, sentComplete: true }));
   const end = r.offers.find((o) => o.kind === "END_TURN");
-  assert.deepEqual([end.canStart, end.blockingType, end.alreadySent], [false, "NOTIFICATION_CHOOSE_TECH", true]);
+  assert.deepEqual([end.canStart, end.blockingType, end.alreadySent], [false, "UNITS", true]);
   assert.ok(r.offers.filter((o) => o.kind !== "END_TURN").every((o) => o.canStart === false));
 });
 
@@ -113,7 +113,7 @@ test("perform end turn checks native blockers and hasSentTurnComplete first", ()
   assert.equal(ok.readback.sentComplete, true);
   const blocked = runPerform(world({ blocking: true }), "END_TURN", 0);
   assert.equal(blocked.refused.code, "ACTION_BLOCKED");
-  assert.equal(blocked.refused.blockingType, "NOTIFICATION_CHOOSE_TECH");
+  assert.equal(blocked.refused.blockingType, "UNITS");
   const dup = runPerform(world({ sentComplete: true }), "END_TURN", 0);
   assert.equal(dup.refused.code, "ACTION_BLOCKED");
 });

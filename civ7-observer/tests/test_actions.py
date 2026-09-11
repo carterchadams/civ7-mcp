@@ -145,3 +145,17 @@ def test_get_result_returns_journaled_outcome(tmp_path):
         pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
         reg.perform(gs, action_id=pottery["actionId"], request_id="req-1", player=1, mode="singleplayer")
     assert reg.get_result("req-1")["status"] == "confirmed"
+
+
+def test_offers_persist_across_registry_instances_on_the_same_turn(tmp_path):
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")
+    pottery = next(o for o in offers["offers"] if o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+    reg2 = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs2, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(PERFORMED)), ctx_reply(3)]})
+    with gs2:
+        res = reg2.perform(gs2, action_id=pottery["actionId"], request_id="r-persist", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert not list(tmp_path.glob("*.tmp"))
