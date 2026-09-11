@@ -254,7 +254,7 @@ across handoffs.
 |---|---|
 | validated observation with all five categories for the configured active player | Changes 3-5 live captures; hotseat matrix above |
 | obtained through the debugger without the LLM seeing executable code | MCP server exposes only `get_observation` / `get_status`, no arguments; payloads are packaged |
-| ordinary and negative hotseat tests pass | matrix: 5 full rounds via CLI (10 positive, 10 negative) plus the handoff attempt; rounds 6-10 via persistent MCP servers below |
+| ordinary and negative hotseat tests pass | 10 full rounds, 20 positive and 20 negative captures (CLI for turns 1-5, persistent MCP servers for turns 6-10), plus the handoff attempt and the save-replacement check |
 | one LLM client produces an accurate report | demo run 1 (`runs/demo-1.txt`), spot-checked claim by claim |
 | a human-performed change is reflected in the next observation | demo run 2: wonder started and commander moved, both reported |
 | no autonomous gameplay actions | none exist; mutators are blocked by the payload policy test |
@@ -283,10 +283,16 @@ Two bound servers (player 0, player 1) stayed alive across every handoff; each r
 | r9-p1-t7 | player 1, turn 7 | server p1: ready, 1 settlement(s), 2 unit(s), 57 visible, session `6df1d048`, 238 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
 | r10-p0-t8 | player 0, turn 8 | server p0: ready, 1 settlement(s), 3 unit(s), 93 visible, session `800e4e32`, 260 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
 
-**Honest round count so far:** CLI rows covered turns 1-5 on both seats (5 full rounds);
-persistent-server rows cover turns 6 and 7 on both seats and turn 8 on player 0
-(2.5 full rounds). Total **7.5 full rounds / 15 seat captures**, each intended-seat
-capture succeeded with a fresh observation id and 0 warnings, each other-seat attempt
-refused. Session ids per persistent server were stable (`800e4e32` for player 0,
-`6df1d048` for player 1) across all handoffs. Turns 8 (player 1), 9 and 10 (both seats)
-remain to reach ten full rounds.
+| r11-p1-t8 | player 1, turn 8 | server p1: ready, 1 settlement(s), 3 unit(s), 64 visible, session `0dabd97a`, 242 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r12-p0-t9 | player 0, turn 9 | server p0: ready, 1 settlement(s), 3 unit(s), 103 visible, session `668d4632`, 231 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r13-p1-t9 | player 1, turn 9 | server p1: ready, 1 settlement(s), 3 unit(s), 56 visible, session `0dabd97a`, 248 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r14-p0-t10 | player 0, turn 10 | server p0: ready, 1 settlement(s), 3 unit(s), 125 visible, session `668d4632`, 231 ms; server p1: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+| r15-p1-t10 | player 1, turn 10 | server p1: ready, 1 settlement(s), 3 unit(s), 56 visible, session `0dabd97a`, 225 ms; server p0: not ready `WRONG_PLAYER`, observation `WRONG_PLAYER` |
+
+**Final count: 10 full hotseat rounds (game turns 1-10), each player captured once per
+round: 20 intended-seat captures (10 via the CLI for turns 1-5, 10 via persistent MCP
+servers for turns 6-10), all succeeded with a fresh observation id and 0 warnings, 178-260
+ms each; 20 other-seat attempts, all refused with `WRONG_PLAYER` and no data.** The
+persistent servers kept one session id each across every handoff; the two ids per server
+in the raw rows come from the watcher being restarted once between turn 8's two captures
+(both servers were relaunched), not from any reconnection inside a run.
