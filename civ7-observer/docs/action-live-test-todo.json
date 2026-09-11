@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 546,
+          "confirmed": 549,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,7 +139,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2205,
+          "confirmed": 2225,
           "rejected": 12,
           "unknown": 0
         }
@@ -163,9 +163,9 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1878,
-          "rejected": 23,
-          "unknown": 2
+          "confirmed": 1899,
+          "rejected": 24,
+          "unknown": 4
         }
       }
     },
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 153,
+          "confirmed": 154,
           "rejected": 2,
           "unknown": 1
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 232,
+          "confirmed": 234,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 89,
+          "confirmed": 90,
           "rejected": 0,
           "unknown": 0
         }
@@ -499,7 +499,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 82,
+          "confirmed": 83,
           "rejected": 8,
           "unknown": 1
         }
@@ -523,7 +523,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 33,
+          "confirmed": 34,
           "rejected": 0,
           "unknown": 0
         }
@@ -595,7 +595,7 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 12,
+          "confirmed": 21,
           "rejected": 0,
           "unknown": 0
         }
@@ -667,8 +667,8 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 4,
-          "rejected": 1,
+          "confirmed": 5,
+          "rejected": 2,
           "unknown": 0
         }
       }
@@ -835,7 +835,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 24,
+          "confirmed": 25,
           "rejected": 5,
           "unknown": 0
         }
@@ -1303,7 +1303,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 191,
+          "confirmed": 199,
           "rejected": 1,
           "unknown": 1
         }
@@ -1519,7 +1519,7 @@
       "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 1
         }
@@ -1591,7 +1591,7 @@
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 0
         }
@@ -1721,6 +1721,168 @@
       "consequence_class": "low",
       "procedure": "take a `resettle` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `RESETTLE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-excavate",
+      "action_family": "excavate",
+      "expected_kind": "EXCAVATE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "excavate"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `excavate` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `EXCAVATE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-research_artifacts",
+      "action_family": "research_artifacts",
+      "expected_kind": "RESEARCH_ARTIFACTS",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "research_artifacts"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `research_artifacts` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `RESEARCH_ARTIFACTS` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-air_attack",
+      "action_family": "air_attack",
+      "expected_kind": "AIR_ATTACK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "air_attack"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `air_attack` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `AIR_ATTACK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-naval_attack",
+      "action_family": "naval_attack",
+      "expected_kind": "NAVAL_ATTACK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "naval_attack"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `naval_attack` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `NAVAL_ATTACK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-cargo_drop",
+      "action_family": "cargo_drop",
+      "expected_kind": "CARGO_DROP",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "cargo_drop"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `cargo_drop` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CARGO_DROP` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-unit_air_drop",
+      "action_family": "unit_air_drop",
+      "expected_kind": "UNIT_AIR_DROP",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "unit_air_drop"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `unit_air_drop` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UNIT_AIR_DROP` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-automate_explore",
+      "action_family": "automate_explore",
+      "expected_kind": "AUTOMATE_EXPLORE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "automate_explore"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `automate_explore` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `AUTOMATE_EXPLORE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-wmd_strike",
+      "action_family": "wmd_strike",
+      "expected_kind": "WMD_STRIKE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "wmd_strike"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `wmd_strike` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `WMD_STRIKE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-move_great_work",
+      "action_family": "move_great_work",
+      "expected_kind": "MOVE_GREAT_WORK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "move_great_work"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `move_great_work` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `MOVE_GREAT_WORK` receipt in the seat journal",
       "evidence_refs": {}
     },
     {
@@ -2784,15 +2946,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "excavate",
+        "research_artifacts",
+        "move_great_work"
+      ],
       "consequence_class": "medium",
       "procedure": "Artifacts and great-work relocation",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2801,15 +2967,20 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "air_attack",
+        "naval_attack",
+        "cargo_drop",
+        "unit_air_drop"
+      ],
       "consequence_class": "medium",
       "procedure": "Air and specialized naval attacks",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2818,15 +2989,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "wmd_strike"
+      ],
       "consequence_class": "medium",
       "procedure": "WMD and contamination cleanup",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2835,15 +3008,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
-      "live_status": "not_seen",
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "start_diplomatic_action"
+      ],
       "consequence_class": "medium",
       "procedure": "City/district attacks and espionage units if player-facing",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2852,15 +3027,18 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "automate_explore",
+        "move_unit"
+      ],
       "consequence_class": "medium",
       "procedure": "Standing multi-turn movement and automate-explore",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {

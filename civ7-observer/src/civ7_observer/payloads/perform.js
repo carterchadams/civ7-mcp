@@ -83,7 +83,9 @@
     const path = Units.getPathTo(unitId, { x: ARG2, y: ARG3 });
     const pplots = path && Array.isArray(path.plots) ? path.plots : [];
     const pturns = path && Array.isArray(path.turns) ? path.turns : [];
-    if (pplots.length === 0 || pturns.length === 0 || pturns[pturns.length - 1] !== 1) return refuse("ACTION_NOT_STARTABLE", "no native one-turn path to the target plot");
+    // a longer path is allowed only toward one of the seat's own settlements (a standing move)
+    let ownSettlement = false; try { for (const c of player.Cities.getCities()) { if (c && c.location && c.location.x === ARG2 && c.location.y === ARG3) ownSettlement = true; } } catch (e) { ownSettlement = false; }
+    if (pplots.length === 0 || pturns.length === 0 || (pturns[pturns.length - 1] !== 1 && !ownSettlement)) return refuse("ACTION_NOT_STARTABLE", "no native one-turn path to the target plot");
     const moveArgs = { X: ARG2, Y: ARG3, Modifiers: 0 };
     const mcheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
     if (!mcheck || mcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the move");
@@ -228,7 +230,8 @@
     const townId = ctown.id;
     Game.CityOperations.sendRequest(townId, CityOperationTypes.CONSIDER_TOWN_PROJECT, {});
     result.outcome = "sent";
-    let still = null; try { still = Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID).some((nid) => { const n = Game.Notifications.find(nid); return n && Game.Notifications.getTypeName(n.Type) === "NOTIFICATION_CHOOSE_TOWN_PROJECT" && Game.Notifications.getBlocksTurnAdvancement(nid); }); } catch (e) { still = null; }
+    // this town's own notification, not any town's: several may be pending at once
+    let still = null; try { still = Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID).some((nid) => { const n = Game.Notifications.find(nid); if (!n || Game.Notifications.getTypeName(n.Type) !== "NOTIFICATION_CHOOSE_TOWN_PROJECT" || !n.Target || n.Target.id !== ARG) return false; let b = null; try { b = Game.Notifications.getBlocksTurnAdvancement(nid); } catch (e) { b = null; } return b === true || (b !== false && n.BlocksTurnAdvancement === true); }); } catch (e) { still = null; }
     result.readback = { kind: KIND, arg: ARG, stillBlocking: still, matches: still === false };
     return JSON.stringify(result);
   }
@@ -343,24 +346,28 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, from: PRE, at: now, matches: isInt(now) && now !== PRE };
     return JSON.stringify(result);
   }
-  if (KIND === "REINFORCE_ARMY" || KIND === "REBASE" || KIND === "TELEPORT_TO_CITY" || KIND === "ESTABLISH_BASE" || KIND === "DISPERSE_INDEPENDENT" || KIND === "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE" || KIND === "REPAIR" || KIND === "REMOVE_FEATURE" || KIND === "REMOVE_IMPROVEMENT" || KIND === "PLANT_FOREST" || KIND === "HARVEST_RESOURCE" || KIND === "BUILD_IMPROVEMENT" || KIND === "EMBED_LOOKOUT" || KIND === "SEARCH" || KIND === "AERIAL_RECON" || KIND === "CALL_REINFORCEMENTS") {
+  if (KIND === "REINFORCE_ARMY" || KIND === "REBASE" || KIND === "TELEPORT_TO_CITY" || KIND === "ESTABLISH_BASE" || KIND === "DISPERSE_INDEPENDENT" || KIND === "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE" || KIND === "REPAIR" || KIND === "REMOVE_FEATURE" || KIND === "REMOVE_IMPROVEMENT" || KIND === "PLANT_FOREST" || KIND === "HARVEST_RESOURCE" || KIND === "BUILD_IMPROVEMENT" || KIND === "EMBED_LOOKOUT" || KIND === "SEARCH" || KIND === "AERIAL_RECON" || KIND === "CALL_REINFORCEMENTS" || KIND === "EXCAVATE" || KIND === "RESEARCH_ARTIFACTS" || KIND === "AIR_ATTACK" || KIND === "NAVAL_ATTACK" || KIND === "CARGO_DROP" || KIND === "UNIT_AIR_DROP" || KIND === "AUTOMATE_EXPLORE" || KIND === "WMD_STRIKE") {
     // Table-driven unit operation: the kind IS the engine's name, validated host-side against the catalog.
     // A plot bound on the offer (arg2/arg3 >= 0) is sent as {X, Y}; otherwise the no-target sentinel.
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "unit operation arguments are not integers");
     if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit operation type unavailable");
     const expect = (KIND === "REINFORCE_ARMY") ? "offmap"
                  : (KIND === "REBASE" || KIND === "TELEPORT_TO_CITY") ? "moved"
+                 : (KIND === "AUTOMATE_EXPLORE") ? "asleep"
                  : "used";
     let actor = null;
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor = u; break; } } } catch (e) { actor = null; }
     if (!actor) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
-    const stateOf = (u) => expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
+    const stateOf = (u) => expect === "asleep" ? (u.isReadyToMove === true ? 1 : 0)
+                         : expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
                          : expect === "offmap" ? (u.isOnMap === true ? 1 : 0)
                          : expect === "gold" ? (player.Treasury && typeof player.Treasury.goldBalance === "number" ? Math.floor(player.Treasury.goldBalance) : 0)
                          : (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0);
     if (stateOf(actor) !== PRE) return refuse("ACTION_EXPIRED", "the unit's state changed since the offer was made");
     const lUnitId = actor.id;
     const lArgs = (ARG2 >= 0 && ARG3 >= 0) ? { X: ARG2, Y: ARG3 } : { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    // the shipped strike mode hard-codes the one weapon on every probe and the send
+    if (KIND === "WMD_STRIKE") lArgs.Type = Database.makeHash("WMD_NUCLEAR_DEVICE");
     const lType = UnitOperationTypes[OP_KIND];
     const check = Game.UnitOperations.canStart(lUnitId, lType, lArgs, false);
     if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the unit operation");
@@ -369,7 +376,8 @@
     let still = null;
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG) { still = u; break; } } } catch (e) { still = null; }
     const after = still ? stateOf(still) : (expect === "gold" ? stateOf(actor) : null);
-    const matches = expect === "used" ? (still === null || (isInt(after) && after < PRE))
+    const matches = expect === "asleep" ? (still !== null && after === 0 && PRE === 1)
+                  : expect === "used" ? (still === null || (isInt(after) && after < PRE))
                   : expect === "offmap" ? (still === null || after === 0)
                   : expect === "moved" ? (still !== null && isInt(after) && after !== PRE)
                   : (isInt(after) && after < PRE);
@@ -1087,6 +1095,28 @@
     Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], markArgs);
     result.outcome = "sent";
     result.readback = { kind: KIND, arg: 0, effectsApplied: applied, matches: false };
+    return JSON.stringify(result);
+  }
+  if (KIND === "MOVE_GREAT_WORK") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "great work arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Culture) return refuse("API_CONTRACT_MISMATCH", "great works unavailable");
+    const idOf = (v) => (isInt(v) ? v : (v && isInt(v.id) ? v.id : null));
+    const slotsOf = () => { const m = {}; try { for (const c of player.Cities.getCities()) { if (!c || !c.id || !c.Constructibles || typeof c.Constructibles.getGreatWorkBuildings !== "function") continue; const list = []; for (const b of (c.Constructibles.getGreatWorkBuildings() || [])) { for (const sl of ((b && b.slots) || [])) { if (sl && isInt(sl.greatWorkIndex) && sl.greatWorkIndex >= 0) list.push(sl.greatWorkIndex); } } m[String(c.id.id)] = list; } } catch (e) { /* partial */ } return m; };
+    let source = null; const before = slotsOf();
+    for (const cid of Object.keys(before)) { if (before[cid].indexOf(ARG) !== -1) source = parseInt(cid, 10); }
+    if (source === null) { try { const n = player.Culture.getNumWorksInArchive(); for (let i = 0; i < n; i++) { if (player.Culture.getArchivedGreatWork(i) === ARG) source = -1; } } catch (e) { /* none */ } }
+    if (source === null) return refuse("UNKNOWN_ACTION", "great work is not held by this seat");
+    if (source !== PRE) return refuse("ACTION_EXPIRED", "the great work moved since the offer was made");
+    let dest = false; try { for (const c of player.Cities.getCities()) { if (!c || !c.id || c.id.id !== ARG2 || !c.Constructibles) continue; for (const b of (c.Constructibles.getGreatWorkBuildings() || [])) { const bid = idOf(b.constructibleID !== undefined ? b.constructibleID : (b.buildingID !== undefined ? b.buildingID : b.id)); if (bid === ARG3 && (b.slots || []).some((sl) => !sl || !isInt(sl.greatWorkIndex) || sl.greatWorkIndex < 0)) dest = true; } } } catch (e) { dest = false; }
+    if (!dest) return refuse("ACTION_NOT_STARTABLE", "destination building has no empty slot in that settlement");
+    const gwArgs = { Player1: BOUND_PLAYER_ID, GreatWorkIndex: ARG, DestinationCity: ARG2, DestinationBuilding: ARG3 };
+    if (PRE >= 0) gwArgs.SourceCity = PRE;
+    const gwCheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], gwArgs, false);
+    if (!gwCheck || gwCheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused moving the great work");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], gwArgs);
+    result.outcome = "sent";
+    const after = slotsOf();
+    result.readback = { kind: KIND, arg: ARG, destinationCity: ARG2, matches: Array.isArray(after[String(ARG2)]) && after[String(ARG2)].indexOf(ARG) !== -1 };
     return JSON.stringify(result);
   }
   if (KIND === "SELECT_CAPITAL") {

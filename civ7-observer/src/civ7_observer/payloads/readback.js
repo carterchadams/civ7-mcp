@@ -20,6 +20,7 @@
     legacyDeck: player ? t(() => player.AdvancedStart.getCards().map((c) => Database.makeHash((c.info || c).id))) : null,
     // remaining placements per placement effect of a card in the deck, keyed by the effect's hash
     legacyPlacements: player ? t(() => { const m = {}; for (const d of player.AdvancedStart.getCards()) { const c = d && d.info ? d.info : d; for (const e of ((c && c.effects) || [])) { if (e && e.isPlacementEffect === true && typeof e.id === "string") m[String(Database.makeHash(e.id))] = e.amount; } } return m; }) : null,
+    greatWorkSlots: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (!c || !c.id || !c.Constructibles || typeof c.Constructibles.getGreatWorkBuildings !== "function") continue; const list = []; for (const b of (c.Constructibles.getGreatWorkBuildings() || [])) { for (const sl of ((b && b.slots) || [])) { if (sl && Number.isInteger(sl.greatWorkIndex) && sl.greatWorkIndex >= 0) list.push(sl.greatWorkIndex); } } m[String(c.id.id)] = list; } return m; }) : null,
     capitalCityId: player ? t(() => player.Cities.getCapital().id.id) : null,
     syncreticCiv: player ? t(() => { const c = player.Identity.getSyncreticCivType(); return Number.isInteger(c) ? c : null; }) : null,
     syncreticChoice: player ? t(() => player.Identity.getSyncreticChoiceType()) : null,
@@ -60,6 +61,8 @@
     cityProduction: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.BuildQueue) m[String(c.id.id)] = c.BuildQueue.currentProductionTypeHash; } return m; }) : null,
     townProjects: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id && c.Growth) m[String(c.id.id)] = Number.isInteger(c.Growth.projectType) ? c.Growth.projectType : -1; } return m; }) : null,
     expandPlots: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) { const r = Game.CityCommands.canStart(c.id, CityCommandTypes.EXPAND, {}, false); m[String(c.id.id)] = r && Array.isArray(r.Plots) ? r.Plots : []; } } return m; }) : null,
+    // towns whose focus decision still blocks the turn, by the notification's own Target
+    townFocusPending: t(() => { const out = []; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (!n || Game.Notifications.getTypeName(n.Type) !== "NOTIFICATION_CHOOSE_TOWN_PROJECT" || !n.Target || !Number.isInteger(n.Target.id)) continue; let b = null; try { b = Game.Notifications.getBlocksTurnAdvancement(nid); } catch (e) { b = null; } if (b === true || (b !== false && n.BlocksTurnAdvancement === true)) out.push(n.Target.id); } return out; }),
     townFlags: player ? t(() => { const m = {}; for (const c of player.Cities.getCities()) { if (c && c.id) m[String(c.id.id)] = c.isTown === true; } return m; }) : null,
     capturedPending: player ? t(() => player.Cities.getCities().filter((c) => c && c.id && c.isJustConqueredFrom).map((c) => c.id.id)) : null,
     razing: player ? t(() => player.Cities.getCities().filter((c) => c && c.id && c.isBeingRazed === true).map((c) => c.id.id)) : null,

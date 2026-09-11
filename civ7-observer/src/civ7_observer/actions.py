@@ -46,6 +46,19 @@ CONFIRMATION_GUIDANCE = {
         "Staying out instead ends the alliance (end alliance with the ally). Join when the ally matters "
         "more than peace with the enemy and your army can carry it."
     ),
+    "air_attack": (
+        "An air attack strikes whatever holds the target plot. Against a civilization this seat is not at war "
+        "with it is an act of war, with everything a war costs. Strike only enemies."
+    ),
+    "naval_attack": (
+        "A naval attack strikes whatever holds the target plot. Against a civilization this seat is not at war "
+        "with it is an act of war, with everything a war costs. Strike only enemies."
+    ),
+    "wmd_strike": (
+        "A nuclear strike destroys units, population and improvements across the target and its surroundings, "
+        "poisons the ground for many turns, and every civilization in the world will hold it against this "
+        "seat. It ends wars only by ending what was fought over. Almost never the right move."
+    ),
     "disperse_independent": (
         "Dispersing an independent power destroys it for good: its settlement, its people and any suzerain "
         "bonus another civilization enjoyed are gone, and every civilization courting it will resent this seat. "
@@ -88,9 +101,10 @@ PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic
                "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action",
                "SELECT_CAPITAL": "select_capital", "CHOOSE_SYNCRETISM_UNITS": "syncretism_units", "CHOOSE_SYNCRETISM_INFRASTRUCTURE": "syncretism_infrastructure", "CHOOSE_SYNCRETISM_SELF": "syncretism_self",
                "ADVANCED_START_REMOVE_CARD": "drop_legacy_card", "ADVANCED_START_PLACE_SETTLEMENT": "place_legacy_settlement", "RESETTLE": "resettle",
+               "EXCAVATE": "excavate", "RESEARCH_ARTIFACTS": "research_artifacts", "AIR_ATTACK": "air_attack", "NAVAL_ATTACK": "naval_attack", "CARGO_DROP": "cargo_drop", "UNIT_AIR_DROP": "unit_air_drop", "AUTOMATE_EXPLORE": "automate_explore", "WMD_STRIKE": "wmd_strike", "MOVE_GREAT_WORK": "move_great_work",
                "REINFORCE_ARMY": "reinforce_army", "REBASE": "rebase", "TELEPORT_TO_CITY": "teleport_to_city", "ESTABLISH_BASE": "establish_base", "DISPERSE_INDEPENDENT": "disperse_independent", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE": "convert_independent_to_city_state", "REPAIR": "repair", "REMOVE_FEATURE": "remove_feature", "REMOVE_IMPROVEMENT": "remove_improvement", "PLANT_FOREST": "plant_forest", "HARVEST_RESOURCE": "harvest_resource", "BUILD_IMPROVEMENT": "build_improvement", "EMBED_LOOKOUT": "embed_lookout", "SEARCH": "search", "AERIAL_RECON": "aerial_recon", "CALL_REINFORCEMENTS": "call_reinforcements", "CONNECT_WITH_ROAD": "connect_with_road", "MOVE_BY_RAIL": "move_by_rail", "UPGRADE_ARMY": "upgrade_army", "FOCUSED_ATTACK_LAND_MELEE": "focused_attack_land_melee", "FOCUSED_ATTACK_LAND_RANGED": "focused_attack_land_ranged", "FOCUSED_ATTACK_SEA_MELEE": "focused_attack_sea_melee", "FOCUSED_ATTACK_SEA_RANGED": "focused_attack_sea_ranged", "FOCUSED_ATTACK_AIR_TO_AIR": "focused_attack_air_to_air", "FOCUSED_ATTACK_AIR_TO_LAND": "focused_attack_air_to_land", "FOCUSED_ATTACK_AIR_BOMB": "focused_attack_air_bomb", "ARMY_OVERRUN": "army_overrun", "COMMANDER_ATTACK": "commander_attack", "STONE_TRAP": "stone_trap", "TREAT_SICK": "treat_sick", "CLAIM_RESOURCE": "claim_resource", "SCORCHED_EARTH": "scorched_earth", "DISPERSE_CLAN": "disperse_clan"}
 # Table-driven unit operations and commands (A19-A22): the offer says whether a plot was bound.
-TABLE_OPERATION_KINDS = frozenset({"REINFORCE_ARMY", "REBASE", "TELEPORT_TO_CITY", "ESTABLISH_BASE", "DISPERSE_INDEPENDENT", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "REPAIR", "REMOVE_FEATURE", "REMOVE_IMPROVEMENT", "PLANT_FOREST", "HARVEST_RESOURCE", "BUILD_IMPROVEMENT", "EMBED_LOOKOUT", "SEARCH", "AERIAL_RECON", "CALL_REINFORCEMENTS"})
+TABLE_OPERATION_KINDS = frozenset({"EXCAVATE", "RESEARCH_ARTIFACTS", "AIR_ATTACK", "NAVAL_ATTACK", "CARGO_DROP", "UNIT_AIR_DROP", "AUTOMATE_EXPLORE", "WMD_STRIKE", "REINFORCE_ARMY", "REBASE", "TELEPORT_TO_CITY", "ESTABLISH_BASE", "DISPERSE_INDEPENDENT", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "REPAIR", "REMOVE_FEATURE", "REMOVE_IMPROVEMENT", "PLANT_FOREST", "HARVEST_RESOURCE", "BUILD_IMPROVEMENT", "EMBED_LOOKOUT", "SEARCH", "AERIAL_RECON", "CALL_REINFORCEMENTS"})
 TABLE_COMMAND_KINDS = frozenset({"CONNECT_WITH_ROAD", "MOVE_BY_RAIL", "UPGRADE_ARMY", "FOCUSED_ATTACK_LAND_MELEE", "FOCUSED_ATTACK_LAND_RANGED", "FOCUSED_ATTACK_SEA_MELEE", "FOCUSED_ATTACK_SEA_RANGED", "FOCUSED_ATTACK_AIR_TO_AIR", "FOCUSED_ATTACK_AIR_TO_LAND", "FOCUSED_ATTACK_AIR_BOMB", "ARMY_OVERRUN", "COMMANDER_ATTACK", "STONE_TRAP", "TREAT_SICK", "CLAIM_RESOURCE", "SCORCHED_EARTH", "DISPERSE_CLAN"})
 
 SYNCRETISM_KINDS = ("CHOOSE_SYNCRETISM_UNITS", "CHOOSE_SYNCRETISM_INFRASTRUCTURE", "CHOOSE_SYNCRETISM_SELF")
@@ -433,7 +447,7 @@ class ActionRegistry:
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
-                for k in ("terrainKey", "pathTurns", "steps", "featureKey", "river", "yields", "tooCloseToSettle"):
+                for k in ("terrainKey", "pathTurns", "steps", "featureKey", "river", "yields", "tooCloseToSettle", "multiTurn", "cityId", "cityName"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "FOUND_CITY":
@@ -513,6 +527,13 @@ class ActionRegistry:
                 rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
                 for k in ("effectId", "cardId", "displayName", "description", "to", "plotIndex", "terrainKey", "remaining"):
                     if k in o:
+                        entry[k] = o[k]
+            if kind == "MOVE_GREAT_WORK":
+                if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "great work offer without its destination")
+                rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
+                for k in ("typeKey", "displayName", "fromCityId", "cityId", "cityName", "constructibleKey", "slotsFree"):
+                    if o.get(k) is not None:
                         entry[k] = o[k]
             if kind == "SELECT_CAPITAL":
                 if not isinstance(o.get("arg2"), int):
@@ -1026,6 +1047,13 @@ class ActionRegistry:
                         effect = {"unitTravelling": label}
                     elif want == "gold" and isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]:
                         effect = {"goldSpent": {**label, "spent": offer["pre"] - gold}}
+                    elif want == "asleep" and offer["pre"] == 1 and isinstance(rb.get("unitAwake"), dict) and rb["unitAwake"].get(unit_key) == 0:
+                        effect = {"unitAutomated": label}
+                elif kind == "MOVE_GREAT_WORK":
+                    slots = rb.get("greatWorkSlots")
+                    held = slots.get(str(offer["arg2"])) if isinstance(slots, dict) else None
+                    if isinstance(held, list) and offer["arg"] in held:
+                        effect = {"greatWorkMoved": {"greatWorkIndex": offer["arg"], "cityId": offer["arg2"], "buildingId": offer["arg3"]}}
                 elif kind in ("PILLAGE", "COASTAL_RAID", "PILLAGE_ROUTE"):
                     moves = rb.get("unitMoves")
                     now = moves.get(str(offer["arg"])) if isinstance(moves, dict) else None
@@ -1154,8 +1182,9 @@ class ActionRegistry:
                     if isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:
                         effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "units": count}}
                 elif kind == "CONSIDER_TOWN_PROJECT":
-                    notes = rb.get("blockingNotifications")
-                    if isinstance(notes, list) and "NOTIFICATION_CHOOSE_TOWN_PROJECT" not in notes:
+                    # this town's own notification gone, not every town's (live: six pending at once)
+                    pending = rb.get("townFocusPending")
+                    if isinstance(pending, list) and offer["arg"] not in pending:
                         effect = {"townFocusKept": {"cityId": offer["arg"]}}
                 elif kind == "CHOOSE_TOWN_PROJECT":
                     projects = rb.get("townProjects")

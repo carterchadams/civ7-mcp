@@ -1169,6 +1169,27 @@ def test_a_move_the_unit_could_not_start_this_turn_confirms_on_its_newly_queued_
     assert "unknown" in str(info.value)
 
 
+def test_automated_exploring_and_a_great_work_move_confirm_by_their_own_signals(tmp_path):
+    ex = {"kind": "AUTOMATE_EXPLORE", "arg": 5, "arg2": -1, "arg3": -1, "pre": 1, "unitId": 5, "expect": "asleep", "canStart": True}
+    gw = {"kind": "MOVE_GREAT_WORK", "arg": 7, "arg2": 131072, "arg3": 9002, "pre": 65536, "typeKey": "GREATWORK_A", "cityName": "Town", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [ex, gw]}
+    p1 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "AUTOMATE_EXPLORE", "arg": 5, "expect": "asleep", "before": 1, "after": 1, "present": True, "matches": False}}
+    p2 = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MOVE_GREAT_WORK", "arg": 7, "destinationCity": 131072, "matches": False}}
+    rb1 = {**RB, "unitAwake": {"5": 0}}
+    rb2 = {**RB, "greatWorkSlots": {"65536": [], "131072": [7]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(p1)), reply(5, json.dumps(rb1)), reply(6, json.dumps(p2)), reply(7, json.dumps(rb2))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        e = next(o for o in out["offers"] if o["kind"] == "automate_explore")
+        w = next(o for o in out["offers"] if o["kind"] == "move_great_work")
+        assert w["cityName"] == "Town" and "arg" not in w
+        r1 = reg.perform(gs, action_id=e["actionId"], request_id="ex-1", player=1, mode="singleplayer")
+        r2 = reg.perform(gs, action_id=w["actionId"], request_id="gw-1", player=1, mode="singleplayer")
+    assert r1["confirmedBy"]["effect"] == {"unitAutomated": {"unitId": 5, "action": "automate_explore", "at": None}}
+    assert r2["confirmedBy"]["effect"] == {"greatWorkMoved": {"greatWorkIndex": 7, "cityId": 131072, "buildingId": 9002}}
+
+
 def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
     gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}

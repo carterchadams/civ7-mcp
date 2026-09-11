@@ -115,6 +115,15 @@ DECISION_OF_KIND = {
     "pillage_route": "unit",
     "plunder_trade_route": "unit",
     "spread_religion": "unit",
+    "excavate": "unit",
+    "research_artifacts": "unit",
+    "air_attack": "unit",
+    "naval_attack": "unit",
+    "cargo_drop": "unit",
+    "unit_air_drop": "unit",
+    "automate_explore": "unit",
+    "wmd_strike": "unit",
+    "move_great_work": "great_works",
     "reinforce_army": "unit",
     "rebase": "unit",
     "teleport_to_city": "unit",
@@ -228,7 +237,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "movesLeft", "charges", "currentProject", "currentProjectKey", "position", "toPosition", "itemKey", "otherResourceKey", "otherCityName", "otherCityId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
                  "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
@@ -261,7 +270,7 @@ SYNCRETISM_NOTE = ("this civilization may take on a related civilization's inher
                    "(syncretism_units), its buildings and quarters (syncretism_infrastructure), or its own tradition and a culture "
                    "slot (syncretism_self); `unlocks` lists what each gives. The choice is permanent and does not block the turn")
 
-MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
+MOVE_HINT_NOTE = ("a `multiTurn` move heads for one of the seat's own settlements over `pathTurns` turns and is confirmed as queued, not arrived; a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
                   "standing order that also ends the unit's turn: Heal rests a damaged unit until full, Fortify and Alert hold "
                   "ground, Sleep waits. A unit carrying `damage` is wounded. A move option's `steps` is how far away the "

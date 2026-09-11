@@ -210,6 +210,58 @@
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
           offered += 1;
         }
+        // Standing multi-turn moves toward the seat's own settlements (A27): the destination is the
+        // seat's own ground, the engine's path is asked only for its length, and nothing about what
+        // lies between is exposed. Such a move is confirmed as queued or under way, never as arrival.
+        let ownCities = null; try { ownCities = player.Cities && typeof player.Cities.getCities === "function" ? player.Cities.getCities() : null; } catch (e) { ownCities = null; }
+        for (const c of (Array.isArray(ownCities) ? ownCities : [])) {
+          if (!c || !c.id || !isInt(c.id.id) || !c.location || !isInt(c.location.x)) continue;
+          if (c.location.x === u.location.x && c.location.y === u.location.y) continue;
+          const tpath = Units.getPathTo(unitId, { x: c.location.x, y: c.location.y });
+          const tplots = tpath && Array.isArray(tpath.plots) ? tpath.plots : [];
+          const tturns = tpath && Array.isArray(tpath.turns) ? tpath.turns : [];
+          if (tplots.length === 0 || tturns.length === 0 || tturns[tturns.length - 1] < 2) continue;   // one-turn destinations are ring offers
+          const targs = { X: c.location.x, Y: c.location.y, Modifiers: 0 };
+          const tcheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, targs, false);
+          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: c.location.x, y: c.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: -1,
+            pendingOps: (typeof u.hasPendingOperations === "function" ? u.hasPendingOperations() : u.hasPendingOperations) === true, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+            pathTurns: tturns[tturns.length - 1], steps: tplots.length, multiTurn: true, cityId: c.id.id, cityName: compose(c.name),
+            movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(tcheck && tcheck.Success === true) });
+        }
+      }
+    }
+    // ---- great works (A23): the shipped screen moves one with MOVE_GREAT_WORK {Player1, GreatWorkIndex,
+    // SourceCity (absent from the archive), DestinationCity, DestinationBuilding}; the works sit in each
+    // city's great-work buildings' slots or in the player's archive, and only empty slots are targets.
+    if (isInt(PlayerOperationTypes.MOVE_GREAT_WORK) && player.Culture && player.Cities && typeof player.Cities.getCities === "function" && Game.Culture && typeof Game.Culture.getGreatWorkType === "function") {
+      const idOf = (v) => (isInt(v) ? v : (v && isInt(v.id) ? v.id : null));
+      const works = [], dests = [];
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || !c.Constructibles || typeof c.Constructibles.getGreatWorkBuildings !== "function") continue;
+        let bs = null; try { bs = c.Constructibles.getGreatWorkBuildings(); } catch (e) { bs = null; }
+        for (const b of (Array.isArray(bs) ? bs : [])) {
+          if (!b) continue;
+          const bid = idOf(b.constructibleID !== undefined ? b.constructibleID : (b.buildingID !== undefined ? b.buildingID : b.id));
+          let free = 0;
+          for (const sl of (Array.isArray(b.slots) ? b.slots : [])) { const gi = sl && isInt(sl.greatWorkIndex) ? sl.greatWorkIndex : -1; if (gi >= 0) works.push({ index: gi, sourceCity: c.id.id }); else free++; }
+          if (isInt(bid) && free > 0) dests.push({ cityId: c.id.id, cityName: compose(c.name), buildingId: bid, free: free,
+            constructibleKey: lookupKey(GameInfo.Constructibles, b.constructibleType !== undefined ? b.constructibleType : b.type, "ConstructibleType") });
+        }
+      }
+      try { const n = player.Culture.getNumWorksInArchive(); for (let i = 0; i < n; i++) { const gi = player.Culture.getArchivedGreatWork(i); if (isInt(gi) && gi >= 0) works.push({ index: gi, sourceCity: -1 }); } } catch (e) { /* no archive */ }
+      let offeredWorks = 0;
+      for (const w of works) {
+        let row = null; try { const gt = Game.Culture.getGreatWorkType(w.index); row = GameInfo.GreatWorks && isInt(gt) ? GameInfo.GreatWorks.lookup(gt) : null; } catch (e) { row = null; }
+        for (const d of dests) {
+          if (offeredWorks >= 24) break;
+          const gargs = { Player1: BOUND_PLAYER_ID, GreatWorkIndex: w.index, DestinationCity: d.cityId, DestinationBuilding: d.buildingId };
+          if (w.sourceCity >= 0) gargs.SourceCity = w.sourceCity;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.MOVE_GREAT_WORK, gargs, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "MOVE_GREAT_WORK", arg: w.index, arg2: d.cityId, arg3: d.buildingId, pre: w.sourceCity, typeKey: row && typeof row.GreatWorkType === "string" ? row.GreatWorkType : null,
+            displayName: row ? compose(row.Name) : null, fromCityId: w.sourceCity, cityId: d.cityId, cityName: d.cityName, constructibleKey: d.constructibleKey, slotsFree: d.free, canStart: true });
+          offeredWorks++;
+        }
       }
     }
     if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.PROMOTE) && GameInfo.UnitPromotionDisciplineDetails) {
@@ -547,7 +599,17 @@
         ["EMBED_LOOKOUT", "used", false],
         ["SEARCH", "used", false],
         ["AERIAL_RECON", "used", false],
-        ["CALL_REINFORCEMENTS", "used", false]
+        ["CALL_REINFORCEMENTS", "used", false],
+        // artifacts, air and naval attacks, drops, exploring on its own, and the one weapon of mass
+        // destruction the shipped strike mode hard-codes (its Type rides on every probe and the send)
+        ["EXCAVATE", "used", false],
+        ["RESEARCH_ARTIFACTS", "used", false],
+        ["AIR_ATTACK", "used", true],
+        ["NAVAL_ATTACK", "used", true],
+        ["CARGO_DROP", "used", false],
+        ["UNIT_AIR_DROP", "used", false],
+        ["AUTOMATE_EXPLORE", "asleep", false],
+        ["WMD_STRIKE", "used", true, "WMD_NUCLEAR_DEVICE"]
       ];
       const ABILITY_COMMANDS = [
         ["CONNECT_WITH_ROAD", "used", false],
@@ -568,21 +630,25 @@
         ["SCORCHED_EARTH", "used", true],
         ["DISPERSE_CLAN", "used", true]
       ];
-      const stateFor = (u, expect) => expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
+      const stateFor = (u, expect) => expect === "asleep" ? (u.isReadyToMove === true ? 1 : 0)
+                                   : expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
                                    : expect === "offmap" ? (u.isOnMap === true ? 1 : 0)
                                    : expect === "gold" ? (player.Treasury && typeof player.Treasury.goldBalance === "number" ? Math.floor(player.Treasury.goldBalance) : 0)
                                    : (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0);
       const enumerate = (rows, types, api, kindOf) => {
         if (typeof types === "undefined" || !api) return;
-        for (const [name, expect, confirm] of rows) {
+        for (const [name, expect, confirm, weapon] of rows) {
           const type = types[name];
           if (!isInt(type)) continue;
+          const extra = typeof weapon === "string" ? { Type: Database.makeHash(weapon) } : null;
+          const withExtra = (o) => (extra ? Object.assign({}, o, extra) : o);
           for (const u of player.Units.getUnits()) {
             if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
-            const probe = api.canStart(u.id, type, NO_TARGET, false);
+            if (expect === "asleep" && u.isReadyToMove !== true) continue;
+            const probe = api.canStart(u.id, type, withExtra(NO_TARGET), false);
             if (!probe || probe.Success !== true) continue;
             let plots = Array.isArray(probe.Plots) ? probe.Plots : [];
-            if (plots.length === 0) { const listing = api.canStart(u.id, type, {}, false); if (listing && Array.isArray(listing.Plots)) plots = listing.Plots; }
+            if (plots.length === 0) { const listing = api.canStart(u.id, type, withExtra({}), false); if (listing && Array.isArray(listing.Plots)) plots = listing.Plots; }
             const detail = typeof probe.AdditionalDescription === "string" ? compose(probe.AdditionalDescription) : null;
             const common = { kind: kindOf(name), arg: u.id.id, pre: stateFor(u, expect), unitId: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), expect: expect,
               from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
@@ -595,7 +661,7 @@
               if (offeredHere >= 8 || !isInt(pi)) continue;
               const loc = GameplayMap.getLocationFromIndex(pi);
               if (!loc || !isInt(loc.x) || loc.x < 0) continue;
-              const at = api.canStart(u.id, type, { X: loc.x, Y: loc.y }, false);
+              const at = api.canStart(u.id, type, withExtra({ X: loc.x, Y: loc.y }), false);
               if (!at || at.Success !== true) continue;
               offers.push({ ...common, arg2: loc.x, arg3: loc.y, to: { x: loc.x, y: loc.y }, plotIndex: pi,
                 terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") });
@@ -761,13 +827,15 @@
       }
     }
     // ---- keep a town's current focus: clears the town-project blocker without changing anything,
-    // which is what the shipped chooser does the moment it opens.
+    // which is what the shipped chooser does the moment it opens. Each blocking notification names
+    // its town in Target (live, turn 67: six towns pending at once, one consider per town), so the
+    // option is offered per town named, and proves itself by that town's notification going.
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.CONSIDER_TOWN_PROJECT)) {
-      let pendingFocus = false;
-      try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && Game.Notifications.getTypeName(n.Type) === "NOTIFICATION_CHOOSE_TOWN_PROJECT" && blocksNow(nid, n)) pendingFocus = true; } } catch (e) { pendingFocus = false; }
-      if (pendingFocus) for (const c of player.Cities.getCities()) {
-        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true) continue;
-        offers.push({ kind: "CONSIDER_TOWN_PROJECT", arg: c.id.id, pre: 0, cityId: c.id.id, cityName: compose(c.name), canStart: true });
+      const pendingTowns = {};
+      try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && Game.Notifications.getTypeName(n.Type) === "NOTIFICATION_CHOOSE_TOWN_PROJECT" && blocksNow(nid, n) && n.Target && isInt(n.Target.id)) pendingTowns[n.Target.id] = isInt(nid.id) ? nid.id : 0; } } catch (e) { /* none */ }
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true || pendingTowns[c.id.id] === undefined) continue;
+        offers.push({ kind: "CONSIDER_TOWN_PROJECT", arg: c.id.id, pre: 0, cityId: c.id.id, cityName: compose(c.name), notificationId: pendingTowns[c.id.id], canStart: true });
       }
     }
     // ---- a town back to growth (A13): the shipped focus list's "growth" entry is CHANGE_GROWTH_MODE

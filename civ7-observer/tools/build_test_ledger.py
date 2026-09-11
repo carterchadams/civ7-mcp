@@ -51,6 +51,8 @@ PLAN_KINDS = {
     "A19": ["reinforce_army", "upgrade_army", "army_overrun", "commander_attack", "focused_attack_land_melee", "focused_attack_land_ranged", "focused_attack_sea_melee", "focused_attack_sea_ranged", "focused_attack_air_to_air", "focused_attack_air_to_land", "focused_attack_air_bomb"],
     "A20": ["connect_with_road", "move_by_rail", "rebase", "teleport_to_city", "establish_base"],
     "A21": ["stone_trap", "treat_sick", "claim_resource", "embed_lookout", "search", "aerial_recon"],
+    "A23": ["excavate", "research_artifacts", "move_great_work"], "A24": ["air_attack", "naval_attack", "cargo_drop", "unit_air_drop"],
+    "A25": ["wmd_strike"], "A26": ["start_diplomatic_action"], "A27": ["automate_explore", "move_unit"],
     "A22": ["repair", "remove_feature", "remove_improvement", "plant_forest", "harvest_resource", "build_improvement", "disperse_independent", "convert_independent_to_city_state", "scorched_earth", "disperse_clan", "call_reinforcements"],
 }
 

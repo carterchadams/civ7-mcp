@@ -1192,7 +1192,7 @@ test("a town-project choice is preceded by the consider step the shipped chooser
   const rows = [{ $hash: 4242, ProjectType: "PROJECT_TOWN_FISHING", Name: "LOC_F" }];
   g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
   let blocking = true;
-  g.Game.Notifications = { ...g.Game.Notifications, getIdsForPlayer: () => (blocking ? [{ owner: 1, id: 1, type: 9 }] : []), find: () => ({ Type: 9 }), getTypeName: () => "NOTIFICATION_CHOOSE_TOWN_PROJECT", getBlocksTurnAdvancement: () => true, getEndTurnBlockingType: () => 0 };
+  g.Game.Notifications = { ...g.Game.Notifications, getIdsForPlayer: () => (blocking ? [{ owner: 1, id: 1, type: 9 }] : []), find: () => ({ Type: 9, Target: { owner: 1, id: 65536 } }), getTypeName: () => "NOTIFICATION_CHOOSE_TOWN_PROJECT", getBlocksTurnAdvancement: () => blocking, getEndTurnBlockingType: () => 0 };
   g.Game.CityCommands = { canStart: () => ({ Success: true }), sendRequest: (cid, cmd, args) => { log.push(`growth(${JSON.stringify(args)})`); city.Growth = { projectType: args.ProjectType }; } };
   const inner = g.Game.CityOperations;
   g.Game.CityOperations = { canStart: inner.canStart, sendRequest: (cid, op, args) => { if (op === 5552) { log.push("consider"); blocking = false; return; } return inner.sendRequest(cid, op, args); } };
@@ -2944,6 +2944,75 @@ test("perform of a table-driven action sends the bound plot or the sentinel and 
   g = mk({ REBASE: { plots: [1011] } }, {});
   assert.equal(runPerformArgs(g, "REBASE", 5, 15, 15, { pre: 1010 }).refused.code, "ACTION_NOT_STARTABLE", "a plot the engine does not list is refused");
   assert.ok(!g._log.some((e) => e.startsWith("tsendRequest")));
+});
+
+test("the strike carries the shipped weapon type on every probe and the send and needs a confirmation; exploring on its own proves itself by the unit going to sleep", () => {
+  const g = withTableActions(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ops: { WMD_STRIKE: { plots: [1013] }, AUTOMATE_EXPLORE: { plots: null, after: "nothing" } } }); g._log = [];
+  g.Database = { makeHash: (s) => (s === "WMD_NUCLEAR_DEVICE" ? 777 : 0) };
+  const r = runOffers(g).offers;
+  assert.deepEqual(r.filter((o) => o.kind === "WMD_STRIKE").map((o) => [o.arg2, o.arg3, o.requiresConfirmation, o.destructive]), [[13, 10, true, true]]);
+  assert.ok(g._log.every((e) => !e.startsWith("tcanStart(WMD_STRIKE") || e.includes('"Type":777')), "the weapon type rides on every strike probe");
+  assert.deepEqual(r.filter((o) => o.kind === "AUTOMATE_EXPLORE").map((o) => [o.arg2, o.pre, o.expect]), [[-1, 1, "asleep"]]);
+  const p = runPerformArgs(g, "WMD_STRIKE", 5, 13, 10, { pre: 2 });
+  assert.equal(p.refused, null);
+  assert.ok(g._log.includes('tsendRequest(WMD_STRIKE,{"X":13,"Y":10,"Type":777})'));
+  const a = withTableActions(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ops: { AUTOMATE_EXPLORE: { plots: null, after: "nothing" } } }); a._log = [];
+  const inner = a.Game.UnitOperations.sendRequest; a.Game.UnitOperations.sendRequest = (uid, t, args) => { inner(uid, t, args); a.Players.get(1).Units.getUnits()[0].isReadyToMove = false; };
+  const q = runPerformArgs(a, "AUTOMATE_EXPLORE", 5, -1, -1, { pre: 1 });
+  assert.deepEqual([q.readback.expect, q.readback.before, q.readback.after, q.readback.matches], ["asleep", 1, 0, true]);
+});
+
+test("a standing move toward one of the seat's own settlements is offered past the one-turn ring and performed on its longer path; any other far plot is still refused", () => {
+  const g = withCity(withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { nextTurn: [[3, 4]] })); g._log = [];
+  const far = runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT" && o.multiTurn === true);
+  assert.deepEqual(far.map((o) => [o.x, o.y, o.pathTurns, o.cityName, o.direction, o.canStart]), [[3, 4, 2, "Cordoba", -1, true]]);
+  const r = runPerformArgs(g, "MOVE_UNIT", 5, 3, 4, { pre: 1010 });
+  assert.equal(r.refused, null, "the settlement's plot takes a multi-turn path");
+  assert.ok(g._log.some((e) => e.startsWith("usendRequest(") && e.includes('"X":3,"Y":4,"Modifiers":0')));
+  const h = withCity(withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { nextTurn: [[14, 14]] })); h._log = [];
+  assert.equal(runPerformArgs(h, "MOVE_UNIT", 5, 14, 14, { pre: 1010 }).refused.code, "ACTION_NOT_STARTABLE", "a far plot that is not the seat's settlement is refused");
+});
+
+// ---- great works: works in the seat's own buildings and archive, empty slots as targets
+function withGreatWorks(g, { archive = [], ok = true } = {}) {
+  withCity(g);
+  const me = g.Players.get(1);
+  const city = me.Cities.getCities()[0];
+  const city2 = { id: { owner: 1, id: 131072, type: 1 }, owner: 1, name: "LOC_T", location: { x: 12, y: 4 }, isTown: true, BuildQueue: { currentProductionTypeHash: -1, isEmpty: true, _q: [], getQueue() { return this._q.slice(); } } };
+  me.Cities = { getCities: () => [city, city2] };
+  const slotsA = [{ greatWorkIndex: 7 }, { greatWorkIndex: -1 }];
+  const slotsB = [{ greatWorkIndex: -1 }];
+  city.Constructibles = { getGreatWorkBuildings: () => [{ constructibleID: { owner: 1, id: 9001 }, constructibleType: 8801, slots: slotsA }] };
+  city2.Constructibles = { getGreatWorkBuildings: () => [{ constructibleID: { owner: 1, id: 9002 }, constructibleType: 8801, slots: slotsB }] };
+  me.Culture = { ...(me.Culture || {}), getNumWorksInArchive: () => archive.length, getArchivedGreatWork: (i) => archive[i] };
+  g.Game.Culture = { getGreatWorkType: (i) => (i === 7 ? 5501 : 5502) };
+  g.GameInfo.GreatWorks = table([{ $hash: 5501, GreatWorkType: "GREATWORK_A", Name: "LOC_GW_A" }, { $hash: 5502, GreatWorkType: "GREATWORK_B", Name: "LOC_GW_B" }]);
+  g.GameInfo.Constructibles = table([{ $hash: 8801, ConstructibleType: "BUILDING_MUSEUM" }]);
+  g.PlayerOperationTypes.MOVE_GREAT_WORK = 6201;
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 6201) return inner.canStart(pid, op, args, show); g._log.push(`gcanStart(${JSON.stringify(args)})`); return { Success: ok }; },
+    sendRequest: (pid, op, args) => { if (op !== 6201) return inner.sendRequest(pid, op, args); g._log.push(`gsendRequest(${JSON.stringify(args)})`);
+      const to = args.DestinationCity === 65536 ? slotsA : slotsB; const from = args.SourceCity === 65536 ? slotsA : (args.SourceCity === 131072 ? slotsB : null);
+      if (from) { const sl = from.find((x) => x.greatWorkIndex === args.GreatWorkIndex); if (sl) sl.greatWorkIndex = -1; }
+      const empty = to.find((x) => x.greatWorkIndex === -1); if (empty) empty.greatWorkIndex = args.GreatWorkIndex; },
+  };
+  return g;
+}
+
+test("great works are offered per (work, building with an empty slot) from the seat's own buildings and archive, and a move reads back the work in its destination", () => {
+  const g = withGreatWorks(withUnits(world({ log: [] }), []), { archive: [11] }); g._log = [];
+  const r = runOffers(g).offers.filter((o) => o.kind === "MOVE_GREAT_WORK");
+  assert.deepEqual(r.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.typeKey, o.cityName, o.constructibleKey, o.slotsFree]), [
+    [7, 65536, 9001, 65536, "GREATWORK_A", "Cordoba", "BUILDING_MUSEUM", 1], [7, 131072, 9002, 65536, "GREATWORK_A", "LOC_T", "BUILDING_MUSEUM", 1],
+    [11, 65536, 9001, -1, "GREATWORK_B", "Cordoba", "BUILDING_MUSEUM", 1], [11, 131072, 9002, -1, "GREATWORK_B", "LOC_T", "BUILDING_MUSEUM", 1]]);
+  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":11,"DestinationCity":65536,"DestinationBuilding":9001})'), "an archived work names no source city");
+  assert.ok(g._log.includes('gcanStart({"Player1":1,"GreatWorkIndex":7,"DestinationCity":131072,"DestinationBuilding":9002,"SourceCity":65536})'));
+  const p = runPerformArgs(g, "MOVE_GREAT_WORK", 7, 131072, 9002, { pre: 65536 });
+  assert.equal(p.refused, null);
+  assert.deepEqual(p.readback, { kind: "MOVE_GREAT_WORK", arg: 7, destinationCity: 131072, matches: true });
+  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 7, 65536, 9001, { pre: 65536 }).refused.code, "ACTION_EXPIRED", "the work has moved since");
+  assert.equal(runPerformArgs(g, "MOVE_GREAT_WORK", 99, 65536, 9001, { pre: -1 }).refused.code, "UNKNOWN_ACTION");
 });
 
 // ---- first contact (the other player's id comes from the seat's own notification text)
