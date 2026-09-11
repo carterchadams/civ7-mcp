@@ -103,6 +103,18 @@
           canStart: !!(check && check.Success === true) });
       }
     }
+    // Which units could found a settlement at all (the shipped panel's own button test). Only those
+    // get the settling hint on their move options: it confused seats moving merchants and soldiers.
+    const canFoundUnits = {};
+    if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.FOUND_CITY)) {
+      try {
+        for (const u of player.Units.getUnits()) {
+          if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+          const ex = Game.UnitOperations.canStart(u.id, UnitOperationTypes.FOUND_CITY, { X: -9999, Y: -9999, UnitAbilityType: -1 }, true);
+          if (ex && ex.Success === true) canFoundUnits[u.id.id] = true;
+        }
+      } catch (e) { /* no settler information available */ }
+    }
     if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.MOVE_TO) && typeof RevealedStates !== "undefined" && isInt(RevealedStates.HIDDEN)) {
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
@@ -129,7 +141,7 @@
           offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1],
             featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: plotIsRiver(loc.x, loc.y), yields: plotYieldsNonZero(loc.x, loc.y),
-            tooCloseToSettle: tooCloseToSettlement(loc.x, loc.y),
+            tooCloseToSettle: canFoundUnits[u.id.id] === true ? tooCloseToSettlement(loc.x, loc.y) : undefined,
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
         }
       }
@@ -175,8 +187,7 @@
         // Same two-step query as the shipped unit panel: `true` asks whether the button exists at all
         // for this unit (settler-class), `false` whether founding is legal on its current plot. A
         // settler that cannot found here is still listed, canStart false, so the seat learns to move it.
-        const exists = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, true);
-        if (!exists || exists.Success !== true) continue;
+        if (canFoundUnits[u.id.id] !== true) continue;
         const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false);
         const ok = !!(check && check.Success === true);
         const close = tooCloseToSettlement(u.location.x, u.location.y);

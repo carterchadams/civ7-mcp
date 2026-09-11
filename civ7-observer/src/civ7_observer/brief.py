@@ -101,6 +101,9 @@ ATTRIBUTES_NOTE = ("buy a node whose attribute has a point available (wildcard p
 RESOURCES_NOTE = ("assign each new resource to a settlement with spare capacity (`cityCap` minus `cityAssigned`; `description` is "
                   "the resource's effect), then consider_resources; it is not startable while a resource can still be assigned")
 
+MOVE_HINT_NOTE = ("a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
+                  "that could found a settlement, and is the game's own minimum-distance rule for that plot")
+
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn. Only a few options per "
                    "settlement are shown: call get_city_options with a cityId for everything it can build. A purchase_unit "
@@ -209,6 +212,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             continue
         group = group_for(decision)
         group.setdefault("_buckets", {}).setdefault(bucket_of(offer), []).append(offer)
+        if decision == "unit":
+            group["note"] = MOVE_HINT_NOTE
         if decision == "production":
             group["note"] = PRODUCTION_NOTE
         if decision in ("policies", "crisis"):

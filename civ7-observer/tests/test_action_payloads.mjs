@@ -354,7 +354,8 @@ test("found offers exist only for units the native FOUND_CITY canStart accepts, 
   const checks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1463004268"));
   assert.equal(checks.length, 3, "an existence check per owned unit, then a legality check for the settler only");
   assert.ok(checks.every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1')));
-  assert.deepEqual(checks.map((e) => e.endsWith(",true)")), [true, false, true]);
+  // the existence checks are made once for every owned unit, then legality for the settler alone
+  assert.deepEqual(checks.map((e) => e.endsWith(",true)")), [true, true, false]);
   assert.equal(found[0].reason, null);
   assert.ok(!log.some((e) => e.startsWith("usendRequest")));
 });
@@ -1117,7 +1118,14 @@ test("move and found offers carry the game's own minimum-settlement-distance rul
   g.GameplayMap.isCityWithinMinimumDistance = (x, y) => x <= 11;
   const moves = runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT");
   assert.ok(moves.length > 0);
-  assert.ok(moves.every((o) => o.tooCloseToSettle === (o.x <= 11)), "every destination reports the rule");
+  assert.ok(moves.every((o) => o.tooCloseToSettle === undefined), "a unit that cannot found gets no settling hint");
+  const settler = withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])); settler._log = [];
+  settler.GameplayMap.isCityWithinMinimumDistance = (x) => x <= 11;
+  settler.UnitOperationTypes.FOUND_CITY = 1463004268;
+  const innerCan = settler.Game.UnitOperations.canStart;
+  settler.Game.UnitOperations.canStart = (uid, op, args, show) => (op === 1463004268 ? { Success: true } : innerCan(uid, op, args, show));
+  const smoves = runOffers(settler).offers.filter((o) => o.kind === "MOVE_UNIT");
+  assert.ok(smoves.every((o) => o.tooCloseToSettle === (o.x <= 11)), "a settler's destinations report the rule");
   const far = moves.find((o) => o.x > 11);
   assert.ok(!far || far.tooCloseToSettle === false);
   assert.ok(!JSON.stringify(moves).includes('"owner"'));
