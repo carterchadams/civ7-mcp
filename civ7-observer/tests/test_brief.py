@@ -420,7 +420,9 @@ def test_a_wounded_unit_shows_its_damage_and_the_heal_order(tmp_path):
 
 
 def test_an_unplaced_resource_is_listed_before_a_reassignment_in_the_same_settlement(tmp_path):
-    rs = [{"kind": "ASSIGN_RESOURCE", "arg": 494, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": True, "canStart": True},
+    rs = [{"kind": "UNASSIGN_RESOURCE", "arg": 430, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "canStart": True},
+          {"kind": "SWAP_RESOURCES", "arg": 430, "arg2": 131073, "arg3": 494, "pre": 1, "cityId": 65536, "cityName": "Capital", "canStart": True},
+          {"kind": "ASSIGN_RESOURCE", "arg": 494, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": True, "canStart": True},
           {"kind": "ASSIGN_RESOURCE", "arg": 613, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": True, "canStart": True},
           {"kind": "ASSIGN_RESOURCE", "arg": 732, "arg2": 65536, "pre": 1, "cityId": 65536, "cityName": "Capital", "reassignment": False, "canStart": True}]
     rs += [{"kind": "ASSIGN_RESOURCE", "arg": 494, "arg2": cid, "pre": 1, "cityId": cid, "cityName": f"Town{cid}", "reassignment": True, "canStart": True} for cid in range(131073, 131073 + 8)]

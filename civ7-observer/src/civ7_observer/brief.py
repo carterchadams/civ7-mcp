@@ -454,10 +454,15 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         # was invisible to the seat (live friction, turn 33), so every entity is represented first.
         buckets = [list(v) for v in group.pop("_buckets", {}).values()]
         # Within an entity, an option that answers the blocker goes before one that merely rearranges:
-        # live (turn 85) a settlement's first listed option was moving an ivory it already held, and
-        # the unplaced camels that would have closed the decision sat behind it and were dropped.
+        # live (turn 85) a settlement's first listed options were taking a jade out and moving an ivory
+        # it already held, and the unplaced camels that would have closed the decision sat behind them
+        # and were dropped, so the seat looped for two whole turns.
+        def rearranging(o: dict[str, Any]) -> int:
+            if o["kind"] in ("unassign_resource", "swap_resources"):
+                return 2
+            return 1 if o.get("reassignment") is True else 0
         for b in buckets:
-            b.sort(key=lambda o: 1 if o.get("reassignment") is True else 0)
+            b.sort(key=rearranging)
         # A blocker-clearing option keeps a reserved slot: it is taken out of the competition for room
         # and put back at the end, so it is never the one dropped and still reads after the choices.
         resolvers: list[dict[str, Any]] = []
