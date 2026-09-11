@@ -32,6 +32,7 @@ The brief is cached within a turn and invalidated by every performed action, so 
 |---|---|
 | `get_turn_brief` | the required decision, bounded options, explicit pause |
 | `list_actions` | the full offer listing, when the bounded options are not enough |
+| `get_unit_options` | one unit's own legal actions, by the unitId a brief shows; far smaller than the full listing |
 | `perform_action` | one offered action id plus a caller-chosen `request_id` (idempotent) |
 | `load_skill` | another skill card by id |
 | `update_plan` | bounded edits to this seat's own multi-turn plan |

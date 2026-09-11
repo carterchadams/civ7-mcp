@@ -37,7 +37,7 @@ PY = sys.executable
 ROOT = Path(__file__).resolve().parents[1]
 RUNS = ROOT / "runs" / "agent-game"
 SERVER = "civ7"
-TOOLS = ("get_turn_brief", "list_actions", "perform_action", "get_action_result", "get_observation",
+TOOLS = ("get_turn_brief", "list_actions", "get_unit_options", "perform_action", "get_action_result", "get_observation",
          "load_skill", "get_plan", "update_plan", "report_friction")
 
 INSTRUCTIONS = """You are playing one seat of a Civilization VII game through the civ7 MCP tools. You control \
@@ -50,7 +50,8 @@ brief sets `pause` and report it.
 Choose only action ids the host has offered you in this turn. Never invent one, and never repeat an \
 action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \
 report_friction rather than guessing, then continue with the least committal legal option if you \
-can. get_observation is large: call it only when a specific decision needs map detail.
+can. get_observation is large: call it only when a specific decision needs map detail, and use \
+get_unit_options(unit_id) rather than list_actions when you need one unit's choices.
 
 Keep a short plan across turns with get_plan / update_plan (at most three commitments). Keep your \
 visible output short: a line per decision saying what you chose and why, and a closing summary under \

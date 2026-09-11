@@ -99,7 +99,8 @@ PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`q
                    "order); a city with a non-empty queue needs no production action this turn")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
-                        "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")
+                        "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option "
+                        "appears; call get_unit_options with its unitId to see where it can go.")
 
 
 def _option(offer: dict[str, Any]) -> dict[str, Any]:
@@ -164,6 +165,13 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         return groups.setdefault(decision, {"kind": decision, "required": decision in required,
                                             "optionCount": 0, "options": [], "entities": [], "_seen": set()})
 
+    def bucket_of(offer: dict[str, Any]) -> Any:
+        """Which entity an option belongs to, so no single unit or city can crowd the others out."""
+        for key in ("unitId", "cityId"):
+            if key in offer:
+                return (key, offer[key])
+        return None
+
     for offer in offers:
         if not offer.get("canStart"):
             # A settler the game will not let found where it stands is still a fact the seat needs:
@@ -179,6 +187,7 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         if decision is None:
             continue
         group = group_for(decision)
+        group.setdefault("_buckets", {}).setdefault(bucket_of(offer), []).append(offer)
         if decision == "production":
             group["note"] = PRODUCTION_NOTE
         if decision == "policies":
@@ -188,8 +197,6 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         if decision == "resources":
             group["note"] = RESOURCES_NOTE
         group["optionCount"] += 1
-        if len(group["options"]) < max_options:
-            group["options"].append(_option(offer))
         entity = _entity(offer)
         if entity is not None and entity["unitId"] not in group["_seen"]:
             group["_seen"].add(entity["unitId"])
@@ -198,6 +205,18 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
 
     decisions = []
     for group in groups.values():
+        # Round-robin across entities: a settler whose own moves sat behind six other units' options
+        # was invisible to the seat (live friction, turn 33), so every entity is represented first.
+        buckets = [list(v) for v in group.pop("_buckets", {}).values()]
+        chosen: list[dict[str, Any]] = []
+        while buckets and len(chosen) < max_options:
+            for b in list(buckets):
+                if len(chosen) >= max_options:
+                    break
+                chosen.append(b.pop(0))
+                if not b:
+                    buckets.remove(b)
+        group["options"] = [_option(o) for o in chosen]
         group["omitted"] = group["optionCount"] - len(group["options"])
         entity_count = len(group.pop("_seen"))
         if group["entities"]:

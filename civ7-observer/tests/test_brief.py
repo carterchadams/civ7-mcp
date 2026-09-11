@@ -242,3 +242,27 @@ def test_unit_promotion_notification_is_a_supported_promotion_decision(tmp_path)
     d = next(d for d in b["decisions"] if d["kind"] == "promotion")
     assert d["required"] is True and d["options"][0]["disciplineName"] == "Bastion" and d["options"][0]["promotionPoints"] == 1
     assert d["entities"] == [{"unitId": 5, "typeKey": "UNIT_ARMY_COMMANDER", "at": {"x": 10, "y": 10}, "movesRemaining": 2}]
+
+
+def test_every_unit_is_represented_before_any_unit_gets_a_second_option(tmp_path):
+    """Live friction (turn 33): a settler's own moves sat behind six other units' options, so the
+    seat could not see where it could go and left it standing."""
+    def move(uid, x, y):
+        return {"kind": "MOVE_UNIT", "arg": uid, "arg2": x, "arg3": y, "pre": 1000 + uid, "unitId": uid,
+                "from": {"x": 10, "y": 10}, "x": x, "y": y, "unitTypeKey": "UNIT_SCOUT", "terrainKey": "TERRAIN_FLAT",
+                "pathTurns": 1, "movesRemaining": 2, "canStart": True}
+    crowd = [move(1, 11, 10), move(1, 11, 11), move(1, 12, 10), move(1, 12, 11), move(1, 13, 10), move(1, 13, 11)]
+    settler = [move(9, 9, 10), move(9, 9, 11)]
+    b, _, _ = build(tmp_path, offers_with(crowd + settler, end_can_start=False, blocking="UNITS"), max_options=4)
+    unit = next(d for d in b["decisions"] if d["kind"] == "unit")
+    seen = [o["unitId"] for o in unit["options"]]
+    assert 9 in seen, "the settler must get an option even though another unit had six"
+    assert seen.count(1) <= 3 and len(unit["options"]) == 4 and unit["optionCount"] == 8 and unit["omitted"] == 4
+
+
+def test_a_blocked_settler_is_pointed_at_the_per_unit_options_tool(tmp_path):
+    blocked = [{"kind": "FOUND_CITY", "arg": 5, "x": 49, "y": 5, "pre": 549, "unitId": 5, "from": {"x": 49, "y": 5},
+                "unitTypeKey": "UNIT_FOUNDER", "terrainKey": "TERRAIN_NAVIGABLE_RIVER", "movesRemaining": 2, "canStart": False}]
+    b, _, _ = build(tmp_path, offers_with(UNITS + blocked, end_can_start=False, blocking="UNITS"))
+    settle = next(d for d in b["decisions"] if d["kind"] == "settle")
+    assert "get_unit_options" in settle["note"]

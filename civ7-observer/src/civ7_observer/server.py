@@ -74,6 +74,11 @@ PERFORM_DESCRIPTION = (
     "`status`: confirmed (the effect was observed), rejected (nothing was sent), or an error. An `unknown` "
     "outcome blocks all further actions until a human reconciles it. Never invent an action id."
 )
+UNIT_OPTIONS_DESCRIPTION = (
+    "Read-only. Every currently legal action for ONE of this seat's units (moves with their destination and terrain, "
+    "skip, found settlement, promotion), by `unit_id` as shown in a brief's `entities`. Use this when the brief's "
+    "bounded options do not show what a particular unit can do; it is far smaller than list_actions."
+)
 RESULT_DESCRIPTION = (
     "Read-only. The recorded outcome of one of this seat's earlier actions by `request_id`: confirmed, "
     "rejected, unknown, or no_such_request. Use it after a transport failure rather than repeating the action."
@@ -215,6 +220,19 @@ def build_server(
         if "error" not in listing and isinstance(listing.get("attachment"), dict):
             last["attachment"] = listing["attachment"]
         return listing
+
+    @mcp.tool(name="get_unit_options", description=UNIT_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
+    def get_unit_options(unit_id: int) -> dict[str, Any]:
+        if isinstance(unit_id, bool) or not isinstance(unit_id, int):
+            return {"error": {"code": "INVALID_ARGUMENT", "message": "unit_id must be an integer, as shown in a brief's entities"}}
+        listing = _with_session(lambda gs: registry.list_offers(gs, player=bound, mode=mode))
+        if "error" in listing:
+            return listing
+        if isinstance(listing.get("attachment"), dict):
+            last["attachment"] = listing["attachment"]
+        options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
+        return {"unitId": unit_id, "attachment": listing["attachment"], "count": len(options), "options": options,
+                "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
     def perform_action(action_id: str, request_id: str) -> dict[str, Any]:

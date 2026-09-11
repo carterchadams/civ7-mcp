@@ -75,6 +75,12 @@ TOOLS = [
         "input_schema": {"type": "object", "properties": {}, "required": []},
     },
     {
+        "name": "get_unit_options",
+        "description": "Every legal action for ONE of this seat's units, by unit_id as shown in a brief's entities. "
+                       "Use it when the brief's bounded options do not show what a particular unit can do.",
+        "input_schema": {"type": "object", "properties": {"unit_id": {"type": "integer"}}, "required": ["unit_id"]},
+    },
+    {
         "name": "perform_action",
         "description": "Perform one offered action. action_id must come from a brief or list_actions in this turn; "
                        "request_id is a short id you choose, which makes the call idempotent. Returns a receipt.",
@@ -191,6 +197,13 @@ class Runner:
                 state["brief"], state["brief_fresh"] = brief, True
                 state["attachment"] = brief.get("attachment") or state.get("attachment")
                 return brief
+            if name == "get_unit_options":
+                unit_id = args.get("unit_id")
+                if isinstance(unit_id, bool) or not isinstance(unit_id, int):
+                    return {"error": {"code": "INVALID_ARGUMENT", "message": "unit_id must be an integer"}}
+                listing = self._session(lambda gs: self.registry.list_offers(gs, player=self.player, mode=self.mode))
+                options = [o for o in listing["offers"] if o.get("unitId") == unit_id]
+                return {"unitId": unit_id, "count": len(options), "options": options}
             if name == "list_actions":
                 return self._session(lambda gs: self.registry.list_offers(gs, player=self.player, mode=self.mode))
             if name == "perform_action":

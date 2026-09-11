@@ -158,7 +158,7 @@ def test_read_only_server_exposes_no_action_tools():
 def test_acting_server_exposes_the_action_tools_with_honest_annotations(tmp_path):
     s, _ = make_acting({"a": []}, journal=tmp_path / "j.jsonl")
     names = sorted(t.name for t in s._tool_manager.list_tools())
-    assert names == ["get_action_result", "get_observation", "get_plan", "get_status", "get_turn_brief", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
+    assert names == ["get_action_result", "get_observation", "get_plan", "get_status", "get_turn_brief", "get_unit_options", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
     perform = tool(s, "perform_action")
     assert perform.annotations.readOnlyHint is False and perform.annotations.idempotentHint is True
     assert perform.annotations.openWorldHint is False
@@ -244,3 +244,19 @@ def test_runner_tools_over_mcp_read_cards_and_write_only_the_seat_workspace(tmp_
     rows = [json.loads(l) for l in (tmp_path / "ws" / "seat1" / "friction.jsonl").read_text().splitlines()]
     assert rows[0]["blocking"] == "RESEARCH" and rows[0]["decision"] == "research" and rows[0]["seat"] == 1 and rows[0]["match"] == "ABCDEF0123456789"
     assert not (tmp_path / "ws" / "seat0").exists()
+
+
+def test_get_unit_options_returns_only_that_units_offers(tmp_path):
+    from test_brief import UNITS, offers_with
+    ctx = json.dumps(GAME)
+    payload = json.dumps(offers_with(UNITS + [
+        {"kind": "SKIP_UNIT", "arg": 9, "pre": 2, "unitId": 9, "from": {"x": 1, "y": 1}, "unitTypeKey": "UNIT_FOUNDER", "movesRemaining": 2, "canStart": True}],
+        end_can_start=False, blocking="UNITS"))
+    scripts = {"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)]}
+    s, _ = make_acting(scripts, journal=tmp_path / "j.jsonl")
+    assert tool(s, "get_unit_options").annotations.readOnlyHint is True
+    out = tool(s, "get_unit_options").fn(unit_id=9)
+    assert out["unitId"] == 9 and out["count"] == 1
+    assert [o["kind"] for o in out["options"]] == ["skip_unit"]
+    assert all(o["unitId"] == 9 for o in out["options"])
+    assert tool(s, "get_unit_options").fn(unit_id="5")["error"]["code"] == "INVALID_ARGUMENT"
