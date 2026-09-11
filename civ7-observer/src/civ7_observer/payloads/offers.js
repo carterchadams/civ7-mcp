@@ -335,6 +335,31 @@
         }
       }
     }
+    // A standing research or civic goal: any unfinished node in the seat's active tree, however far
+    // off, that the engine accepts as a target. The game then researches its way there by itself,
+    // instead of blocking the turn for a fresh choice every time one node finishes.
+    for (const [targetKind, comp, treeType] of [["SET_TECH_TREE_TARGET_NODE", player.Techs, (() => { try { return player.Techs.getTreeType(); } catch (e) { return null; } })()],
+                                                ["SET_CULTURE_TREE_TARGET_NODE", player.Culture, (() => { try { return player.Culture.getActiveTree(); } catch (e) { return null; } })()]]) {
+      if (!isInt(PlayerOperationTypes[targetKind]) || !comp || typeof comp.getTargetNode !== "function" || !isInt(treeType)) continue;
+      if (!GameInfo.ProgressionTreeNodes || typeof GameInfo.ProgressionTreeNodes[Symbol.iterator] !== "function") continue;
+      const treeRow = GameInfo.ProgressionTrees && typeof GameInfo.ProgressionTrees.lookup === "function" ? GameInfo.ProgressionTrees.lookup(treeType) : null;
+      const treeKey = treeRow && typeof treeRow.ProgressionTreeType === "string" ? treeRow.ProgressionTreeType : null;
+      if (!treeKey) continue;
+      let held = null; try { held = comp.getTargetNode(); } catch (e) { held = null; }
+      if (!isInt(held)) continue;
+      for (const nd of GameInfo.ProgressionTreeNodes) {
+        if (!nd || !isInt(nd.$hash) || nd.ProgressionTree !== treeKey) continue;
+        if (nd.$hash === held) continue;   // already the standing goal
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[targetKind], { ProgressionTreeNodeType: nd.$hash }, false);
+        if (!check || check.Success !== true) continue;
+        let cost = null, turns = null;
+        try { const c = comp.getNodeCost(nd.$hash); cost = isInt(c) ? c : null; } catch (e) { cost = null; }
+        try { const t = comp.getTurnsForNode(nd.$hash); turns = isInt(t) ? t : null; } catch (e) { turns = null; }
+        offers.push({ kind: targetKind, arg: nd.$hash, pre: held, typeKey: nd.ProgressionTreeNodeType,
+          displayName: typeof nd.Name === "string" ? compose(nd.Name) : null, tree: treeKey,
+          cost: cost, turns: turns, currentTarget: held, canStart: true });
+      }
+    }
     // ---- diplomacy
     // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
     // this is the one place the payload looks past the bound player. The scope is exactly the shipped

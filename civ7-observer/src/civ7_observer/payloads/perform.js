@@ -643,6 +643,23 @@
     result.readback = { kind: KIND, arg: ARG, answerKey: key, stillPending: stillPending, matches: stillPending === false };
     return JSON.stringify(result);
   }
+  // A tree target is a standing goal: the game researches its way there on its own, so the seat is
+  // not asked to pick again every few turns. It takes the same node argument as the immediate choice.
+  if (KIND === "SET_TECH_TREE_TARGET_NODE" || KIND === "SET_CULTURE_TREE_TARGET_NODE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const tcomp = KIND === "SET_TECH_TREE_TARGET_NODE" ? player.Techs : player.Culture;
+    let held = null; try { held = tcomp.getTargetNode(); } catch (e) { held = null; }
+    if (held !== PRE) return refuse("ACTION_EXPIRED", "the standing goal changed since the offer was made");
+    const targs = { ProgressionTreeNodeType: ARG };
+    const tcheck = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], targs, false);
+    if (!tcheck || tcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the operation");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], targs);
+    result.outcome = "sent";
+    let after = null; try { after = tcomp.getTargetNode(); } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, targetNode: isInt(after) ? after : null, matches: after === ARG };
+    return JSON.stringify(result);
+  }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");
   if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
   if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");

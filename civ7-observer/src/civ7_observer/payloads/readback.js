@@ -9,6 +9,8 @@
     isTurnActive: player ? t(() => player.isTurnActive) : null,
     techResearching: player ? t(() => player.Techs.getResearching().type) : null,
     civicResearching: player ? t(() => player.Culture.getResearching().type) : null,
+    techTargetNode: player ? t(() => player.Techs.getTargetNode()) : null,
+    civicTargetNode: player ? t(() => player.Culture.getTargetNode()) : null,
     hasSentTurnComplete: t(() => GameContext.hasSentTurnComplete()),
     blockingNotifications: t(() => { const out = []; if (Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID) === EndTurnBlockingTypes.NONE) return out; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); let b = null; try { b = typeof Game.Notifications.getBlocksTurnAdvancement === "function" ? Game.Notifications.getBlocksTurnAdvancement(nid) : null; } catch (e) { b = null; } if (b === true || (b !== false && n && n.BlocksTurnAdvancement === true)) out.push(Game.Notifications.getTypeName(n.Type)); } return out; }),
     endTurnBlocking: t(() => { const v = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID); for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) return Game.Notifications.getTypeName(n.Type); } return String(v); }),

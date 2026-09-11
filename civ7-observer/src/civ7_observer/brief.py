@@ -68,6 +68,9 @@ BLOCKER_DECISION = {
 DECISION_OF_KIND = {
     "research": "research",
     "civic": "civic",
+    # The goal sits with the choice it steers, so a seat sees both in one place.
+    "research_goal": "research",
+    "civic_goal": "civic",
     "produce_unit": "production",
     "produce_constructible": "production",
     "purchase_unit": "production",
@@ -111,7 +114,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description", "isCrisis",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
                  "celebration", "effects", "unlocksTraditions", "townDefault", "upgradeToCity", "tooCloseToSettle", "goldBalance",
-                 "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance",
+                 "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",

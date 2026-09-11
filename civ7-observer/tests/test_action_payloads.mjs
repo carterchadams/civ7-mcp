@@ -1212,6 +1212,80 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- standing research and civic goals
+function withTreeGoals(g, { techTarget = -1, civicTarget = -1, acceptable = [701, 702, 801], applied = true } = {}) {
+  const me = g.Players.get(1);
+  me.Techs.getTargetNode = () => techTarget;
+  me.Culture.getTargetNode = () => civicTarget;
+  me.Techs.getTreeType = () => 500;
+  me.Culture.getActiveTree = () => 600;
+  g.GameInfo.ProgressionTrees = table([{ $hash: 500, ProgressionTreeType: "TREE_TECHS_AQ" }, { $hash: 600, ProgressionTreeType: "TREE_CIVICS_AQ_MAIN" }]);
+  const nodeRows = [{ $hash: 701, ProgressionTreeNodeType: "NODE_TECH_AQ_POTTERY", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_P" },
+                    { $hash: 702, ProgressionTreeNodeType: "NODE_TECH_AQ_WRITING", ProgressionTree: "TREE_TECHS_AQ", Name: "LOC_W" },
+                    { $hash: 801, ProgressionTreeNodeType: "NODE_CIVIC_AQ_MAIN_MYSTICISM", ProgressionTree: "TREE_CIVICS_AQ_MAIN", Name: "LOC_M" }];
+  g.GameInfo.ProgressionTreeNodes = table(nodeRows);
+  g.GameInfo.ProgressionTreeNodes[Symbol.iterator] = function* () { yield* nodeRows; };
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, SET_TECH_TREE_TARGET_NODE: 9101, SET_CULTURE_TREE_TARGET_NODE: 9102 };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op === 9101 || op === 9102) { g._log.push(`tcanStart(${pid},${op},${JSON.stringify(args)},${show})`); return { Success: pid === 1 && acceptable.includes(args.ProgressionTreeNodeType) }; }
+      return inner.canStart(pid, op, args, show);
+    },
+    sendRequest: (pid, op, args) => {
+      if (op === 9101 || op === 9102) { g._log.push(`tsendRequest(${pid},${op},${JSON.stringify(args)})`); if (applied) { if (op === 9101) me.Techs.getTargetNode = () => args.ProgressionTreeNodeType; else me.Culture.getTargetNode = () => args.ProgressionTreeNodeType; } return; }
+      return inner.sendRequest(pid, op, args);
+    },
+  };
+  return g;
+}
+
+test("goal offers list every node in the seat's own tree the engine accepts as a target, with its cost", () => {
+  const log = [];
+  const g = withTreeGoals(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "SET_TECH_TREE_TARGET_NODE").map((o) => [o.arg, o.typeKey, o.tree, o.cost, o.turns, o.pre]),
+    [[701, "NODE_TECH_AQ_POTTERY", "TREE_TECHS_AQ", 60, 4, -1], [702, "NODE_TECH_AQ_WRITING", "TREE_TECHS_AQ", 100, 7, -1]]);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "SET_CULTURE_TREE_TARGET_NODE").map((o) => [o.arg, o.typeKey, o.tree]),
+    [[801, "NODE_CIVIC_AQ_MAIN_MYSTICISM", "TREE_CIVICS_AQ_MAIN"]]);
+  assert.ok(!log.some((e) => e.startsWith("tsendRequest")));
+});
+
+test("the node that is already the standing goal is not offered again", () => {
+  const log = [];
+  const g = withTreeGoals(withUnits(world({ log }), []), { techTarget: 701 }); g._log = log;
+  const goals = runOffers(g).offers.filter((o) => o.kind === "SET_TECH_TREE_TARGET_NODE");
+  assert.deepEqual(goals.map((o) => [o.arg, o.pre, o.currentTarget]), [[702, 701, 701]]);
+});
+
+test("perform SET_TECH_TREE_TARGET_NODE sends the goal and reads back the node the engine now holds", () => {
+  const log = [];
+  const g = withTreeGoals(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "SET_TECH_TREE_TARGET_NODE", 702, 0, 0, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "SET_TECH_TREE_TARGET_NODE", arg: 702, targetNode: 702, matches: true });
+  assert.ok(log.find((e) => e.startsWith("tsendRequest(") && e.includes("9101") && e.includes('"ProgressionTreeNodeType":702')));
+  const civ = withTreeGoals(withUnits(world({ log: [] }), [])); civ._log = [];
+  const rc = runPerformArgs(civ, "SET_CULTURE_TREE_TARGET_NODE", 801, 0, 0, { pre: -1 });
+  assert.deepEqual(rc.readback, { kind: "SET_CULTURE_TREE_TARGET_NODE", arg: 801, targetNode: 801, matches: true });
+});
+
+test("perform of a goal refuses a node the engine will not target and a goal that changed since the offer", () => {
+  for (const [label, mk, node, pre] of [
+    ["not targetable", () => withTreeGoals(withUnits(world({ log: [] }), []), { acceptable: [] }), 702, -1],
+    ["goal changed", () => withTreeGoals(withUnits(world({ log: [] }), []), { techTarget: 701 }), 702, -1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "SET_TECH_TREE_TARGET_NODE", node, 0, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
+  }
+  const none = withTreeGoals(withUnits(world({ log: [] }), []), { applied: false }); none._log = [];
+  const rr = runPerformArgs(none, "SET_TECH_TREE_TARGET_NODE", 702, 0, 0, { pre: -1 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- diplomacy (the only place the payload looks past the bound seat, and only at met players)
 function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2" } = {}) {
   const me = g.Players.get(1);

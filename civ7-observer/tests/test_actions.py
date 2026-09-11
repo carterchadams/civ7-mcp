@@ -1064,6 +1064,35 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_a_standing_research_goal_confirms_on_the_node_the_engine_holds(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "SET_TECH_TREE_TARGET_NODE", "arg": 702, "pre": -1, "typeKey": "NODE_TECH_EX_GUNPOWDER", "displayName": "Gunpowder", "tree": "TREE_TECHS_EX", "cost": 900, "turns": 14, "currentTarget": -1, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_TARGET_NODE", "arg": 702, "targetNode": -1, "matches": False}}
+    rb = {**RB, "techTargetNode": 702}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        goal = next(o for o in out["offers"] if o["kind"] == "research_goal")
+        assert goal["displayName"] == "Gunpowder" and goal["turns"] == 14 and goal["currentTarget"] == -1 and "arg" not in goal
+        res = reg.perform(gs, action_id=goal["actionId"], request_id="goal-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"treeGoal": {"kind": "research_goal", "node": 702}}
+
+
+def test_a_civic_goal_the_engine_did_not_take_stays_unknown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "SET_CULTURE_TREE_TARGET_NODE", "arg": 801, "pre": -1, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_CULTURE_TREE_TARGET_NODE", "arg": 801, "targetNode": -1, "matches": False}}
+    rb = {**RB, "civicTargetNode": -1}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        goal = next(o for o in out["offers"] if o["kind"] == "civic_goal")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=goal["actionId"], request_id="goal-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
 def test_diplomatic_action_confirms_on_influence_spent_and_names_its_target(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9001, "pre": 1256, "typeKey": "DIPLOMACY_ACTION_OPEN_BORDERS", "displayName": "Open Borders", "targetPlayerId": 0, "targetName": "Abbasid", "targetIsMajor": True, "group": "TREATY", "cost": 33, "costYield": "influence", "influenceBalance": 1256, "affordable": True, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9001, "influenceBefore": 1256, "influence": 1256, "matches": False}}
