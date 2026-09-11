@@ -226,3 +226,22 @@ that applied the extra-policy-slot card had three culture slots against the othe
 there is no observable "already spent" signal and applying is folded into the pick. The choose-civilization notification records kept
 `BlocksTurnAdvancement` true after the finish while `Game.Notifications.getBlocksTurnAdvancement(id)`
 said false: that per-id query is the live verdict and is what every blocking check uses now.
+
+## Not implemented yet, with the contract established
+
+**Attack.** `canStart(MOVE_TO, {Modifiers: ATTACK})` accepts every empty adjacent plot and
+`Game.Combat.testAttackInto` returned `-1` even for a plot holding a foreign unit, so neither is the
+target test; `Game.Combat.getBestDefender({x, y}, unitId)` is (it names the owner, which is why move
+offers use only its boolean). The positive shape of an attack preview has not been observed, so no
+attack action exists and moves into occupied plots are withheld instead.
+
+**Trade routes.** Merchants have been idle since the Exploration age began and two seats have asked
+for this. The source is the seat's own component: `Trade.projectPossibleTradeRoutes()` returns
+entries with `targetCityId`, `status` and `domain`, and the shipped chooser sends
+`Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.MAKE_TRADE_ROUTE, {X, Y})` for the target
+city's plot after `canStart`. `TradeRouteStatus` on this build: INVALID 0, SUCCESS -327245337,
+AT_WAR -503474736, DISTANCE -1224148699, NEED_MORE_FRIENDSHIP 543324911, NO_RESOURCES 575990753,
+ALREADY_EXISTS 854558881, OVER_OCEAN 45420062, NO_URBAN_SEA_ROUTE 262580538. It is **not implemented**
+because no seat has met another civilization yet, so the query returns an empty list for every seat
+and the populated shape cannot be verified; resolving a `targetCityId` also means reading a foreign
+city, which needs the same care the occupied-plot check took.
