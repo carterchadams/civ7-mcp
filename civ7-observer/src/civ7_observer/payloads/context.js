@@ -31,11 +31,17 @@
     }
   }
   let turn = null;
+  let age = null;
   if (has("Game")) {
     try {
       turn = Game.turn;
     } catch (e) {
       turn = null;
+    }
+    try {
+      age = Game.age;
+    } catch (e) {
+      age = null;
     }
   }
   return JSON.stringify({
@@ -49,6 +55,7 @@
     localPlayerId: localPlayerId === undefined ? null : localPlayerId,
     localObserverId: localObserverId === undefined ? null : localObserverId,
     turn: turn === undefined ? null : turn,
+    age: age === undefined ? null : age,
     href: (typeof location !== "undefined" && location && location.href) ? String(location.href) : null
   });
 })()

@@ -18,7 +18,7 @@ PRODUCTION_KINDS = ("unit", "constructible", "project")
 MAX_NODES = 500
 MAX_TREES = 20
 NODE_STATES = {0: "NODE_STATE_INVALID", 1: "NODE_STATE_CLOSED", 2: "NODE_STATE_OPEN", 3: "NODE_STATE_IN_PROGRESS", 4: "NODE_STATE_UNLOCKED", 5: "NODE_STATE_FULLY_UNLOCKED"}
-COMPLETED_STATES = (4, 5)
+COMPLETED_STATES = (3, 4, 5)
 MAX_MAP_DIM = 512
 COVERAGE = "currently-visible-only"
 OMITTED_FEATURES = [
@@ -224,16 +224,27 @@ def _node_common(o: dict[str, Any], path: str) -> dict[str, Any]:
         "tree": _opt(_str, o["tree"], path + ".tree"),
         "depthUnlocked": _int(o["depthUnlocked"], path + ".depthUnlocked", minimum=0),
         "maxDepth": _int(o["maxDepth"], path + ".maxDepth", minimum=0),
+        "repeatedDepth": _int(o["repeatedDepth"], path + ".repeatedDepth", minimum=0),
     }
     rec["state"], rec["stateName"] = _node_state(o["state"], o["stateName"], path)
-    if rec["depthUnlocked"] > rec["maxDepth"]:
+    d, m, rd, st = rec["depthUnlocked"], rec["maxDepth"], rec["repeatedDepth"], rec["state"]
+    if d > m:
         _fail(path, "depthUnlocked exceeds maxDepth")
+    earned = d > 0 or rd > 0
+    if st == 5 and not (d == m or rd > 0):
+        _fail(path, "FULLY_UNLOCKED below max depth")
+    if st == 4 and not (0 < d < m):
+        _fail(path, "UNLOCKED with inconsistent depth")
+    if st in (0, 1, 2) and earned:
+        _fail(path, "earned depth with a non-progress state")
+    rec["_earned"] = earned
     return rec
 
 
 def _current_node(v: Any, path: str) -> dict[str, Any]:
-    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "progress", "cost", "turnsLeft", "depthUnlocked", "maxDepth"))
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "progress", "cost", "turnsLeft", "depthUnlocked", "maxDepth", "repeatedDepth"))
     rec = _node_common(o, path)
+    del rec["_earned"]
     rec["progress"] = _int(o["progress"], path + ".progress", minimum=0)
     rec["cost"] = _int(o["cost"], path + ".cost", minimum=0)
     rec["turnsLeft"] = _opt(_int, o["turnsLeft"], path + ".turnsLeft", minimum=0)
@@ -241,10 +252,12 @@ def _current_node(v: Any, path: str) -> dict[str, Any]:
 
 
 def _completed_node(v: Any, path: str) -> dict[str, Any]:
-    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "depthUnlocked", "maxDepth"))
+    o = _obj(v, path, ("type", "typeKey", "displayName", "tree", "state", "stateName", "depthUnlocked", "maxDepth", "repeatedDepth"))
     rec = _node_common(o, path)
+    if not rec.pop("_earned"):
+        _fail(path, "completed nodes must have an earned depth")
     if rec["state"] not in COMPLETED_STATES:
-        _fail(path + ".state", "completed nodes must be UNLOCKED or FULLY_UNLOCKED")
+        _fail(path + ".state", "completed nodes must be IN_PROGRESS (next depth), UNLOCKED or FULLY_UNLOCKED")
     return rec
 
 

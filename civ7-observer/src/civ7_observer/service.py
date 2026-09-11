@@ -46,8 +46,8 @@ class GameSession:
     def context_is_live(self, probe: RealmProbe) -> bool:
         """Same in-game realm, same seat, same turn as when the session was opened."""
         return (classify(probe) is RealmKind.GAME
-                and (probe.turn, probe.local_player_id, probe.local_observer_id)
-                == (self.context.turn, self.context.local_player_id, self.context.local_observer_id))
+                and (probe.turn, probe.age, probe.local_player_id, probe.local_observer_id)
+                == (self.context.turn, self.context.age, self.context.local_player_id, self.context.local_observer_id))
 
 
 def open_game_session(
@@ -79,8 +79,8 @@ def open_game_session(
         session.close()
         raise ObserverError("NOT_IN_GAME", "reopened session is not an in-game realm", context=context.to_dict())
     expected = result.context
-    if (context.turn, context.local_player_id, context.local_observer_id) != (
-            expected["turn"], expected["localPlayerId"], expected["localObserverId"]):
+    if (context.turn, context.age, context.local_player_id, context.local_observer_id) != (
+            expected["turn"], expected["age"], expected["localPlayerId"], expected["localObserverId"]):
         session.close()
         raise ObserverError("CONTEXT_CHANGED", "game context changed between doctor and session open",
                             before=expected, after=context.to_dict())

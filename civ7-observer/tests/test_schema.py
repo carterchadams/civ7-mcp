@@ -23,14 +23,14 @@ GOOD = {
     "technology": {
         "status": "supported",
         "tree": {"type": 500, "typeKey": "TREE_TECHS_AQ"},
-        "current": {"type": 701, "typeKey": "NODE_TECH_AQ_POTTERY", "displayName": "Pottery", "tree": "TREE_TECHS_AQ", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 45, "cost": 60, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 1},
+        "current": {"type": 701, "typeKey": "NODE_TECH_AQ_POTTERY", "displayName": "Pottery", "tree": "TREE_TECHS_AQ", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 45, "cost": 60, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 1, "repeatedDepth": 0},
         "queuedTarget": {"type": 702, "typeKey": "NODE_TECH_AQ_WRITING"},
-        "completed": [{"type": 700, "typeKey": "NODE_TECH_AQ_AGRICULTURE", "displayName": "Agriculture", "tree": "TREE_TECHS_AQ", "state": 5, "stateName": "NODE_STATE_FULLY_UNLOCKED", "depthUnlocked": 1, "maxDepth": 1}],
+        "completed": [{"type": 700, "typeKey": "NODE_TECH_AQ_AGRICULTURE", "displayName": "Agriculture", "tree": "TREE_TECHS_AQ", "state": 5, "stateName": "NODE_STATE_FULLY_UNLOCKED", "depthUnlocked": 1, "maxDepth": 1, "repeatedDepth": 0}],
     },
     "civics": {
         "status": "supported",
         "trees": {"active": {"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, "available": [{"type": 600, "typeKey": "TREE_CIVICS_AQ_MAIN"}, {"type": 601, "typeKey": "TREE_CIVICS_AQ_GREECE"}]},
-        "current": {"type": 801, "typeKey": "NODE_CIVIC_AQ_MAIN_DISCIPLINE", "displayName": "Discipline", "tree": "TREE_CIVICS_AQ_MAIN", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 72, "cost": 125, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 2},
+        "current": {"type": 801, "typeKey": "NODE_CIVIC_AQ_MAIN_DISCIPLINE", "displayName": "Discipline", "tree": "TREE_CIVICS_AQ_MAIN", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "progress": 72, "cost": 125, "turnsLeft": 1, "depthUnlocked": 0, "maxDepth": 2, "repeatedDepth": 0},
         "queuedTarget": None,
         "completed": [],
     },
@@ -92,6 +92,9 @@ def mutate(path, value):
     (["technology", "current", "stateName"], "NODE_STATE_OPEN"),
     (["technology", "current", "progress"], -1),
     (["technology", "completed", 0, "state"], 2),
+    (["technology", "completed", 0, "depthUnlocked"], 0),
+    (["technology", "completed", 0, "repeatedDepth"], schema.DELETE),
+    (["technology", "current", "repeatedDepth"], -1),
     (["technology", "completed", 0, "extra"], 1),
     (["technology", "queuedTarget"], {"type": 702}),
     (["civics", "trees", "active"], 600),
@@ -165,7 +168,24 @@ def test_progression_current_may_be_null_and_active_tree_may_be_null():
 
 
 def test_completed_allows_unlocked_with_mastery_remaining():
-    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "NODE_TECH_AQ_SAILING", "displayName": "Sailing", "tree": "TREE_TECHS_AQ", "state": 4, "stateName": "NODE_STATE_UNLOCKED", "depthUnlocked": 1, "maxDepth": 2})
+    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "NODE_TECH_AQ_SAILING", "displayName": "Sailing", "tree": "TREE_TECHS_AQ", "state": 4, "stateName": "NODE_STATE_UNLOCKED", "depthUnlocked": 1, "maxDepth": 2, "repeatedDepth": 0})
+    schema.validate_payload(d)
+
+
+def test_completed_allows_in_progress_next_depth_with_earned_depth():
+    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "NODE_TECH_AQ_SAILING", "displayName": "Sailing", "tree": "TREE_TECHS_AQ", "state": 3, "stateName": "NODE_STATE_IN_PROGRESS", "depthUnlocked": 1, "maxDepth": 2, "repeatedDepth": 0})
+    schema.validate_payload(d)
+
+
+@pytest.mark.parametrize("state, name, depth, mx", [(3, "NODE_STATE_IN_PROGRESS", 0, 2), (5, "NODE_STATE_FULLY_UNLOCKED", 1, 2), (4, "NODE_STATE_UNLOCKED", 2, 2)])
+def test_completed_rejects_contradictory_depth_state(state, name, depth, mx):
+    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "X", "displayName": "X", "tree": "T", "state": state, "stateName": name, "depthUnlocked": depth, "maxDepth": mx, "repeatedDepth": 0})
+    with pytest.raises(schema.InvalidObservation):
+        schema.validate_payload(d)
+
+
+def test_repeatable_fully_unlocked_at_depth_zero_is_allowed():
+    d = mutate(["technology", "completed", 0], {"type": 703, "typeKey": "X", "displayName": "X", "tree": "T", "state": 5, "stateName": "NODE_STATE_FULLY_UNLOCKED", "depthUnlocked": 0, "maxDepth": 1, "repeatedDepth": 2})
     schema.validate_payload(d)
 
 

@@ -85,3 +85,10 @@ test("payload source contains no forbidden operations", () => {
     assert.ok(!source.includes(bad), `forbidden token in payload: ${bad}`);
   }
 });
+
+test("context probe reports the age hash", () => {
+  const r = run({ UI: { isInGame: () => true }, Players: {}, GameplayMap: {}, GameContext: { localPlayerID: 1, localObserverID: 1 }, Game: { turn: 42, age: 4242 } });
+  assert.equal(r.age, 4242);
+  const r2 = run({});
+  assert.equal(r2.age, null);
+});

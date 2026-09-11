@@ -43,8 +43,8 @@
   if (inGame !== true) {
     return refuse("NOT_IN_GAME", "UI.isInGame() is not true");
   }
-  if (!isInt(turnBefore) || !isInt(localPlayerId) || !isInt(localObserverId)) {
-    return refuse("NOT_IN_GAME", "turn or seat identity missing");
+  if (!isInt(turnBefore) || !isInt(localPlayerId) || !isInt(localObserverId) || !isInt(age)) {
+    return refuse("NOT_IN_GAME", "turn, age or seat identity missing");
   }
   if (localPlayerId !== BOUND_PLAYER_ID || localObserverId !== BOUND_PLAYER_ID) {
     return refuse("WRONG_PLAYER", "bound player " + BOUND_PLAYER_ID + " is not the local seat (localPlayerId=" + localPlayerId + ", localObserverId=" + localObserverId + ")");
@@ -69,7 +69,7 @@
 
   result.context = {
     turn: turnBefore,
-    age: isInt(age) ? age : null,
+    age: age,
     ageType: lookupKey(GameInfo.Ages, age, "AgeType"),
     playerId: BOUND_PLAYER_ID,
     localPlayerId: localPlayerId,
@@ -192,11 +192,18 @@
   // Node state is read from Game.ProgressionTrees.getNode (the shipped dock/tree-grid path),
   // never from the getResearching() record, whose state field is unreliable.
   let nodeDefMissing = 0;
+  const ENUM_MEMBERS = ["NODE_STATE_INVALID", "NODE_STATE_CLOSED", "NODE_STATE_OPEN", "NODE_STATE_IN_PROGRESS", "NODE_STATE_UNLOCKED", "NODE_STATE_FULLY_UNLOCKED"];
   const progression = (label, comp, extraTrees) => {
     need(comp !== undefined && comp !== null, label + " component is missing");
-    need(typeof ProgressionTreeNodeState !== "undefined" && ProgressionTreeNodeState && Number.isInteger(ProgressionTreeNodeState.NODE_STATE_FULLY_UNLOCKED), "ProgressionTreeNodeState enum unavailable");
+    need(typeof ProgressionTreeNodeState !== "undefined" && ProgressionTreeNodeState, "ProgressionTreeNodeState enum unavailable");
     const S = ProgressionTreeNodeState;
-    const stateName = (v) => { for (const k of Object.keys(S)) if (S[k] === v) return k; return null; };
+    const seen = new Set();
+    for (const m of ENUM_MEMBERS) {
+      need(isInt(S[m]), "ProgressionTreeNodeState." + m + " is not an integer");
+      need(!seen.has(S[m]), "ProgressionTreeNodeState has duplicate values");
+      seen.add(S[m]);
+    }
+    const stateName = (v) => { for (const m of ENUM_MEMBERS) if (S[m] === v) return m; return null; };
     const treeRef = (hash) => {
       if (hash === undefined || hash === null || hash === -1 || hash === 0) return null;
       need(isInt(hash), label + " tree hash is not an integer");
@@ -211,32 +218,41 @@
         tree: typeof row.ProgressionTree === "string" ? row.ProgressionTree : null
       };
     };
+    // Every live node must carry a known state and a depth/state pair that is consistent
+    // with the shipped tree-grid semantics (earned depth is independent of current research).
     const liveNode = (hash) => {
       const n = Game.ProgressionTrees.getNode(BOUND_PLAYER_ID, hash);
       need(n && isInt(n.state) && isInt(n.depthUnlocked) && isInt(n.maxDepth) && isInt(n.progress), label + " getNode(" + hash + ") returned an unusable node");
-      return n;
+      const rd = isInt(n.repeatedDepth) ? n.repeatedDepth : 0;
+      need(stateName(n.state) !== null, label + " node " + hash + " has unknown state " + n.state);
+      need(n.depthUnlocked >= 0 && n.depthUnlocked <= n.maxDepth, label + " node " + hash + " depthUnlocked out of range");
+      const earned = n.depthUnlocked > 0 || rd > 0;
+      if (n.state === S.NODE_STATE_FULLY_UNLOCKED) need(n.depthUnlocked === n.maxDepth || rd > 0, label + " node " + hash + " FULLY_UNLOCKED below max depth");
+      else if (n.state === S.NODE_STATE_UNLOCKED) need(n.depthUnlocked > 0 && n.depthUnlocked < n.maxDepth, label + " node " + hash + " UNLOCKED with inconsistent depth");
+      else if (n.state !== S.NODE_STATE_IN_PROGRESS) need(!earned, label + " node " + hash + " has earned depth but state " + stateName(n.state));
+      return { node: n, repeatedDepth: rd, earned: earned };
     };
     const rec = comp.getResearching();
     need(rec && typeof rec === "object" && isInt(rec.type), label + ".getResearching() returned no record");
     let current = null;
     if (rec.type !== -1) {
-      const n = liveNode(rec.type);
+      const ln = liveNode(rec.type), n = ln.node;
       const d = nodeDef(rec.type);
       const cost = comp.getNodeCost(rec.type);
       const turns = comp.getTurnsLeft();
       need(isInt(cost) && isInt(turns), label + " cost/turns are not integers");
       current = { type: rec.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state),
-        progress: n.progress, cost: cost, turnsLeft: turns < 0 ? null : turns, depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth };
+        progress: n.progress, cost: cost, turnsLeft: turns < 0 ? null : turns, depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth, repeatedDepth: ln.repeatedDepth };
     }
     const researched = comp.getResearched();
     need(Array.isArray(researched), label + ".getResearched() did not return an array");
     const completed = [];
     for (const r of researched) {
       need(r && isInt(r.type), label + ".getResearched() entry is malformed");
-      const n = liveNode(r.type);
-      if (n.state !== S.NODE_STATE_UNLOCKED && n.state !== S.NODE_STATE_FULLY_UNLOCKED) continue;
+      const ln = liveNode(r.type), n = ln.node;
+      if (!ln.earned) continue;   // known OPEN / CLOSED / INVALID nodes with nothing earned
       const d = nodeDef(r.type);
-      completed.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state), depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth });
+      completed.push({ type: r.type, typeKey: d.typeKey, displayName: d.displayName, tree: d.tree, state: n.state, stateName: stateName(n.state), depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth, repeatedDepth: ln.repeatedDepth });
     }
     const target = comp.getTargetNode();
     need(isInt(target), label + ".getTargetNode() is not an integer");
@@ -270,6 +286,9 @@
     const width = GameplayMap.getGridWidth();
     const height = GameplayMap.getGridHeight();
     need(isInt(width) && isInt(height) && width > 0 && height > 0, "map dimensions are not positive integers");
+    if (width > 512 || height > 512) {
+      return refuse("PAYLOAD_TOO_LARGE", "map " + width + "x" + height + " exceeds the supported 512x512; not scanned");
+    }
     let tileDefMissing = 0;
     const key = (table, hash, field) => {
       if (hash === -1) return null;
@@ -312,10 +331,10 @@
   }
 
   // ---- 6. context after
-  let turnAfter, lpAfter, loAfter;
-  try { turnAfter = Game.turn; lpAfter = GameContext.localPlayerID; loAfter = GameContext.localObserverID; } catch (e) { return refuse("CONTEXT_CHANGED", "context unreadable after extraction"); }
-  if (turnAfter !== turnBefore || lpAfter !== localPlayerId || loAfter !== localObserverId) {
-    return refuse("CONTEXT_CHANGED", "turn or seat changed during extraction");
+  let turnAfter, ageAfter, lpAfter, loAfter;
+  try { turnAfter = Game.turn; ageAfter = Game.age; lpAfter = GameContext.localPlayerID; loAfter = GameContext.localObserverID; } catch (e) { return refuse("CONTEXT_CHANGED", "context unreadable after extraction"); }
+  if (turnAfter !== turnBefore || ageAfter !== age || lpAfter !== localPlayerId || loAfter !== localObserverId) {
+    return refuse("CONTEXT_CHANGED", "turn, age or seat changed during extraction");
   }
   return JSON.stringify(result);
 })()

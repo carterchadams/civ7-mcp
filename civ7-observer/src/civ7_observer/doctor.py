@@ -134,6 +134,6 @@ def run_doctor(
         assert selection.selected is not None and selection.selected.probe is not None
         selected = selection.selected.target.identity()
         pr = selection.selected.probe
-        context = {"turn": pr.turn, "localPlayerId": pr.local_player_id, "localObserverId": pr.local_observer_id}
+        context = {"turn": pr.turn, "age": pr.age, "localPlayerId": pr.local_player_id, "localObserverId": pr.local_observer_id}
     return finish(status, summary, target_count=len(target_list), targets=[p.to_dict() for p in selection.probes],
                   selected=selected, context=context)

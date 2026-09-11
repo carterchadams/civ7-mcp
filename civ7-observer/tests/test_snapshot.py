@@ -99,3 +99,16 @@ def test_snapshot_final_context_disconnect_is_typed_and_unpublished(tmp_path):
         snapshot.run_snapshot(port=9444, timeout=1, out=tmp_path / "o.json", player=None, mode="singleplayer", discover=lambda p, t: tl, session_factory=Factory(scripts))
     assert ei.value.code == "CDP_CONNECTION_CLOSED"
     assert not (tmp_path / "o.json").exists()
+
+
+def test_snapshot_discards_when_age_changes_after(tmp_path):
+    with pytest.raises(service.ObserverError) as ei:
+        run_snapshot(tmp_path, json.dumps(OBS), after=json.dumps({**GAME, "age": 5555}))
+    assert ei.value.code == "CONTEXT_CHANGED"
+
+
+def test_snapshot_rejects_payload_age_that_disagrees_with_session(tmp_path):
+    other = {**OBS, "context": {**OBS["context"], "age": 5555}}
+    with pytest.raises(service.ObserverError) as ei:
+        run_snapshot(tmp_path, json.dumps(other))
+    assert ei.value.code == "CONTEXT_CHANGED"

@@ -7,8 +7,8 @@ from civ7_observer.payloads import load_payload
 from scripted_socket import ScriptedSocket
 
 GAME = {"probeVersion": 1, "hasUI": True, "hasGameContext": True, "hasGame": True, "inGame": True,
-        "hasPlayers": True, "hasMap": True, "localPlayerId": 1, "localObserverId": 1, "turn": 12, "href": "coui://ui/x"}
-MENU = {**GAME, "inGame": False, "hasGameContext": False, "hasGame": False, "localPlayerId": None, "localObserverId": None, "turn": None}
+        "hasPlayers": True, "hasMap": True, "localPlayerId": 1, "localObserverId": 1, "turn": 12, "age": 4242, "href": "coui://ui/x"}
+MENU = {**GAME, "inGame": False, "hasGameContext": False, "hasGame": False, "localPlayerId": None, "localObserverId": None, "turn": None, "age": None}
 NON_GAME = {**MENU, "hasUI": False, "hasPlayers": False, "hasMap": False}
 INCONSISTENT = {**GAME, "hasPlayers": False}
 
@@ -83,6 +83,16 @@ def test_parse_realm_probe_rejects_bad_contract(value):
     with pytest.raises(targets.RealmProbeInvalid) as ei:
         targets.parse_realm_probe(value)
     assert ei.value.code == "API_CONTRACT_MISMATCH"
+
+
+def test_parse_exposes_age():
+    assert targets.parse_realm_probe(json.dumps(GAME)).age == 4242
+    assert targets.parse_realm_probe(json.dumps(MENU)).age is None
+
+
+def test_game_realm_requires_age():
+    probe = targets.parse_realm_probe(json.dumps({**GAME, "age": None}))
+    assert targets.classify(probe) == targets.RealmKind.INCONSISTENT
 
 
 def test_parse_accepts_in_game_null_as_unknown():

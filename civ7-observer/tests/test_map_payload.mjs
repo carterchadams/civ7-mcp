@@ -137,3 +137,12 @@ test("map warnings: unknown terrain key keeps the hash", () => {
   assert.equal(r.map.tiles[0].terrainKey, null);
   assert.ok(r.warnings.some((w) => w.code === "TILE_DEFINITION_MISSING"));
 });
+
+test("oversized map dimensions are refused before any plot is scanned", () => {
+  const log = [];
+  const g = world({ log });
+  g.GameplayMap.getGridWidth = () => 513;
+  const r = run(g);
+  assert.equal(r.refused?.code, "PAYLOAD_TOO_LARGE");
+  assert.deepEqual(log.filter((e) => e.startsWith("vis(")), []);
+});

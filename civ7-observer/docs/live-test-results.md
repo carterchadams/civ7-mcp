@@ -187,3 +187,13 @@ Ekklesia) between the turn-14 probe and this capture.
 | omitted features | resources, foreign units/settlements, diplomacy, notifications, yields, hidden and fogged tiles, seed, other players |
 | fog regression | PASS: scout 131072 moved (58, 34) → (60, 34); 17 previously visible tiles (e.g. 56,31 … 58,34) are absent from the new export, 13 new tiles appear; counts 116/94/3194 → 112/98/3194 (fogged +4 net, hidden unchanged); no stale record for a departed tile |
 | anti-leak fixtures (offline) | Node fixtures plant an omniscient opponent, global unit/city maps, a resource and bulk-visibility reader; tests fail if any is touched or if detail is read before visibility |
+
+## Changes 4 and 5 review fixes (seat 2 = player 1 Alexander, turn 16)
+
+| test | result |
+|---|---|
+| `doctor --json` context now carries `age` | `{"turn":16,"age":2077444219,"localPlayerId":1,"localObserverId":1}` |
+| `snapshot --mode local-hotseat` with enum validation, earned-depth completed list, age check, map bound | PASS: 0 warnings; Masonry current 18/83 depth 0/2; 4 completed techs; Chiefdom 1/1 and Discipline UNLOCKED 1/2 in completed civics; 112 visible tiles |
+| active next-depth research (mastery in progress) | pending: select Discipline's second depth as the current civic, capture, expect Discipline in `completed` with state IN_PROGRESS and depthUnlocked 1 |
+| queued target (non-null) | pending: queue a farther tech as target, capture, expect `queuedTarget` set while `current` differs |
+| UI comparison of an advancing value | pending: read the research panel's Masonry progress and compare with `progress 18 / cost 83`, 7 turns |

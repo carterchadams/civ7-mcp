@@ -18,7 +18,7 @@ const base = () => {
     Culture: { getActiveTree: () => 600, getAvailableTrees: () => [600], getResearching: () => ({ type: 800, state: 0, progress: 10, depth: 0, maxDepth: 1 }), getResearched: () => [{ type: 800, state: 3, progress: 10, depth: 0, maxDepth: 1 }], getTargetNode: () => -1, getTurnsLeft: () => 6, getNodeCost: () => 60 } };
   return {
     UI: { isInGame: () => true, isMultiplayer: () => false },
-    Game: { turn: 12, age: 4242, ProgressionTrees: { getNode: (pid, t) => ({ 700: { nodeType: 700, state: 5, progress: 0, depthUnlocked: 1, maxDepth: 1 }, 800: { nodeType: 800, state: 3, progress: 10, depthUnlocked: 0, maxDepth: 1 } })[t] ?? null } },
+    Game: { turn: 12, age: 4242, ProgressionTrees: { getNode: (pid, t) => ({ 700: { nodeType: 700, state: 5, progress: 0, depthUnlocked: 1, maxDepth: 1, repeatedDepth: 0 }, 800: { nodeType: 800, state: 3, progress: 10, depthUnlocked: 0, maxDepth: 1, repeatedDepth: 0 } })[t] ?? null } },
     ProgressionTreeNodeState: { NODE_STATE_INVALID: 0, NODE_STATE_CLOSED: 1, NODE_STATE_OPEN: 2, NODE_STATE_IN_PROGRESS: 3, NODE_STATE_UNLOCKED: 4, NODE_STATE_FULLY_UNLOCKED: 5 },
     GameContext: { localPlayerID: 1, localObserverID: 1 },
     Players: { get: (id) => (id === 1 ? me : undefined) },

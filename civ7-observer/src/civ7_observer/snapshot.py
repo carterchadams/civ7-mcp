@@ -69,8 +69,8 @@ def capture(gs, *, player: int | None, mode: str) -> dict[str, Any]:
     after = gs.read_context()
     if not gs.context_is_live(after):
         raise ObserverError("CONTEXT_CHANGED", "game context changed during the capture; result discarded", after=after.to_dict())
-    if validated["context"]["turn"] != gs.context.turn:
-        raise ObserverError("CONTEXT_CHANGED", "payload observed a different turn than the session; result discarded")
+    if validated["context"]["turn"] != gs.context.turn or validated["context"]["age"] != gs.context.age:
+        raise ObserverError("CONTEXT_CHANGED", "payload observed a different turn or age than the session; result discarded")
     return schema.build_observation(
         validated, session_id=session_id(), observation_id=uuid.uuid4().hex,
         captured_at=datetime.now(timezone.utc).isoformat(timespec="seconds").replace("+00:00", "Z"),

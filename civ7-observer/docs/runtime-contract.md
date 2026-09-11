@@ -158,6 +158,22 @@ FULLY_UNLOCKED node.
 `Units 89`, `ProgressionTreeNodes 186`, `ProgressionTrees 23`, `Terrains 6`, `Biomes 6`,
 `Features 40`, `Ages 3`, `Civilizations 33`, `Leaders 24`, `Yields 7`.
 
+## Meaning of progression fields exported to the model
+
+| field | meaning | source |
+|---|---|---|
+| `current.progress` | points already accumulated toward the **current depth** of the current node (not remaining work) | `Game.ProgressionTrees.getNode().progress`; the dock draws `1 − progress/cost` as the remaining ratio (`panel-sub-system-dock.js:407,526`) |
+| `current.cost` | total points required for that depth (0 possible; the dock treats 0 as complete) | `Techs/Culture.getNodeCost(type)` |
+| `current.turnsLeft` | game's own estimate; `null` when nothing is selected (raw -1) | `getTurnsLeft()` |
+| `depthUnlocked` / `maxDepth` | depths already earned / total depths (mastery = depth 2) | `getNode()` |
+| `repeatedDepth` | repeat count for repeatable nodes (depth resets to 0) | `getNode().repeatedDepth`; `tree-grid.js:342` |
+| `completed[]` | every node with an **earned depth** (`depthUnlocked > 0` or `repeatedDepth > 0`), regardless of whether its next depth is currently being researched; `state` is the node's real state (3 while the next depth is in progress, 4 with mastery remaining, 5 fully unlocked) | `tree-grid.js:294-296` computes completed levels from `depthUnlocked` independently of the current research |
+
+Consistency rules enforced in the payload and the schema: FULLY_UNLOCKED requires
+`depthUnlocked == maxDepth` (or a repeat count), UNLOCKED requires `0 < depthUnlocked < maxDepth`,
+and INVALID/CLOSED/OPEN require no earned depth. Any other combination, an unknown state
+value, or an enum missing any of its six members refuses the capture.
+
 ## Progression state matrix (observed)
 
 | where | record `state` | `getNode().state` | meaning |

@@ -85,3 +85,12 @@ def test_read_context_transport_failure_is_a_typed_observer_error():
         with pytest.raises(service.ObserverError) as ei:
             gs.read_context()
     assert ei.value.code == "CDP_CONNECTION_CLOSED"
+
+
+def test_open_game_session_detects_age_only_change_on_reopen():
+    changed = {**GAME, "age": 5555}
+    f = Factory({"a": [reply(1, json.dumps(GAME)), reply(1, json.dumps(changed))]})
+    tl = [target("a")]
+    with pytest.raises(service.ObserverError) as ei:
+        service.open_game_session(port=9444, timeout=1, discover=lambda p, t: tl, session_factory=f)
+    assert ei.value.code == "CONTEXT_CHANGED"

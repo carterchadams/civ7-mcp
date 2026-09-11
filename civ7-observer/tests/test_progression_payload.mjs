@@ -77,7 +77,7 @@ test("technology: current, completed with depth, queued target, tree", () => {
   const t = r.technology;
   assert.equal(t.status, "supported");
   assert.deepEqual(t.tree, { type: 500, typeKey: "TREE_TECHS_AQ" });
-  assert.deepEqual(t.current, { type: 701, typeKey: "NODE_TECH_AQ_POTTERY", displayName: "Pottery", tree: "TREE_TECHS_AQ", state: 3, stateName: "NODE_STATE_IN_PROGRESS", progress: 45, cost: 60, turnsLeft: 1, depthUnlocked: 0, maxDepth: 1 });
+  assert.deepEqual(t.current, { type: 701, typeKey: "NODE_TECH_AQ_POTTERY", displayName: "Pottery", tree: "TREE_TECHS_AQ", state: 3, stateName: "NODE_STATE_IN_PROGRESS", progress: 45, cost: 60, turnsLeft: 1, depthUnlocked: 0, maxDepth: 1, repeatedDepth: 0 });
   assert.deepEqual(t.queuedTarget, { type: 702, typeKey: "NODE_TECH_AQ_WRITING" });
   assert.deepEqual(t.completed.map((n) => [n.typeKey, n.stateName, n.depthUnlocked, n.maxDepth]), [
     ["NODE_TECH_AQ_AGRICULTURE", "NODE_STATE_FULLY_UNLOCKED", 1, 1],
@@ -147,4 +147,79 @@ test("progression reads use only the bound player id", () => {
   run(game({ log }));
   assert.ok(log.filter((e) => e.startsWith("getNode(")).every((e) => e.startsWith("getNode(1,")));
   assert.ok(log.filter((e) => e.startsWith("Players.get(")).every((e) => e === "Players.get(1)"));
+});
+
+// ---- review of changes 4 and 5
+
+test("a node being researched to its next depth keeps its earned depth in completed, with its real state", () => {
+  const nodes = { ...NODES, 703: { state: 3, depthUnlocked: 1, maxDepth: 2, progress: 20 } };
+  const g = game({ nodes });
+  g.Players.get(1).Techs.getResearching = () => ({ type: 703, state: 0, progress: 20, depth: 1, maxDepth: 2 });
+  const r = run(g);
+  assert.equal(r.refused, null);
+  assert.equal(r.technology.current.typeKey, "NODE_TECH_AQ_SAILING");
+  assert.equal(r.technology.current.depthUnlocked, 1);
+  const sailing = r.technology.completed.find((n) => n.typeKey === "NODE_TECH_AQ_SAILING");
+  assert.ok(sailing, "earned depth must stay in completed while the next depth is researched");
+  assert.equal(sailing.stateName, "NODE_STATE_IN_PROGRESS");
+  assert.equal(sailing.depthUnlocked, 1);
+  assert.equal(sailing.maxDepth, 2);
+});
+
+test("finished mastery reports FULLY_UNLOCKED at max depth", () => {
+  const nodes = { ...NODES, 703: { state: 5, depthUnlocked: 2, maxDepth: 2 } };
+  const r = run(game({ nodes }));
+  const sailing = r.technology.completed.find((n) => n.typeKey === "NODE_TECH_AQ_SAILING");
+  assert.deepEqual([sailing.stateName, sailing.depthUnlocked, sailing.maxDepth], ["NODE_STATE_FULLY_UNLOCKED", 2, 2]);
+});
+
+test("civics: earned depth is preserved while researching the next civic depth", () => {
+  const nodes = { ...NODES, 801: { state: 3, depthUnlocked: 1, maxDepth: 2, progress: 30 } };
+  const r = run(game({ nodes }));
+  const disc = r.civics.completed.find((n) => n.typeKey === "NODE_CIVIC_AQ_MAIN_DISCIPLINE");
+  assert.ok(disc && disc.depthUnlocked === 1 && disc.stateName === "NODE_STATE_IN_PROGRESS");
+});
+
+test("unknown node state on a non-current node refuses instead of silently dropping it", () => {
+  const nodes = { ...NODES, 700: { state: 99, depthUnlocked: 1, maxDepth: 1 } };
+  assert.equal(run(game({ nodes })).refused?.code, "API_CONTRACT_MISMATCH");
+});
+
+test("an incomplete state enum refuses instead of silently dropping nodes", () => {
+  const g = game();
+  g.ProgressionTreeNodeState = { NODE_STATE_INVALID: 0, NODE_STATE_CLOSED: 1, NODE_STATE_OPEN: 2, NODE_STATE_IN_PROGRESS: 3, NODE_STATE_FULLY_UNLOCKED: 5 };
+  assert.equal(run(g).refused?.code, "API_CONTRACT_MISMATCH");
+  const g2 = game();
+  g2.ProgressionTreeNodeState = { ...STATE, NODE_STATE_UNLOCKED: 5 };  // duplicate value
+  assert.equal(run(g2).refused?.code, "API_CONTRACT_MISMATCH");
+});
+
+test("contradictory depth/state records refuse", () => {
+  for (const bad of [
+    { state: 2, depthUnlocked: 1, maxDepth: 2 },   // OPEN with earned depth
+    { state: 5, depthUnlocked: 0, maxDepth: 1 },   // FULLY_UNLOCKED without depth
+    { state: 4, depthUnlocked: 2, maxDepth: 2 },   // UNLOCKED at max depth
+    { state: 4, depthUnlocked: 0, maxDepth: 2 },   // UNLOCKED without depth
+    { state: 3, depthUnlocked: 3, maxDepth: 2 },   // depth beyond max
+  ]) {
+    const nodes = { ...NODES, 702: bad };
+    assert.equal(run(game({ nodes })).refused?.code, "API_CONTRACT_MISMATCH", JSON.stringify(bad));
+  }
+});
+
+test("repeatable node at depth 0 with repeatedDepth may be FULLY_UNLOCKED", () => {
+  const g = game();
+  g.Game.ProgressionTrees.getNode = (pid, t) => (t === 702 ? { nodeType: 702, state: 5, progress: 0, depthUnlocked: 0, maxDepth: 1, repeatedDepth: 2, unlockIndices: [] } : (() => { const n = NODES[t]; return { nodeType: t, state: n.state, progress: n.progress ?? 0, depthUnlocked: n.depthUnlocked, maxDepth: n.maxDepth, repeatedDepth: 0, unlockIndices: [] }; })());
+  const r = run(g);
+  assert.equal(r.refused, null);
+  const w = r.technology.completed.find((n) => n.typeKey === "NODE_TECH_AQ_WRITING");
+  assert.ok(w && w.repeatedDepth === 2);
+});
+
+test("age change during extraction refuses with CONTEXT_CHANGED", () => {
+  const g = game();
+  let age = 4242;
+  Object.defineProperty(g.Game, "age", { get: () => age });
+  g.GameplayMap.getRevealedState = () => { age = 5555; return 0; };
+  assert.equal(run(g).refused?.code, "CONTEXT_CHANGED");
 });
