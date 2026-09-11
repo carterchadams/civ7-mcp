@@ -46,6 +46,14 @@ SKILL_ID = re.compile(r"^civ7-[a-z0-9-]+$")
 # Only these names are owned by this tool. The output directory is a real package: it also holds the
 # hand-written loader and the local/ cards, and neither is ever rewritten, reported or deleted here.
 GENERATED_NAME = re.compile(r"^(civ7-[a-z0-9-]+\.md|operating\.md|rules\.json|index\.json)$")
+RUNTIME_MARKER = "<!-- Runtime-maintained:"
+
+
+def runtime_maintained(path: Path) -> bool:
+    """Explicitly curated runtime cards are no longer generated from the guide."""
+    return path.is_file() and path.suffix == ".md" and any(
+        line.startswith(RUNTIME_MARKER) for line in path.read_text(encoding="utf-8").splitlines()[:3]
+    )
 
 
 def _strip_links(text: str) -> str:
@@ -202,21 +210,23 @@ def main(argv: list[str] | None = None) -> int:
         print(f"guide not found: {args.guide}", file=sys.stderr)
         return 2
     files = build(args.guide, args.out)
+    curated = {p.name for p in args.out.glob("*.md") if runtime_maintained(p)}
     if args.check:
         stale = [name for name, content in files.items()
-                 if not (args.out / name).exists() or (args.out / name).read_text(encoding="utf-8") != content]
+                 if name not in curated and (not (args.out / name).exists() or (args.out / name).read_text(encoding="utf-8") != content)]
         extra = [p.name for p in args.out.glob("*")
-                 if p.is_file() and GENERATED_NAME.match(p.name) and p.name not in files]
+                 if p.is_file() and GENERATED_NAME.match(p.name) and p.name not in files and p.name not in curated]
         if stale or extra:
             print(f"skill cards are out of date (stale: {stale}, unexpected: {extra}); run tools/build_skills.py", file=sys.stderr)
             return 1
-        print(f"{len(files)} generated files match the guide")
+        print(f"Generated files match the guide; {len(curated)} runtime-maintained cards preserved")
         return 0
     args.out.mkdir(parents=True, exist_ok=True)
     for name, content in files.items():
-        (args.out / name).write_text(content, encoding="utf-8")
+        if name not in curated:
+            (args.out / name).write_text(content, encoding="utf-8")
     for path in args.out.glob("*"):
-        if path.is_file() and GENERATED_NAME.match(path.name) and path.name not in files:
+        if path.is_file() and GENERATED_NAME.match(path.name) and path.name not in files and path.name not in curated:
             path.unlink()
     print(f"wrote {len(files)} files to {args.out}")
     return 0

@@ -1,28 +1,26 @@
 # Reconnaissance, uncertainty and map memory
+<!-- Runtime-maintained: edit this card directly; build_skills.py preserves it. -->
 
 **Use when:** Use when exploring, updating enemy sightings, choosing safe routes or deciding which missing information is worth obtaining.
 
 Needs to read: context, map, memory, military, rules. Needs to execute (only if enabled): units.move, units.scout_action. Rules: R-GEOGRAPHY.
 
-## Required situation
+## Exploration priorities
 
-Read visible tiles and entities with coverage flags, known terrain from previous legitimate observations, unit movement options, discovered points of interest and known borders. Keep `last_seen_turn` and confidence separate from location. A foreign unit can disappear from vision without being destroyed.
+Give each scout a distinct objective: reveal an expansion corridor, collect a known discovery, find contacts/Independent Powers, inspect a coast or watch a threatened approach. Once nearby settlement choices are informed, push toward new frontiers. Do not circle home indefinitely or park every scout while useful safe routes remain.
 
-## Procedure
+Compare new information, expected reward, travel turns and survival. Prefer a collectible discovery detour that also reveals useful terrain; protect wounded scouts and leave retreat options. Do not feed scouts into hostile settlements for a bonus. Use an offered scout vision/search action when it reveals more useful information than moving.
 
-1. Give each scout an information objective: reveal a nearby settlement corridor, locate a defensible approach, check a suspected coast, establish safe merchant access, or watch a threatened border. A random wandering path is not a plan.
-2. Prefer routes that answer a useful near-term question while leaving the unit a defensible endpoint. Consider movement cost, visible enemies, retreat choices and the value of another turn of vision. A high-visibility position is helpful only when the scout can survive there.
-3. Explore around the home economy before committing every scout to distant travel. Settlers need nearby site information and the empire needs warning of approaches. Broader exploration becomes more valuable when local decisions are already well informed.
-4. For a path through fog, separate known traversable segments from uncertain segments. Advance in shorter steps when a newly exposed enemy could change the plan. A pathfinder route is not a safety guarantee.
-5. Update memory only with allowed observations. Preserve old facts as dated records, invalidate contradicted sightings, and avoid treating a stale enemy position as a current attack target.
-6. Maintain deliberate observation on a dangerous front. Revisit a previously safe route before sending a valuable civilian if enough time has passed for the situation to change.
+Distinguish collectible discoveries from persistent high-yield/resource tiles. The former need their actual legal interaction and reward choice; the latter need settlement, growth or connection. Select a reward that relieves the current bottleneck and verify collection. A unit visit alone is not proof of a reward. Remove consumed targets and avoid duplicate scout assignments.
 
-## Valuing information
+## Route and memory discipline
 
-Choose scouting that can change a pending decision. Revealing the second ring around a candidate settlement can be more useful than discovering an unrelated coastline. Conversely, once good settlement sites are known, search for new contacts, trade access or victory-relevant geography rather than endlessly polishing the same local map.
+Choose land, river, coastal or island routes from actual connectivity and movement permissions. Split frontiers at natural barriers. Never infer a second continent, an ocean requirement or a map edge from the map-script name. Retain enough local vision for civilians while another scout searches farther afield.
 
-Count safe opportunities as well as danger. Do not make a civilian wait forever for proof that every unknown tile is enemy-free; use escort, staged movement and a bounded risk judgment. Label that judgment rather than presenting it as certainty.
+Advance in short steps near uncertain threats, refreshing after discoveries. Keep last-seen turn and confidence separate from current location; an enemy lost from vision is not destroyed. Revisit an old route before sending a valuable civilian, but use escorts and bounded risk rather than waiting for impossible certainty.
 
-## Failure and degraded mode
+Record target, next step and review/abandon trigger in the plan. Reassess after a reward is consumed, an enemy appears, a route closes or an Age transition opens new access. Newly accessible land and islands deserve another reconnaissance pass in Exploration.
 
-If foreign entities are omitted, do not recommend attacks or call a route safe. Explain that tactical reconnaissance is incomplete. If persistent map memory is unavailable, limit the report to fresh vision and explicitly lose historical detail rather than silently reconstructing hidden terrain. Do not query hidden tiles as an oracle.
+## Capability limits
+
+If foreign entities are omitted, tactical safety is unknown: report the missing information without inventing enemies or calling routes safe. If only visible destinations are offered, move toward the visible frontier and report missing reconnaissance capability; never probe hidden coordinates. Use only offered interactions, preserve dated player-authorized memory, and do not reconstruct hidden terrain from a map template.

@@ -1071,7 +1071,8 @@ def test_age_transition_choice_confirms_on_the_parameter_and_the_finish_on_the_n
     chosen = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHOOSE_AGE_CIVILIZATION", "arg": 125352635, "civilization": "CIVILIZATION_ABBASID", "selected": None, "matches": False}}
     finished = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_AGE_TRANSITION_DATA", "arg": 0, "civilization": "CIVILIZATION_ABBASID", "matches": False}}
     rb1 = {**RB, "ageTransitionCivilization": "CIVILIZATION_ABBASID", "blockingNotifications": ["NOTIFICATION_CHOOSE_CIVILIZATION"]}
-    rb2 = {**RB, "age": 5151, "blockingNotifications": []}   # the age itself moved on
+    # live: the notification object lingers but the engine's blocker is NONE and the seat may end its turn
+    rb2 = {**RB, "endTurnBlocking": "NONE", "blockingNotifications": ["NOTIFICATION_CHOOSE_CIVILIZATION"]}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(chosen)), reply(5, json.dumps(rb1)), reply(6, json.dumps(finished)), reply(7, json.dumps(rb2))]})
     with gs:
@@ -1082,4 +1083,4 @@ def test_age_transition_choice_confirms_on_the_parameter_and_the_finish_on_the_n
         assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"ageTransitionCivilization": "CIVILIZATION_ABBASID"}
         fin = next(o for o in out["offers"] if o["kind"] == "finish_age_transition")
         res2 = reg.perform(gs, action_id=fin["actionId"], request_id="fin-1", player=1, mode="singleplayer")
-    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"ageAdvancedTo": 5151}
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"civilizationChoiceClosed": True, "endTurnBlocking": "NONE"}

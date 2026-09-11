@@ -48,10 +48,12 @@ Assembled per turn, in this order: the operating instructions, the operating con
 cards routed for this turn's decisions, the friction card, the rules those cards reference, the
 seat's own plan, and a one-line catalog of every other card it may load.
 
-Cards are generated from `plans/CIV7-AGENT-STRATEGY-GUIDE.md` by `tools/build_skills.py`, which is
+Cards initially come from `plans/CIV7-AGENT-STRATEGY-GUIDE.md` via `tools/build_skills.py`, which is
 deterministic and idempotent: every line of card text is copied verbatim from the guide, and
 `tools/build_skills.py --check` (run by `tests/test_build_skills.py`) fails if the committed cards
-drift from the source. Do not hand-edit `src/civ7_observer/skills/*.md`. This project's own cards,
+drift from the source. Cards with `<!-- Runtime-maintained:` in their first three lines are curated directly:
+the builder preserves them and excludes them from source-equality checks. Their runtime text is
+authoritative; edit these cards without updating the plans. This project's own cards,
 which have no source in the guide, live in `skills/local/`.
 
 Routing is explicit, in `skills/__init__.py`: the turn-management card always, then one card per

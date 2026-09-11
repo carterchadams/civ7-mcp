@@ -1,7 +1,7 @@
 """Loading and routing for the runner's skill cards.
 
-`skills/*.md` are generated from the strategy guide by `tools/build_skills.py` and must not be
-edited by hand. `skills/local/*.md` are this project's own cards (currently the friction card),
+`skills/*.md` start from the strategy guide. Cards marked Runtime-maintained are edited directly
+and preserved by `tools/build_skills.py`; other cards remain generated. `skills/local/*.md` are this project's own cards (currently the friction card),
 which have no source in the guide.
 """
 

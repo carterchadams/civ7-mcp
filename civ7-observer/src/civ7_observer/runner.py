@@ -126,8 +126,10 @@ TOOLS = [
 INSTRUCTIONS = """You are playing one seat of a Civilization VII game. You control only that seat; \
 nothing else is reachable, and every fact you have belongs to it.
 
-Play this turn: read the brief, resolve the decision it marks required, read the brief again, and \
-repeat until the turn can be ended, then end it. Stop immediately if the brief sets `pause`.
+Play this turn: read the brief, resolve required decisions, and refresh after actions. Before ending, \
+make a bounded review of useful exploration, known bonus tiles, Independent Powers, Influence spending \
+and due plan commitments. Take worthwhile supported optional actions; do not churn queues or repeat \
+queries without new information. Then end the turn. Stop immediately if the brief sets `pause`.
 
 Choose only action ids the host has offered you in this turn. Never invent one, and never repeat an \
 action whose receipt was an error or unknown. If a tool or a fact you need is missing, call \

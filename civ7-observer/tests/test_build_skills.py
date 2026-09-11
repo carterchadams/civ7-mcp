@@ -44,6 +44,18 @@ def test_check_fails_when_a_card_drifts(tmp_path):
     assert proc.returncode == 1 and "out of date" in proc.stderr
 
 
+def test_runtime_maintained_card_survives_check_and_regeneration(tmp_path):
+    scratch = tmp_path / "skills"
+    command = [sys.executable, str(BUILDER), "--out", str(scratch)]
+    subprocess.run(command, check=True, capture_output=True)
+    card = scratch / "civ7-reconnaissance-and-memory.md"
+    curated = "<!-- Runtime-maintained: direct strategy edit -->\n# Curated exploration\n"
+    card.write_text(curated)
+    subprocess.run(command + ["--check"], check=True, capture_output=True)
+    subprocess.run(command, check=True, capture_output=True)
+    assert card.read_text() == curated
+
+
 def test_every_skill_in_the_guide_becomes_a_card(tmp_path):
     files = build_to(tmp_path)
     cards = [n for n in files if n.startswith("civ7-") and n.endswith(".md")]

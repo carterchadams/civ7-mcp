@@ -62,7 +62,7 @@ visible output short: a line per decision saying what you chose and why, and a c
 150 words. The skill cards below are your procedures; the rest of the catalog can be loaded on demand."""
 
 
-def context(attempts: int = 6):
+def context(attempts: int = 40):
     """Read-only: who is seated and what turn it is.
 
     Right after a confirmed end turn the game is handing the seat over, so the context legitimately
@@ -189,7 +189,7 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
             "init": init, "contextAfter": after}
 
 
-def wait_for_seat_change(seat: int, turn: int, *, seconds: float = 20.0) -> dict:
+def wait_for_seat_change(seat: int, turn: int, *, seconds: float = 180.0) -> dict:
     deadline = time.monotonic() + seconds
     ctx = context()
     while time.monotonic() < deadline and (ctx["localPlayerId"], ctx["turn"]) == (seat, turn):

@@ -1,4 +1,5 @@
 # Diplomacy, Independent Powers and war support
+<!-- Runtime-maintained: edit this card directly; build_skills.py preserves it. -->
 
 **Use when:** Use for first contacts, incoming proposals, Independent Power investment, treaties, war preparation or peace negotiation.
 
@@ -21,3 +22,20 @@ Read only disclosed contacts, relations, active agreements and timers, relevant 
 ## Human-opponent caution
 
 Agendas and relationship stages are useful disclosed game mechanics, not a mind-reading model. Against another agent or a human, assess observable military positions, offered terms and incentives. A stated promise is uncertain future behavior; record it separately from binding game-enforced treaty effects.
+
+## Make Independent Powers part of the plan
+
+On discovery, record the settlement's identity/location, observed disposition, visible military, strategic access or bonuses, legal diplomatic projects, Influence price, progress and completion timing. Distinguish an Independent Power from an established City-State; offered interactions may differ. Reassess after a raid, a competing investment or an Age transition.
+
+For a hostile Independent, first protect exposed civilians, improvements and routes. Then choose explicitly:
+- Diplomacy when an offered befriending or other project can secure a useful partner or route at an acceptable cost and delay. Check when hostility actually changes; starting a project is not proof that raids stop immediately. Maintain protection until the state confirms it.
+- Military action when ongoing damage, a blocked expansion corridor or an urgent threat outweighs the cost and lost peaceful benefits. Use disclosed defenders and native combat previews; assemble adequate force and support rather than attack a settlement with a scout or drip-feed units. Compare the legal capture/dispersal outcome with leaving a future partner intact.
+- Containment or bypass when neither investment pays now: cover the threatened approach, change the civilian route, and set a review trigger. This is a temporary decision, not forgetting the threat.
+
+Do not provoke an otherwise useful Independent through attacks or nearby settlement without checking the displayed consequences. Do not assume hostility makes diplomacy impossible or that every Independent must be destroyed. Before integration, compare settlement headroom, economic burden and remaining useful Age horizon with continued partnership.
+
+## Use Influence deliberately
+
+Treat Influence as working capital. Each review compare stock, net income, ongoing commitments, response deadlines and actual offered prices. Name a small reserve for a plausible near-term defense/response, then put affordable surplus toward a concrete benefit: Independent relations, a useful endeavor, access/trade, or war support when legal. Prefer a high-value focused investment over scattering funding across contests you cannot finish.
+
+Compare cost, time until benefit, competing progress and likely usable duration. Buy acceleration only when it changes a contest or meaningful deadline. Useful cooperation can beat idle reserves; rejecting or supporting an offer also has an opportunity cost. Avoid spiteful sanctions, unsupported espionage or paid responses without a stated payoff. If valuable projects repeatedly exceed the budget, consider an offered Influence-generating policy/building/attribute by its actual yield and displaced alternative.

@@ -509,8 +509,9 @@ class ActionRegistry:
             if kind == "SET_AGE_TRANSITION_DATA":
                 # finishing the transition can hand the seat over or change the age itself
                 notes = rb.get("blockingNotifications")
-                if (turn, age, seat, observer) == (offer["turn"], offer["age"], player, player) and isinstance(notes, list) and "NOTIFICATION_CHOOSE_CIVILIZATION" not in notes:
-                    effect = {"civilizationChoiceClosed": True}
+                if (turn, age, seat, observer) == (offer["turn"], offer["age"], player, player) and (
+                        rb.get("endTurnBlocking") == "NONE" or (isinstance(notes, list) and "NOTIFICATION_CHOOSE_CIVILIZATION" not in notes)):
+                    effect = {"civilizationChoiceClosed": True, "endTurnBlocking": rb.get("endTurnBlocking")}
                 elif age != offer["age"]:
                     effect = {"ageAdvancedTo": age}
                 elif seat != player and turn >= offer["turn"]:

@@ -1,4 +1,5 @@
 # Turn management and commitment execution
+<!-- Runtime-maintained: edit this card directly; build_skills.py preserves it. -->
 
 **Use when:** Use at every playable turn and after a major state change to resolve blockers, preserve priorities and verify completed actions.
 
@@ -6,7 +7,7 @@ Needs to read: context, decisions, economy, memory, military, victory. Needs to 
 
 ## Required situation
 
-Read the current alert summary, mandatory decision queue, changed entities, available strategic timers and prior commitments. Distinguish “unit can act” from “decision must be resolved before end turn.” A fresh observation ID does not alone prove that a prior action completed.
+Read alerts, mandatory choices, changes, deadlines and commitments. Available actions are not all mandatory; a new observation ID is not an action receipt.
 
 ## Procedure
 
@@ -22,8 +23,12 @@ Read the current alert summary, mandatory decision queue, changed entities, avai
 
 Prefer explicit “do X until Y, unless Z” commitments. Examples: defend the northern pass until two reinforcements arrive; fund a city conversion after an emergency purchase reserve is met; investigate one coastline until a viable port connection is established. Avoid unrelated micro-actions that spend the funds reserved for these plans.
 
-Do not continually change city roles because a new option looks attractive. Change when the evidence changes: threat, prerequisite, expected return, deadline or victory opportunity. Record that trigger so a later turn does not revive the cancelled objective.
+Change city roles only when threats, prerequisites, payoff or deadlines change; record the trigger.
 
 ## Failure and degraded mode
 
 If mandatory choices cannot be enumerated, use the native end-turn readiness result only as a final guard, not as a complete strategic checklist. An unsupported mandatory screen requires human/host resolution. In observer mode, return the triage and intended sequence without claiming any progress.
+
+## Opportunities before end turn
+
+Check scouting/rewards, Independent threats and useful Influence projects once before ending. Skip with a reason; do not churn queues. Keep a concrete exploration, Independent or resource-route objective among useful commitments, with a target, next step and review trigger. Reassess Influence after contact, raids or project completion. Verify rewards and progress; issued orders are not completed objectives.

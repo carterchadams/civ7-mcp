@@ -61,7 +61,10 @@
     // The single blocker value can be a category (live: CULTURE while government and traditions were
     // what actually blocked), so the notifications that block the turn are reported alongside it.
     const blockingNotifications = [];
-    try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ }
+    // Live (turn 93): after finishing the age transition the blocker was NONE while the choose-civilization
+    // notification object lingered with BlocksTurnAdvancement still true, so the list is only consulted
+    // while the engine itself says the turn is blocked.
+    if (blocked) { try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ } }
     result.context.blockingNotifications = blockingNotifications;
     try { result.context.unitIds = player.Units.getUnits().filter((u) => u && u.id && isInt(u.id.id)).map((u) => u.id.id); } catch (e) { result.context.unitIds = null; }
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];

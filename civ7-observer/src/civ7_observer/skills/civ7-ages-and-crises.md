@@ -1,4 +1,5 @@
 # Age transition, civilization choice and crisis response
+<!-- Runtime-maintained: edit this card directly; build_skills.py preserves it. -->
 
 **Use when:** Use as an Age nears its end, during crisis choices, at civilization/Dedication selection, and immediately after entering a new Age.
 
@@ -27,3 +28,13 @@ Avoid assuming the same crisis appears in every game or that an announced future
 3. Re-evaluate connection and resource assignments, Great Work slots, diplomacy and surviving effects. Read actual state rather than assuming everything either persisted or vanished.
 4. Resolve government, policy, Dedication and other mandatory setup choices in native dependency order.
 5. Select a small next-Age plan with funded first steps. Clear obsolete pending action IDs and cancel commitments whose prerequisites no longer exist.
+
+## Exploration Age opening review
+
+After resolving transition setup, choose the next plan from the refreshed map and rules, not the previous Age's queue. Revisit known Independent sites and relations: do not assume allies, hostility, projects or bonuses persisted. Assign Influence to the best newly available partnership, access or defense opportunity, with a named response reserve.
+
+Renew exploration immediately: new travel access, resources and objectives can make a previously irrelevant coast, island or land corridor valuable. Pair an expedition commitment with homeland defense and a funded economy. Use `civ7-naval-and-overseas` for the route/foothold/delivery checks even if the best route is over land.
+
+Check actual enabled Age objectives and their bottlenecks: eligible Distant Lands holdings and Treasure deliveries where relevant, religious choices and relic opportunities, specialist/science capacity, military reach and diplomatic access. Do not attempt every track at once. Choose a primary payoff and a compatible secondary opportunity; confirm native scoring and prerequisites before redirecting investment. Update resource assignments, settlement roles, government/policies and production for that choice.
+
+Reassess when a route opens, an Independent becomes hostile/friendly, the first delivery succeeds, or the Age horizon shortens. Cancel expeditions and diplomatic contests that can no longer repay their remaining cost. Clear old action handles and retain only current-generation commitments with verified prerequisites.
