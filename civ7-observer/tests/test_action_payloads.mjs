@@ -2021,6 +2021,169 @@ test("perform of a unit command refuses an unknown unit, a changed state and a r
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- pillage and spread religion (plot-target operations), a town back to growth, queue edits,
+// a tradition out of its slot, resources out or swapped, and wake/cancel (Priority 2)
+function withPillage(g, { plots = [1011, 1012], moves = 2, spend = true, spread = false, charges = 3 } = {}) {
+  withMap(g, {});
+  g.UnitOperationTypes = { ...g.UnitOperationTypes, PILLAGE: 3001, COASTAL_RAID: 3002, PILLAGE_ROUTE: 3003, SPREAD_RELIGION: 3004 };
+  g.GameplayMap = { ...g.GameplayMap, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  const u = g.Players.get(1).Units.getUnits()[0];
+  u.Movement = { movementMovesRemaining: moves };
+  let left = charges;
+  u.getActivationOperationPlots = (type, excl) => (type === "UNITOPERATION_SPREAD_RELIGION" ? plots : []);
+  const prev = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => {
+      if (op === 3001 || op === 3002 || op === 3003) { g._log.push(`pcanStart(${op},${JSON.stringify(args)})`); if (args.X === undefined) return { Success: true, Plots: plots }; return { Success: plots.includes(args.Y * 100 + args.X) }; }
+      if (op === 3004) { g._log.push(`rcanStart(${JSON.stringify(args)})`); if (!spread) return { Success: false }; return { Success: args.X === -9999 || plots.includes(args.Y * 100 + args.X), ChargesRemaining: left }; }
+      return prev.canStart(uid, op, args, show);
+    },
+    sendRequest: (uid, op, args) => {
+      if (op === 3004) { g._log.push(`rsendRequest(${JSON.stringify(args)})`); if (spend) left -= 1; return; }
+      if (op === 3001 || op === 3002 || op === 3003) { g._log.push(`psendRequest(${op},${JSON.stringify(args)})`); if (spend) u.Movement = { movementMovesRemaining: moves - 1 }; return; }
+      return prev.sendRequest(uid, op, args);
+    },
+  };
+  return g;
+}
+
+test("pillage offers list the plots the engine names and confirm on the unit's moves being spent", () => {
+  const g = withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = [];
+  const r = runOffers(g);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "PILLAGE").map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.movesLeft]), [[5, 11, 10, 2, 2], [5, 12, 10, 2, 2]]);
+  assert.equal(r.offers.filter((o) => o.kind === "COASTAL_RAID").length, 2);
+  const pr = runPerformArgs(g, "PILLAGE", 5, 11, 10, { pre: 2 });
+  assert.deepEqual(pr.readback, { kind: "PILLAGE", arg: 5, target: { x: 11, y: 10 }, before: 2, after: 1, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("psendRequest(3001,") && e.includes('"X":11,"Y":10')));
+  for (const [label, mk, x, y, pre] of [["moves changed", () => withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 11, 10, 1], ["plot not listed", () => withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 50, 50, 2]]) {
+    const h = mk(); h._log = [];
+    assert.ok(runPerformArgs(h, "PILLAGE", 5, x, y, { pre }).refused, label);
+    assert.ok(!h._log.some((e) => e.startsWith("psendRequest")), label);
+  }
+  const stays = withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { spend: false }); stays._log = [];
+  assert.equal(runPerformArgs(stays, "PILLAGE", 5, 11, 10, { pre: 2 }).readback.matches, false);
+});
+
+test("spreading religion is offered on the unit's activation plots and confirms on a charge being spent", () => {
+  const g = withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { spread: true }); g._log = [];
+  const sp = runOffers(g).offers.filter((o) => o.kind === "SPREAD_RELIGION");
+  assert.deepEqual(sp.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.charges]), [[5, 11, 10, 3, 3], [5, 12, 10, 3, 3]]);
+  const r = runPerformArgs(g, "SPREAD_RELIGION", 5, 11, 10, { pre: 3 });
+  assert.deepEqual(r.readback, { kind: "SPREAD_RELIGION", arg: 5, target: { x: 11, y: 10 }, before: 3, after: 2, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("rsendRequest(") && e.includes('"X":11,"Y":10,"UnitAbilityType":-1')));
+  const none = withPillage(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])); none._log = [];
+  assert.deepEqual(runOffers(none).offers.filter((o) => o.kind === "SPREAD_RELIGION"), [], "a unit without the operation is never offered it");
+});
+
+function withTownAndQueue(g, { project = 4242, queue = [301, 302, 303], removeOk = true, swapOk = true, growthOk = true } = {}) {
+  withCity(g, {});
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.isTown = true; city.Growth = { projectType: project, isReadyToPlacePopulation: false };
+  city.BuildQueue._q = queue.map((t) => ({ type: t }));
+  g.CityCommandTypes = { ...(g.CityCommandTypes || {}), CHANGE_GROWTH_MODE: 7772 };
+  g.GrowthTypes = { EXPAND: 0, PROJECT: 1 }; g.ProjectTypes = { NO_PROJECT: -1 };
+  g.CityOperationsParametersValues = { RemoveAt: 1, Swap: 2, MoveTo: 3, Exclusive: 4 };
+  const rows = [{ $hash: 4242, ProjectType: "PROJECT_TOWN_A", Name: "LOC_A" }];
+  g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
+  g.Game.CityCommands = { canStart: (cid, cmd, args) => { g._log.push(`gcanStart(${cmd},${JSON.stringify(args)})`); return { Success: cmd === 7772 && args.Type === 0 && growthOk }; }, sendRequest: (cid, cmd, args) => { g._log.push(`gsend(${JSON.stringify(args)})`); city.Growth = { projectType: -1 }; } };
+  const inner = g.Game.CityOperations;
+  g.Game.CityOperations = {
+    canStart: (cid, op, args, show) => { if (args.InsertMode === undefined) return inner.canStart(cid, op, args, show); g._log.push(`qcanStart(${JSON.stringify(args)})`); return { Success: args.InsertMode === 1 ? removeOk : swapOk }; },
+    sendRequest: (cid, op, args) => { if (args.InsertMode === undefined) return inner.sendRequest(cid, op, args); g._log.push(`qsend(${JSON.stringify(args)})`); const q = city.BuildQueue._q; if (args.InsertMode === 1) q.splice(args.QueueLocation, 1); else { const a = args.QueueSourceLocation, b = args.QueueDestinationLocation; [q[a], q[b]] = [q[b], q[a]]; } },
+  };
+  return g;
+}
+
+test("a town running a project is offered a return to growth, proved by the project clearing", () => {
+  const g = withTownAndQueue(withUnits(world({ log: [] }), [])); g._log = [];
+  const t = runOffers(g).offers.filter((o) => o.kind === "TOWN_GROWTH_MODE");
+  assert.deepEqual(t.map((o) => [o.arg, o.pre, o.currentProjectKey]), [[65536, 4242, "PROJECT_TOWN_A"]]);
+  const r = runPerformArgs(g, "TOWN_GROWTH_MODE", 65536, 0, 0, { pre: 4242 });
+  assert.deepEqual(r.readback, { kind: "TOWN_GROWTH_MODE", arg: 65536, projectBefore: 4242, projectAfter: -1, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("gsend(") && e.includes('"Type":0,"ProjectType":-1,"City":65536')));
+  const growing = withTownAndQueue(withUnits(world({ log: [] }), []), { project: -1 }); growing._log = [];
+  assert.deepEqual(runOffers(growing).offers.filter((o) => o.kind === "TOWN_GROWTH_MODE"), []);
+});
+
+test("queue edits are offered per item and proved by the queue itself", () => {
+  const g = withTownAndQueue(withUnits(world({ log: [] }), [])); g._log = [];
+  const offers = runOffers(g).offers;
+  assert.deepEqual(offers.filter((o) => o.kind === "QUEUE_REMOVE").map((o) => [o.arg2, o.arg3, o.pre]), [[0, 301, 3], [1, 302, 3], [2, 303, 3]]);
+  assert.deepEqual(offers.filter((o) => o.kind === "QUEUE_MOVE_UP").map((o) => [o.arg2, o.toPosition]), [[1, 0], [2, 1]]);
+  assert.deepEqual(offers.filter((o) => o.kind === "QUEUE_MOVE_DOWN").map((o) => [o.arg2, o.toPosition]), [[0, 1], [1, 2]]);
+  const up = runPerformArgs(g, "QUEUE_MOVE_UP", 65536, 1, 302, { pre: 3 });
+  assert.deepEqual(up.readback, { kind: "QUEUE_MOVE_UP", arg: 65536, position: 1, item: 302, queueAfter: [302, 301, 303], matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("qsend(") && e.includes('"InsertMode":2,"QueueSourceLocation":1,"QueueDestinationLocation":0')));
+  const rm = withTownAndQueue(withUnits(world({ log: [] }), [])); rm._log = [];
+  const rr = runPerformArgs(rm, "QUEUE_REMOVE", 65536, 2, 303, { pre: 3 });
+  assert.deepEqual(rr.readback.queueAfter, [301, 302]); assert.equal(rr.readback.matches, true);
+  const stale = withTownAndQueue(withUnits(world({ log: [] }), [])); stale._log = [];
+  assert.ok(runPerformArgs(stale, "QUEUE_REMOVE", 65536, 1, 303, { pre: 3 }).refused, "the item is no longer at that position");
+  assert.ok(runPerformArgs(stale, "QUEUE_REMOVE", 65536, 1, 302, { pre: 2 }).refused, "the queue length changed");
+});
+
+function withPolicyAndResources(g, { active = [-305844099], deactOk = true, assigned = [[1630, 65536], [1640, 131073]], unassignOk = true, swapOk = true } = {}) {
+  withCity(g, {});
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, CHANGE_TRADITION: 8801, ASSIGN_RESOURCE: 8802, SWAP_RESOURCES: 8803 };
+  g.PlayerOperationParameters = { Activate: -1326475004, Deactivate: 1318334332, Clear: -611376643 };
+  g.CultureSlotTypes = { TRADITION_CULTURE_SLOT: 0, POLICY_CULTURE_SLOT: 1, CRISIS_CULTURE_SLOT: 2 };
+  g.GameInfo.Traditions = table([{ $hash: -305844099, $index: 69, TraditionType: "TRADITION_ANGARIUM", Name: "LOC_ANG", Description: "LOC_ANG_D" }]);
+  g.GameInfo.Resources = table([{ $hash: 501, ResourceType: "RESOURCE_JADE" }, { $hash: 502, ResourceType: "RESOURCE_IVORY" }]);
+  g.GameplayMap = { ...(g.GameplayMap || {}), getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  const me = g.Players.get(1);
+  let act = active.slice();
+  me.Culture = { ...me.Culture, getActiveTraditions: (slot) => (slot === 0 ? act : []), isTraditionActive: (h) => act.includes(h) };
+  const cities = { 65536: me.Cities.getCities()[0], 131073: { id: { owner: 1, id: 131073, type: 1 }, name: "LOC_D", location: { x: 5, y: 5 }, isTown: false, BuildQueue: { getQueue: () => [], currentProductionTypeHash: -1 } } };
+  let homes = Object.fromEntries(assigned);
+  for (const c of Object.values(cities)) c.Resources = { getAssignedResources: () => Object.entries(homes).filter(([v, cid]) => cid === c.id.id).map(([v]) => ({ value: Number(v) })) };
+  me.Cities = { getCities: () => Object.values(cities) };
+  me.Resources = { getResources: () => [{ value: 1630, uniqueResource: { resource: 501 } }, { value: 1640, uniqueResource: { resource: 502 } }] };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op === 8801) { g._log.push(`tcanStart(${JSON.stringify(args)})`); return { Success: deactOk && args.Action === 1318334332 }; }
+      if (op === 8802) { g._log.push(`acanStart(${JSON.stringify(args)})`); return { Success: unassignOk && args.Action === 1318334332 }; }
+      if (op === 8803) { g._log.push(`scanStart(${JSON.stringify(args)})`); return { Success: swapOk }; }
+      return inner.canStart(pid, op, args, show);
+    },
+    sendRequest: (pid, op, args) => {
+      if (op === 8801) { g._log.push(`tsend(${JSON.stringify(args)})`); act = act.filter((h) => h !== args.TraditionType); return; }
+      if (op === 8802) { g._log.push(`asend(${JSON.stringify(args)})`); delete homes[args.Location.y * 100 + args.Location.x]; return; }
+      if (op === 8803) { g._log.push(`ssend(${JSON.stringify(args)})`); const a = args.Location.y * 100 + args.Location.x, b = args.Location2.y * 100 + args.Location2.x; [homes[a], homes[b]] = [homes[b], homes[a]]; return; }
+      return inner.sendRequest(pid, op, args);
+    },
+  };
+  return g;
+}
+
+test("an active tradition is offered for deactivation and proved by leaving the active list", () => {
+  const g = withPolicyAndResources(withUnits(world({ log: [] }), [])); g._log = [];
+  const raw = runOffers(g); assert.equal(raw.refused, null, JSON.stringify(raw.refused));
+  const d = raw.offers.filter((o) => o.kind === "DEACTIVATE_TRADITION");
+  assert.deepEqual(d.map((o) => [o.arg, o.slot, o.typeKey]), [[-305844099, "TRADITION_CULTURE_SLOT", "TRADITION_ANGARIUM"]]);
+  const r = runPerformArgs(g, "DEACTIVATE_TRADITION", -305844099, 0, 0, { pre: 1 });
+  assert.deepEqual(r.readback, { kind: "DEACTIVATE_TRADITION", arg: -305844099, active: false, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("tsend(") && e.includes('"Action":1318334332')));
+  const closed = withPolicyAndResources(withUnits(world({ log: [] }), []), { deactOk: false }); closed._log = [];
+  assert.deepEqual(runOffers(closed).offers.filter((o) => o.kind === "DEACTIVATE_TRADITION"), [], "outside a policy window the engine refuses, and nothing is offered");
+});
+
+test("resources are offered out of a settlement and swapped between two, proved by where they end up", () => {
+  const g = withPolicyAndResources(withUnits(world({ log: [] }), [])); g._log = [];
+  const offers = runOffers(g).offers;
+  assert.deepEqual(offers.filter((o) => o.kind === "UNASSIGN_RESOURCE").map((o) => [o.arg, o.arg2, o.pre, o.resourceKey]), [[1630, 65536, 65536, "RESOURCE_JADE"], [1640, 131073, 131073, "RESOURCE_IVORY"]]);
+  assert.deepEqual(offers.filter((o) => o.kind === "SWAP_RESOURCES").map((o) => [o.arg, o.arg2, o.pre, o.otherCityId]), [[1630, 1640, 65536, 131073]]);
+  const un = runPerformArgs(g, "UNASSIGN_RESOURCE", 1630, 65536, 0, { pre: 65536 });
+  assert.deepEqual(un.readback, { kind: "UNASSIGN_RESOURCE", arg: 1630, homeBefore: 65536, homeAfter: null, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("asend(") && e.includes('"City":65536,"Action":1318334332')));
+  const sw = withPolicyAndResources(withUnits(world({ log: [] }), [])); sw._log = [];
+  const rs = runPerformArgs(sw, "SWAP_RESOURCES", 1630, 1640, 0, { pre: 65536 });
+  assert.deepEqual(rs.readback, { kind: "SWAP_RESOURCES", arg: 1630, homeBefore: 65536, homeAfter: 131073, matches: true });
+  assert.ok(sw._log.find((e) => e.startsWith("ssend(") && e.includes('"Location2"')));
+  const moved = withPolicyAndResources(withUnits(world({ log: [] }), [])); moved._log = [];
+  assert.ok(runPerformArgs(moved, "UNASSIGN_RESOURCE", 1630, 65536, 0, { pre: 131073 }).refused, "the resource is not where the offer said");
+});
+
 // ---- attacking
 function withAttack(g, { defenders = { "1010": { id: 77, owner: 4 } }, ranged = false, canAttack = true, attacksRemaining = 1,
                          startsWar = false, spend = true, reach = null, opOk = true } = {}) {

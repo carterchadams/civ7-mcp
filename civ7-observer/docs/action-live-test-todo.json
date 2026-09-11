@@ -56,7 +56,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "research_goal"
@@ -65,7 +65,13 @@
       "consequence_class": "low",
       "procedure": "take a `research_goal` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-civic_goal",
@@ -74,7 +80,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "civic_goal"
@@ -83,7 +89,13 @@
       "consequence_class": "low",
       "procedure": "take a `civic_goal` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_TARGET_NODE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-end_turn",
@@ -103,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 526,
+          "confirmed": 528,
           "rejected": 4,
           "unknown": 0
         }
@@ -127,7 +139,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2093,
+          "confirmed": 2099,
           "rejected": 12,
           "unknown": 0
         }
@@ -151,8 +163,8 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1711,
-          "rejected": 21,
+          "confirmed": 1730,
+          "rejected": 22,
           "unknown": 1
         }
       }
@@ -175,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 149,
+          "confirmed": 150,
           "rejected": 2,
           "unknown": 1
         }
@@ -271,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 81,
+          "confirmed": 82,
           "rejected": 0,
           "unknown": 0
         }
@@ -775,7 +787,7 @@
       "expected_evidence": "a confirmed `MAKE_TRADE_ROUTE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -986,6 +998,258 @@
       "evidence_refs": {}
     },
     {
+      "case_id": "LT-pillage",
+      "action_family": "pillage",
+      "expected_kind": "PILLAGE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "pillage"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `pillage` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PILLAGE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-coastal_raid",
+      "action_family": "coastal_raid",
+      "expected_kind": "COASTAL_RAID",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "coastal_raid"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `coastal_raid` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `COASTAL_RAID` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-pillage_route",
+      "action_family": "pillage_route",
+      "expected_kind": "PILLAGE_ROUTE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "pillage_route"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `pillage_route` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PILLAGE_ROUTE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-plunder_trade_route",
+      "action_family": "plunder_trade_route",
+      "expected_kind": "PLUNDER_TRADE_ROUTE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "plunder_trade_route"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `plunder_trade_route` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PLUNDER_TRADE_ROUTE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-spread_religion",
+      "action_family": "spread_religion",
+      "expected_kind": "SPREAD_RELIGION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "spread_religion"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `spread_religion` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SPREAD_RELIGION` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-town_growth_mode",
+      "action_family": "town_growth_mode",
+      "expected_kind": "TOWN_GROWTH_MODE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "town_growth_mode"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `town_growth_mode` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `TOWN_GROWTH_MODE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-queue_remove",
+      "action_family": "queue_remove",
+      "expected_kind": "QUEUE_REMOVE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "queue_remove"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `queue_remove` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `QUEUE_REMOVE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-queue_move_up",
+      "action_family": "queue_move_up",
+      "expected_kind": "QUEUE_MOVE_UP",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "queue_move_up"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `queue_move_up` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `QUEUE_MOVE_UP` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-queue_move_down",
+      "action_family": "queue_move_down",
+      "expected_kind": "QUEUE_MOVE_DOWN",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "queue_move_down"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `queue_move_down` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `QUEUE_MOVE_DOWN` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-deactivate_tradition",
+      "action_family": "deactivate_tradition",
+      "expected_kind": "DEACTIVATE_TRADITION",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "deactivate_tradition"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `deactivate_tradition` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `DEACTIVATE_TRADITION` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-unassign_resource",
+      "action_family": "unassign_resource",
+      "expected_kind": "UNASSIGN_RESOURCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "unassign_resource"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `unassign_resource` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UNASSIGN_RESOURCE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-swap_resources",
+      "action_family": "swap_resources",
+      "expected_kind": "SWAP_RESOURCES",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "swap_resources"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `swap_resources` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SWAP_RESOURCES` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-wake_unit",
+      "action_family": "wake_unit",
+      "expected_kind": "WAKE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "wake_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `wake_unit` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-cancel_order",
+      "action_family": "cancel_order",
+      "expected_kind": "CANCEL",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "cancel_order"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `cancel_order` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CANCEL` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
       "case_id": "LT-unit_order",
       "action_family": "unit_order",
       "expected_kind": "UNIT_ORDER",
@@ -1003,8 +1267,8 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 118,
-          "rejected": 0,
+          "confirmed": 124,
+          "rejected": 1,
           "unknown": 1
         }
       }
@@ -1303,14 +1567,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "keep_captured_city",
+        "raze_captured_city",
+        "liberate_captured_city"
+      ],
       "consequence_class": "medium",
       "procedure": "Captured settlement keep/raze/liberate",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1319,14 +1588,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "propose_peace",
+        "accept_peace",
+        "reject_peace"
+      ],
       "consequence_class": "medium",
       "procedure": "Peace deals: inspect, propose, accept, reject",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1335,14 +1609,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "join_ally_war"
+      ],
       "consequence_class": "medium",
       "procedure": "Ally at war / call to arms",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1351,14 +1628,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "choose_city_state_bonus"
+      ],
       "consequence_class": "medium",
       "procedure": "Choose city-state bonus",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1367,14 +1647,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "support_diplomatic_action"
+      ],
       "consequence_class": "medium",
       "procedure": "Support/oppose ongoing diplomatic actions",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1383,14 +1666,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 1,
-      "implementation_status": "unimplemented",
-      "live_status": "not_seen",
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "start_diplomatic_action"
+      ],
       "consequence_class": "medium",
       "procedure": "Diplomatic projects with secondary targets",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1399,14 +1685,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "acknowledge_advisor_warning"
+      ],
       "consequence_class": "medium",
       "procedure": "Advisor-warning acknowledgement",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1415,14 +1704,20 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "pillage",
+        "coastal_raid",
+        "pillage_route",
+        "plunder_trade_route"
+      ],
       "consequence_class": "medium",
       "procedure": "Pillage, coastal raid, route plunder",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1431,14 +1726,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "spread_religion"
+      ],
       "consequence_class": "medium",
       "procedure": "Religious spread and relics",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1447,14 +1745,19 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "queue_remove",
+        "queue_move_up",
+        "queue_move_down"
+      ],
       "consequence_class": "medium",
       "procedure": "Production queue remove/reorder/move",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1463,14 +1766,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "deactivate_tradition"
+      ],
       "consequence_class": "medium",
       "procedure": "Policy deactivation and replacement",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1479,14 +1785,18 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "unassign_resource",
+        "swap_resources"
+      ],
       "consequence_class": "medium",
       "procedure": "Resource unassign/clear/swap",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1495,14 +1805,17 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 2,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "town_growth_mode"
+      ],
       "consequence_class": "medium",
       "procedure": "Town return to growth mode",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1511,14 +1824,18 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
+      "kinds": [
+        "wake_unit",
+        "cancel_order"
+      ],
       "consequence_class": "medium",
       "procedure": "Wake/cancel orders and unit swap",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -1532,6 +1849,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Capital selection",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1548,6 +1866,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Syncretism choices",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1564,6 +1883,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Legacy deck revise and placement effects",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1580,6 +1900,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Resettle/migrant and alternate founding",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1596,6 +1917,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Army reinforcement, focused attacks, overrun",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1612,6 +1934,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Roads, rail, bases, rebase, cargo",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1628,6 +1951,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Civilization/unit-specific abilities",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1644,6 +1968,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Tile actions: repair, remove, plant, disperse",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1660,6 +1985,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Artifacts and great-work relocation",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1676,6 +2002,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Air and specialized naval attacks",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1692,6 +2019,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "WMD and contamination cleanup",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1708,6 +2036,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "City/district attacks and espionage units if player-facing",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1724,6 +2053,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Standing multi-turn movement and automate-explore",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",
@@ -1740,6 +2070,7 @@
       "eligibility": {
         "offered": []
       },
+      "kinds": [],
       "consequence_class": "medium",
       "procedure": "Custom religion name and renaming",
       "expected_evidence": "see plans/remaining-player-actions-implementation.md",

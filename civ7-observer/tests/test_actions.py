@@ -1405,6 +1405,36 @@ def test_peace_actions_confirm_on_the_relationship_and_the_table(tmp_path):
         assert r2["confirmedBy"]["effect"] == {"peaceMade": {"targetPlayerId": 7}}
 
 
+def test_priority_two_kinds_confirm_on_their_own_signals(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "PILLAGE", "arg": 5, "arg2": 11, "arg3": 10, "pre": 2, "unitId": 5, "movesLeft": 2, "canStart": True},
+        {"kind": "SPREAD_RELIGION", "arg": 6, "arg2": 11, "arg3": 10, "pre": 3, "unitId": 6, "charges": 3, "canStart": True},
+        {"kind": "TOWN_GROWTH_MODE", "arg": 131073, "pre": 4242, "cityId": 131073, "currentProjectKey": "PROJECT_TOWN_A", "canStart": True},
+        {"kind": "QUEUE_MOVE_UP", "arg": 65536, "arg2": 1, "arg3": 302, "pre": 3, "cityId": 65536, "position": 1, "toPosition": 0, "queue": ["a", "b", "c"], "canStart": True},
+        {"kind": "DEACTIVATE_TRADITION", "arg": -305844099, "pre": 1, "typeKey": "TRADITION_ANGARIUM", "slot": "TRADITION_CULTURE_SLOT", "canStart": True},
+        {"kind": "SWAP_RESOURCES", "arg": 1630, "arg2": 1640, "pre": 65536, "resourceKey": "RESOURCE_JADE", "otherCityId": 131073, "canStart": True}]}
+    P = lambda kind, arg, extra: {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": kind, "arg": arg, "matches": False, **extra}}
+    rbs = [{**RB, "unitMoves": {"5": 1}}, {**RB, "unitCharges": {"6": 2}}, {**RB, "townProjects": {"131073": -1}}, {**RB, "cityQueues": {"65536": [302, 301, 303]}},
+           {**RB, "activeTraditions": []}, {**RB, "resourceAssignments": {"1630": 131073, "1640": 65536}}]
+    performed = [P("PILLAGE", 5, {}), P("SPREAD_RELIGION", 6, {}), P("TOWN_GROWTH_MODE", 131073, {}), P("QUEUE_MOVE_UP", 65536, {}), P("DEACTIVATE_TRADITION", -305844099, {}), P("SWAP_RESOURCES", 1630, {})]
+    script = [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)]
+    n = 4
+    for pf, rb in zip(performed, rbs):
+        script += [reply(n, json.dumps(pf)), reply(n + 1, json.dumps(rb))]; n += 2
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": script})
+    expected = {"pillage": {"pillaged": {"unitId": 5, "x": 11, "y": 10, "kind": "pillage"}}, "spread_religion": {"religionSpread": {"unitId": 6, "x": 11, "y": 10, "chargesLeft": 2}},
+                "town_growth_mode": {"townGrowing": {"cityId": 131073}}, "queue_move_up": {"queueEdited": {"cityId": 65536, "movedTo": 0}},
+                "deactivate_tradition": {"traditionDeactivated": {"tradition": -305844099}}, "swap_resources": {"resourcesSwapped": {"plotIndex": 1630, "otherPlotIndex": 1640, "nowInCityId": 131073}}}
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        by = {o["kind"]: o for o in out["offers"]}
+        for i, kind in enumerate(["pillage", "spread_religion", "town_growth_mode", "queue_move_up", "deactivate_tradition", "swap_resources"]):
+            res = reg.perform(gs, action_id=by[kind]["actionId"], request_id=f"p2-{i}", player=1, mode="singleplayer")
+            assert res["status"] == "confirmed", kind
+            assert res["confirmedBy"]["effect"] == expected[kind], kind
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

@@ -37,6 +37,18 @@ PLAN_ITEMS = {
 }
 
 
+# Which catalog kinds complete which plan item. An item is implemented once every kind is in the
+# catalog; its live status is passed once every kind has a confirmed receipt.
+PLAN_KINDS = {
+    "A01": ["keep_captured_city", "raze_captured_city", "liberate_captured_city"], "A02": ["propose_peace", "accept_peace", "reject_peace"],
+    "A03": ["join_ally_war"], "A04": ["choose_city_state_bonus"], "A05": ["support_diplomatic_action"],
+    "A06": ["start_diplomatic_action"], "A07": ["acknowledge_advisor_warning"],
+    "A08": ["pillage", "coastal_raid", "pillage_route", "plunder_trade_route"], "A09": ["spread_religion"],
+    "A10": ["queue_remove", "queue_move_up", "queue_move_down"], "A11": ["deactivate_tradition"],
+    "A12": ["unassign_resource", "swap_resources"], "A13": ["town_growth_mode"], "A14": ["wake_unit", "cancel_order"],
+}
+
+
 def journal_counts(journals: Path | None) -> dict[str, dict[str, int]]:
     out: dict[str, dict[str, int]] = {}
     if not journals or not journals.exists():
@@ -73,15 +85,20 @@ def build(journals: Path | None) -> dict:
             "expected_evidence": f"a confirmed `{internal}` receipt in the seat journal",
             "evidence_refs": {"journal": seen} if seen else old.get("evidence_refs", {}),
         })
+    public_to_internal = {v: k for k, v in PUBLIC_KIND.items()}
     for aid, title in PLAN_ITEMS.items():
         cid = f"PLAN-{aid}"
         old = prior.get(cid, {})
+        kinds = PLAN_KINDS.get(aid, [])
+        implemented = bool(kinds) and all(k in public_to_internal for k in kinds)
+        live_all = implemented and all(counts.get(public_to_internal[k], {}).get("confirmed") for k in kinds)
         cases.append({
-            "case_id": cid, "action_family": title, "expected_kind": old.get("expected_kind"), "variant": "plan-item",
-            "priority": int(aid[1:]) // 7 + 1, "implementation_status": old.get("implementation_status", "unimplemented"),
-            "live_status": old.get("live_status", "not_seen"), "eligibility": old.get("eligibility", {"offered": []}),
+            "case_id": cid, "action_family": title, "expected_kind": None, "variant": "plan-item",
+            "priority": int(aid[1:]) // 7 + 1, "implementation_status": "offline_verified" if implemented else old.get("implementation_status", "unimplemented"),
+            "live_status": "passed" if live_all else old.get("live_status", "not_seen"),
+            "eligibility": {"offered": []}, "kinds": kinds,
             "consequence_class": old.get("consequence_class", "medium"), "procedure": old.get("procedure", title),
-            "expected_evidence": old.get("expected_evidence", "see plans/remaining-player-actions-implementation.md"),
+            "expected_evidence": "a confirmed receipt of each listed kind" if kinds else "see plans/remaining-player-actions-implementation.md",
             "evidence_refs": old.get("evidence_refs", {}),
         })
     return {"version": 1, "cases": cases}

@@ -96,6 +96,21 @@ MUTATION_ALLOWLIST = (
     # sending a merchant: the shipped chooser's own fallback, a plain move to the target city's plot
     'Game.UnitOperations.canStart(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs, false)',
     'Game.UnitOperations.sendRequest(mUnitId, UnitOperationTypes.MOVE_TO, sendArgs)',
+    # pillage, coastal raid, pillage route, spread religion: plot-target operations, the kind being the engine's name
+    'Game.UnitOperations.canStart(actor2.id, opType2, probeArgs, false)',
+    'Game.UnitOperations.canStart(opUnitId, opType2, opArgs, false)',
+    'Game.UnitOperations.sendRequest(opUnitId, opType2, opArgs)',
+    # a town back to growth: the same growth-mode command, Type EXPAND
+    'Game.CityCommands.canStart(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false)',
+    'Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs)',
+    # queue edits: BUILD with an insert mode, as the shipped build-queue panel sends them
+    'Game.CityOperations.canStart(qCityId, CityOperationTypes.BUILD, queueArgs, false)',
+    'Game.CityOperations.sendRequest(qCityId, CityOperationTypes.BUILD, queueArgs)',
+    # taking a tradition out, and moving resources: two named player operations reached by name
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, traditionOp, deactArgs, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, traditionOp, deactArgs)',
+    'Game.PlayerOperations.canStart(BOUND_PLAYER_ID, resourceOp, resArgs, false)',
+    'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, resourceOp, resArgs)',
     # the six generic unit commands: the kind IS the engine's command name, validated host-side
     # against the catalog, so no caller text ever reaches UnitCommandTypes
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
@@ -296,6 +311,9 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     # every other operation is sent through the host-substituted kind; the one literal type name is the
     # legacy effect applied alongside its card, which the engine cannot report as already spent
     assert src.count("PlayerOperationTypes.") == src.count("PlayerOperationTypes.ADVANCED_START_USE_EFFECT")
+    # two operations are reached by a literal name because their kind is not the operation (a
+    # deactivation is CHANGE_TRADITION; an unassignment is ASSIGN_RESOURCE); nothing else may be
+    assert sorted(set(re.findall(r'PlayerOperationTypes\["([A-Z_]+)"\]', src))) == ["ASSIGN_RESOURCE", "CHANGE_TRADITION"]
     stripped = src
     for a in MUTATION_ALLOWLIST:
         stripped = stripped.replace(a, "")

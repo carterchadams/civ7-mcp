@@ -275,6 +275,7 @@
         // A town already running a project keeps it: the engine's check accepts a second choice and
         // then drops it (live, twice on turn 56, both unknown). Only a town with no project is offered.
         if (cur !== -1) continue;
+        // (A town running a project can instead be returned to growth: see TOWN_GROWTH_MODE below.)
         for (const pr of GameInfo.Projects) {
           if (!pr || !isInt(pr.$hash) || typeof pr.ProjectType !== "string") continue;
           const gargs = { Type: GrowthTypes.PROJECT, ProjectType: pr.$hash, City: c.id.id };
@@ -462,6 +463,9 @@
         ["REMOVE_FROM_ARMY", true, "army"],
         ["UNPACK_ARMY", true, "armySize"],
         ["ACTIVATE_GREAT_PERSON", true, "gone"],
+        ["WAKE", false, "awake"],
+        ["CANCEL", false, "awake"],
+        ["PLUNDER_TRADE_ROUTE", false, "spent"],
       ];
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
@@ -482,6 +486,8 @@
           const pre = expect === "type" ? (isInt(u.type) ? u.type : -1)
                     : expect === "army" ? (u.armyId && isInt(u.armyId.id) ? u.armyId.id : -1)
                     : expect === "armySize" ? armySizeOf(u)
+                    : expect === "spent" ? (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0)
+                    : expect === "awake" ? (u.isReadyToMove === true ? 1 : 0)
                     : 1;
           if (!needsPlot) { offers.push({ ...common, pre: pre }); continue; }
           let plots = Array.isArray(check.Plots) ? check.Plots : [];
@@ -501,6 +507,54 @@
               terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") });
             offeredHere++;
           }
+        }
+      }
+    }
+    // ---- pillage, coastal raid, pillage a route (A08). The shipped pillage modes ask canStart with
+    // an empty argument for the legal plot set and send the chosen plot; the attack is spent either
+    // way, so the unit's own remaining moves and attacks are the proof.
+    if (typeof UnitOperationTypes !== "undefined") {
+      for (const opName of ["PILLAGE", "COASTAL_RAID", "PILLAGE_ROUTE"]) {
+        const opType = UnitOperationTypes[opName];
+        if (!isInt(opType)) continue;
+        for (const u of player.Units.getUnits()) {
+          if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID || u.isOnMap !== true || !u.location) continue;
+          const listing = Game.UnitOperations.canStart(u.id, opType, {}, false);
+          if (!listing || listing.Success !== true || !Array.isArray(listing.Plots) || listing.Plots.length === 0) continue;
+          const moves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0;
+          let offeredHere = 0;
+          for (const pi of listing.Plots) {
+            if (offeredHere >= 6 || !isInt(pi)) continue;
+            const loc = GameplayMap.getLocationFromIndex(pi);
+            if (!loc || !isInt(loc.x) || loc.x < 0) continue;
+            const check = Game.UnitOperations.canStart(u.id, opType, { X: loc.x, Y: loc.y }, false);
+            if (!check || check.Success !== true) continue;
+            offers.push({ kind: opName, arg: u.id.id, arg2: loc.x, arg3: loc.y, pre: moves, unitId: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+              from: { x: u.location.x, y: u.location.y }, to: { x: loc.x, y: loc.y }, plotIndex: pi, movesLeft: moves,
+              terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), canStart: true });
+            offeredHere++;
+          }
+        }
+      }
+      // Spreading religion (A09): a plot-target operation whose legal plots come from the unit's own
+      // activation plots, as the shipped button highlights them. Charges are read off the check.
+      const spreadType = UnitOperationTypes.SPREAD_RELIGION;
+      if (isInt(spreadType)) for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID || u.isOnMap !== true || !u.location) continue;
+        const probe = Game.UnitOperations.canStart(u.id, spreadType, { X: -9999, Y: -9999, UnitAbilityType: -1 }, false);
+        if (!probe || probe.Success !== true) continue;
+        const charges = isInt(probe.ChargesRemaining) ? probe.ChargesRemaining : null;
+        let plots = []; try { const v = u.getActivationOperationPlots("UNITOPERATION_SPREAD_RELIGION", false); if (Array.isArray(v)) plots = v; } catch (e) { plots = []; }
+        let offeredHere = 0;
+        for (const pi of plots) {
+          if (offeredHere >= 6 || !isInt(pi)) continue;
+          const loc = GameplayMap.getLocationFromIndex(pi);
+          if (!loc || !isInt(loc.x) || loc.x < 0) continue;
+          const check = Game.UnitOperations.canStart(u.id, spreadType, { X: loc.x, Y: loc.y, UnitAbilityType: -1 }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "SPREAD_RELIGION", arg: u.id.id, arg2: loc.x, arg3: loc.y, pre: isInt(charges) ? charges : -1, unitId: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+            from: { x: u.location.x, y: u.location.y }, to: { x: loc.x, y: loc.y }, plotIndex: pi, charges: charges, canStart: true });
+          offeredHere++;
         }
       }
     }
@@ -609,6 +663,42 @@
         }
       }
     }
+    // ---- a town back to growth (A13): the shipped focus list's "growth" entry is CHANGE_GROWTH_MODE
+    // with Type EXPAND and no project, and it is the one way to leave a running project.
+    if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.CHANGE_GROWTH_MODE) && typeof GrowthTypes !== "undefined" && isInt(GrowthTypes.EXPAND) &&
+        typeof ProjectTypes !== "undefined" && isInt(ProjectTypes.NO_PROJECT)) {
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true) continue;
+        const cur = c.Growth && isInt(c.Growth.projectType) ? c.Growth.projectType : -1;
+        if (cur === -1) continue;
+        const growthArgs = { Type: GrowthTypes.EXPAND, ProjectType: ProjectTypes.NO_PROJECT, City: c.id.id };
+        const check = Game.CityCommands.canStart(c.id, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "TOWN_GROWTH_MODE", arg: c.id.id, pre: cur, cityId: c.id.id, cityName: compose(c.name), currentProject: cur,
+          currentProjectKey: lookupKey(GameInfo.Projects, cur, "ProjectType"), canStart: true });
+      }
+    }
+    // ---- production queue edits (A10): remove an item, or move one up or down. Every edit is the
+    // same BUILD with an InsertMode, exactly as the shipped build-queue panel sends it.
+    if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD) && typeof CityOperationsParametersValues !== "undefined" &&
+        isInt(CityOperationsParametersValues.RemoveAt) && isInt(CityOperationsParametersValues.Swap)) {
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || !c.BuildQueue) continue;
+        let q = null; try { q = c.BuildQueue.getQueue(); } catch (e) { q = null; }
+        if (!Array.isArray(q) || q.length < 1) continue;
+        const keys = q.map((it) => it && isInt(it.type) ? (lookupKey(GameInfo.Constructibles, it.type, "ConstructibleType") || lookupKey(GameInfo.Units, it.type, "UnitType") || lookupKey(GameInfo.Projects, it.type, "ProjectType") || String(it.type)) : null);
+        for (let i = 0; i < q.length && i < 8; i++) {
+          const item = q[i]; if (!item || !isInt(item.type)) continue;
+          const rem = Game.CityOperations.canStart(c.id, CityOperationTypes.BUILD, { InsertMode: CityOperationsParametersValues.RemoveAt, QueueLocation: i }, false);
+          if (rem && rem.Success === true) offers.push({ kind: "QUEUE_REMOVE", arg: c.id.id, arg2: i, arg3: item.type, pre: q.length, cityId: c.id.id, cityName: compose(c.name), position: i, itemKey: keys[i], queue: keys, canStart: true });
+          for (const [kind, to] of [["QUEUE_MOVE_UP", i - 1], ["QUEUE_MOVE_DOWN", i + 1]]) {
+            if (to < 0 || to >= q.length) continue;
+            const mv = Game.CityOperations.canStart(c.id, CityOperationTypes.BUILD, { InsertMode: CityOperationsParametersValues.Swap, QueueSourceLocation: i, QueueDestinationLocation: to }, false);
+            if (mv && mv.Success === true) offers.push({ kind: kind, arg: c.id.id, arg2: i, arg3: item.type, pre: q.length, cityId: c.id.id, cityName: compose(c.name), position: i, toPosition: to, itemKey: keys[i], queue: keys, canStart: true });
+          }
+        }
+      }
+    }
     // ---- a just-captured settlement: keep, raze or liberate
     // The shipped capture chooser sends CityCommands.DESTROY with a Directive: 0 liberates to the
     // founder, 2 keeps, 3 razes. The city reports isJustConqueredFrom while the choice is pending and
@@ -674,6 +764,47 @@
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.VIEWED_ADVISOR_WARNING, { Target: nid }, false);
         if (!check || check.Success !== true) continue;
         offers.push({ kind: "VIEWED_ADVISOR_WARNING", arg: nid.id, arg2: nid.type, pre: 1, typeKey: name, notificationId: nid.id, canStart: true });
+      }
+    }
+    // ---- taking a tradition or policy out of its slot (A11). The shipped policies screen sends
+    // CHANGE_TRADITION with Action Deactivate; a swap is a deactivation followed by an activation.
+    if (isInt(PlayerOperationTypes.CHANGE_TRADITION) && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Deactivate) && typeof CultureSlotTypes !== "undefined") {
+      for (const slotKey of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) {
+        const slotType = CultureSlotTypes[slotKey]; if (!isInt(slotType)) continue;
+        let active = null; try { active = player.Culture.getActiveTraditions(slotType); } catch (e) { active = null; }
+        if (!Array.isArray(active)) continue;
+        for (const th of active) {
+          const row = GameInfo.Traditions.lookup(th); if (!row || !isInt(row.$hash)) continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_TRADITION, { TraditionType: row.$hash, Action: PlayerOperationParameters.Deactivate }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "DEACTIVATE_TRADITION", arg: row.$hash, pre: active.length, typeKey: row.TraditionType, slot: slotKey, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+            description: typeof row.Description === "string" ? compose(row.Description) : null, canStart: true });
+        }
+      }
+    }
+    // ---- resources out of a settlement, or two swapped (A12), as the commerce screen sends them
+    if (isInt(PlayerOperationTypes.ASSIGN_RESOURCE) && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Deactivate)) {
+      const assigned = [];
+      const resourceNames = {};
+      try { for (const r of player.Resources.getResources()) { if (r && isInt(r.value) && r.uniqueResource && isInt(r.uniqueResource.resource)) resourceNames[r.value] = lookupKey(GameInfo.Resources, r.uniqueResource.resource, "ResourceType"); } } catch (e) { /* unnamed */ }
+      for (const c of player.Cities.getCities()) { if (!c || !c.id || !c.Resources) continue; try { for (const ar of c.Resources.getAssignedResources()) { if (ar && isInt(ar.value)) assigned.push({ value: ar.value, cityId: c.id.id, cityName: compose(c.name), resourceKey: resourceNames[ar.value] || null }); } } catch (e) { /* none */ } }
+      for (const a of assigned) {
+        const loc = GameplayMap.getLocationFromIndex(a.value);
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.ASSIGN_RESOURCE, { Location: loc, City: a.cityId, Action: PlayerOperationParameters.Deactivate }, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "UNASSIGN_RESOURCE", arg: a.value, arg2: a.cityId, pre: a.cityId, plotIndex: a.value, cityId: a.cityId, cityName: a.cityName, resourceKey: a.resourceKey, canStart: true });
+      }
+      if (isInt(PlayerOperationTypes.SWAP_RESOURCES)) {
+        let pairs = 0;
+        for (let i = 0; i < assigned.length && pairs < 12; i++) for (let j = i + 1; j < assigned.length && pairs < 12; j++) {
+          if (assigned[i].cityId === assigned[j].cityId) continue;
+          const l1 = GameplayMap.getLocationFromIndex(assigned[i].value), l2 = GameplayMap.getLocationFromIndex(assigned[j].value);
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.SWAP_RESOURCES, { Location: l1, Location2: l2 }, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "SWAP_RESOURCES", arg: assigned[i].value, arg2: assigned[j].value, pre: assigned[i].cityId, resourceKey: assigned[i].resourceKey, cityName: assigned[i].cityName,
+            otherResourceKey: assigned[j].resourceKey, otherCityName: assigned[j].cityName, otherCityId: assigned[j].cityId, canStart: true });
+          pairs++;
+        }
       }
     }
     // ---- diplomacy

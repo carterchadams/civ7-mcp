@@ -261,20 +261,24 @@
   // The six generic unit commands. The kind IS the engine's command name, validated host-side against
   // the catalog, so nothing a caller says ever reaches UnitCommandTypes as text.
   if (KIND === "UPGRADE" || KIND === "PACK_ARMY" || KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" ||
-      KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON") {
+      KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON" || KIND === "WAKE" || KIND === "CANCEL" || KIND === "PLUNDER_TRADE_ROUTE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "unit command argument is not an integer");
     if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit command type unavailable");
     const needsPlot = KIND === "ADD_TO_ARMY" || KIND === "REMOVE_FROM_ARMY" || KIND === "UNPACK_ARMY" || KIND === "ACTIVATE_GREAT_PERSON";
     const expect = (KIND === "UPGRADE") ? "type"
                  : (KIND === "PACK_ARMY" || KIND === "UNPACK_ARMY") ? "armySize"
-                 : (KIND === "ACTIVATE_GREAT_PERSON") ? "gone" : "army";
+                 : (KIND === "ACTIVATE_GREAT_PERSON") ? "gone"
+                 : (KIND === "WAKE" || KIND === "CANCEL") ? "awake"
+                 : (KIND === "PLUNDER_TRADE_ROUTE") ? "spent" : "army";
     let actor = null;
     try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor = u; break; } } } catch (e) { actor = null; }
     if (!actor) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
     const sizeOf = (u) => { try { if (!u.armyId || !isInt(u.armyId.id) || u.armyId.id < 0) return -1; const a = Armies.get(u.armyId); return a && isInt(a.unitCount) ? a.unitCount : -1; } catch (e) { return -1; } };
     const stateOf = (u) => expect === "type" ? (isInt(u.type) ? u.type : -1)
                          : expect === "army" ? (u.armyId && isInt(u.armyId.id) ? u.armyId.id : -1)
-                         : expect === "armySize" ? sizeOf(u) : 1;
+                         : expect === "armySize" ? sizeOf(u)
+                         : expect === "spent" ? (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0)
+                         : expect === "awake" ? (u.isReadyToMove === true ? 1 : 0) : 1;
     const before = stateOf(actor);
     if (before !== PRE) return refuse("ACTION_EXPIRED", "the unit's state changed since the command was offered");
     const cUnitId = actor.id;
@@ -318,6 +322,105 @@
     result.outcome = "sent";
     const now = merchant.location && isInt(merchant.location.x) ? GameplayMap.getIndexFromXY(merchant.location.x, merchant.location.y) : null;
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, from: PRE, at: now, matches: isInt(now) && now !== PRE };
+    return JSON.stringify(result);
+  }
+  if (KIND === "PILLAGE" || KIND === "COASTAL_RAID" || KIND === "PILLAGE_ROUTE" || KIND === "SPREAD_RELIGION") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "operation arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit operation type unavailable");
+    let actor2 = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor2 = u; break; } } } catch (e) { actor2 = null; }
+    if (!actor2) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const opType2 = UnitOperationTypes[OP_KIND];
+    const spread = KIND === "SPREAD_RELIGION";
+    const probeArgs = spread ? { X: -9999, Y: -9999, UnitAbilityType: -1 } : {};
+    const before2 = spread ? (() => { const r = Game.UnitOperations.canStart(actor2.id, opType2, probeArgs, false); return r && isInt(r.ChargesRemaining) ? r.ChargesRemaining : -1; })()
+                           : (actor2.Movement && isInt(actor2.Movement.movementMovesRemaining) ? actor2.Movement.movementMovesRemaining : 0);
+    if (before2 !== PRE) return refuse("ACTION_EXPIRED", spread ? "the unit's charges changed since the offer was made" : "the unit's moves changed since the offer was made");
+    const opUnitId = actor2.id;
+    const opArgs = spread ? { X: ARG2, Y: ARG3, UnitAbilityType: -1 } : { X: ARG2, Y: ARG3 };
+    const ocheck = Game.UnitOperations.canStart(opUnitId, opType2, opArgs, false);
+    if (!ocheck || ocheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the operation at that plot");
+    Game.UnitOperations.sendRequest(opUnitId, opType2, opArgs);
+    result.outcome = "sent";
+    const after2 = spread ? (() => { const r = Game.UnitOperations.canStart(actor2.id, opType2, probeArgs, false); return r && isInt(r.ChargesRemaining) ? r.ChargesRemaining : -1; })()
+                          : (actor2.Movement && isInt(actor2.Movement.movementMovesRemaining) ? actor2.Movement.movementMovesRemaining : null);
+    result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, before: PRE, after: after2, matches: isInt(after2) && after2 < PRE };
+    return JSON.stringify(result);
+  }
+  if (KIND === "TOWN_GROWTH_MODE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "town argument is not an integer");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.CHANGE_GROWTH_MODE) || typeof GrowthTypes === "undefined" || !isInt(GrowthTypes.EXPAND) || typeof ProjectTypes === "undefined" || !isInt(ProjectTypes.NO_PROJECT)) return refuse("API_CONTRACT_MISMATCH", "growth mode contract unavailable");
+    let town = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { town = c; break; } } } catch (e) { town = null; }
+    if (!town || town.isTown !== true) return refuse("UNKNOWN_ACTION", "settlement is not one of the bound player's towns");
+    const curProj = town.Growth && isInt(town.Growth.projectType) ? town.Growth.projectType : -1;
+    if (curProj !== PRE) return refuse("ACTION_EXPIRED", "the town's project changed since the offer was made");
+    if (curProj === -1) return refuse("ACTION_EXPIRED", "the town is already growing");
+    const townId = town.id;
+    const growthArgs = { Type: GrowthTypes.EXPAND, ProjectType: ProjectTypes.NO_PROJECT, City: ARG };
+    const gcheck = Game.CityCommands.canStart(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false);
+    if (!gcheck || gcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused returning to growth");
+    Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs);
+    result.outcome = "sent";
+    const now = town.Growth && isInt(town.Growth.projectType) ? town.Growth.projectType : -1;
+    result.readback = { kind: KIND, arg: ARG, projectBefore: PRE, projectAfter: now, matches: now === -1 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "QUEUE_REMOVE" || KIND === "QUEUE_MOVE_UP" || KIND === "QUEUE_MOVE_DOWN") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "queue arguments are not integers");
+    if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD) || typeof CityOperationsParametersValues === "undefined") return refuse("API_CONTRACT_MISMATCH", "queue edit contract unavailable");
+    let qcity = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { qcity = c; break; } } } catch (e) { qcity = null; }
+    if (!qcity || !qcity.BuildQueue) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const qbefore = qcity.BuildQueue.getQueue();
+    if (!Array.isArray(qbefore) || qbefore.length !== PRE) return refuse("ACTION_EXPIRED", "the city's build queue changed since the offer was made");
+    if (ARG2 < 0 || ARG2 >= qbefore.length || !qbefore[ARG2] || qbefore[ARG2].type !== ARG3) return refuse("ACTION_EXPIRED", "the item is no longer at that position in the queue");
+    const dest = KIND === "QUEUE_MOVE_UP" ? ARG2 - 1 : ARG2 + 1;
+    if (KIND !== "QUEUE_REMOVE" && (dest < 0 || dest >= qbefore.length)) return refuse("ACTION_NOT_STARTABLE", "nowhere to move the item");
+    const qCityId = qcity.id;
+    const queueArgs = KIND === "QUEUE_REMOVE" ? { InsertMode: CityOperationsParametersValues.RemoveAt, QueueLocation: ARG2 }
+                                              : { InsertMode: CityOperationsParametersValues.Swap, QueueSourceLocation: ARG2, QueueDestinationLocation: dest };
+    const qcheck = Game.CityOperations.canStart(qCityId, CityOperationTypes.BUILD, queueArgs, false);
+    if (!qcheck || qcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the queue edit");
+    Game.CityOperations.sendRequest(qCityId, CityOperationTypes.BUILD, queueArgs);
+    result.outcome = "sent";
+    let qafter = null; try { qafter = qcity.BuildQueue.getQueue().map((it) => it.type); } catch (e) { qafter = null; }
+    const ok = Array.isArray(qafter) && (KIND === "QUEUE_REMOVE" ? qafter.length === PRE - 1 : qafter[dest] === ARG3);
+    result.readback = { kind: KIND, arg: ARG, position: ARG2, item: ARG3, queueAfter: qafter, matches: ok };
+    return JSON.stringify(result);
+  }
+  if (KIND === "DEACTIVATE_TRADITION") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "tradition argument is not an integer");
+    const traditionOp = PlayerOperationTypes["CHANGE_TRADITION"];
+    if (!isInt(traditionOp) || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Deactivate)) return refuse("API_CONTRACT_MISMATCH", "tradition contract unavailable");
+    const trow = GameInfo.Traditions.lookup(ARG);
+    if (!trow) return refuse("UNKNOWN_ACTION", "not a tradition definition");
+    let isActive = null; try { isActive = player.Culture.isTraditionActive(ARG) === true; } catch (e) { isActive = null; }
+    if (isActive !== true) return refuse("ACTION_EXPIRED", "that tradition is not in a slot");
+    const deactArgs = { TraditionType: ARG, Action: PlayerOperationParameters.Deactivate };
+    const tcheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, traditionOp, deactArgs, false);
+    if (!tcheck2 || tcheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused taking the card out");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, traditionOp, deactArgs);
+    result.outcome = "sent";
+    let stillActive = null; try { stillActive = player.Culture.isTraditionActive(ARG) === true; } catch (e) { stillActive = null; }
+    result.readback = { kind: KIND, arg: ARG, active: stillActive, matches: stillActive === false };
+    return JSON.stringify(result);
+  }
+  if (KIND === "UNASSIGN_RESOURCE" || KIND === "SWAP_RESOURCES") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "resource arguments are not integers");
+    const resourceOp = KIND === "UNASSIGN_RESOURCE" ? PlayerOperationTypes["ASSIGN_RESOURCE"] : PlayerOperationTypes[OP_KIND];
+    if (!isInt(resourceOp) || typeof PlayerOperationParameters === "undefined") return refuse("API_CONTRACT_MISMATCH", "resource contract unavailable");
+    const where = (value) => { const m = {}; for (const c of player.Cities.getCities()) { if (!c || !c.id || !c.Resources) continue; try { for (const ar of c.Resources.getAssignedResources()) { if (ar && isInt(ar.value)) m[ar.value] = c.id.id; } } catch (e) { /* none */ } } return m[value] === undefined ? null : m[value]; };
+    const homeBefore = where(ARG);
+    if (homeBefore !== PRE) return refuse("ACTION_EXPIRED", "the resource is no longer where it was when the offer was made");
+    const l1 = GameplayMap.getLocationFromIndex(ARG);
+    const resArgs = KIND === "UNASSIGN_RESOURCE" ? { Location: l1, City: ARG2, Action: PlayerOperationParameters.Deactivate } : { Location: l1, Location2: GameplayMap.getLocationFromIndex(ARG2) };
+    const rcheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, resourceOp, resArgs, false);
+    if (!rcheck2 || rcheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the resource change");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, resourceOp, resArgs);
+    result.outcome = "sent";
+    const homeAfter = where(ARG);
+    result.readback = { kind: KIND, arg: ARG, homeBefore: PRE, homeAfter: homeAfter, matches: KIND === "UNASSIGN_RESOURCE" ? homeAfter === null : (homeAfter !== null && homeAfter !== PRE) };
     return JSON.stringify(result);
   }
   if (KIND === "ATTACK") {
