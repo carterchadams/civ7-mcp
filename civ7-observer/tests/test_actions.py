@@ -1144,6 +1144,31 @@ def test_a_move_that_stops_short_confirms_on_the_unit_having_left_its_plot(tmp_p
     assert res["confirmedBy"]["effect"] == {"unitMoved": {"unitId": 5, "toward": [12, 10], "now": [11, 10], "arrived": False}}
 
 
+def test_a_move_the_unit_could_not_start_this_turn_confirms_on_its_newly_queued_operation(tmp_path):
+    mv = {"kind": "MOVE_UNIT", "arg": 5, "pre": 1010, "unitId": 5, "from": {"x": 10, "y": 10}, "x": 11, "y": 10, "pendingOps": False, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [mv]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MOVE_UNIT", "arg": 5, "target": {"x": 11, "y": 10}, "location": {"x": 10, "y": 10}, "matches": False}}
+    rb = {**RB, "unitLocations": {"5": [10, 10]}, "unitPendingOps": {"5": 1}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        m = next(o for o in out["offers"] if o["kind"] == "move_unit")
+        res = reg.perform(gs, action_id=m["actionId"], request_id="mv-2", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitMoved": {"unitId": 5, "toward": [11, 10], "now": [10, 10], "arrived": False, "queued": True}}
+    # a unit that already had a queued operation when offered proves nothing by still having one
+    stale = {**mv, "pendingOps": True}
+    reg2 = actions.ActionRegistry(journal_path=tmp_path / "journal2.jsonl")
+    gs2, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps({**OFFERS, "offers": OFFERS["offers"] + [stale]})), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs2:
+        out = reg2.list_offers(gs2, player=1, mode="singleplayer")
+        m = next(o for o in out["offers"] if o["kind"] == "move_unit")
+        with pytest.raises(service.ObserverError) as info:
+            reg2.perform(gs2, action_id=m["actionId"], request_id="mv-3", player=1, mode="singleplayer")
+    assert "unknown" in str(info.value)
+
+
 def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
     gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}

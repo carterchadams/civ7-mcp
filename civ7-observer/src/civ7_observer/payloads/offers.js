@@ -199,7 +199,8 @@
           if (occupiedByOther(unitId, loc.x, loc.y)) continue;
           const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
           const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
-          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
+          offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y }, direction: d,
+            pendingOps: (typeof u.hasPendingOperations === "function" ? u.hasPendingOperations() : u.hasPendingOperations) === true, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1], steps: cand.steps,
             featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: plotIsRiver(loc.x, loc.y), yields: plotYieldsNonZero(loc.x, loc.y),
             tooCloseToSettle: canFoundUnits[u.id.id] === true ? tooCloseToSettlement(loc.x, loc.y) : undefined,

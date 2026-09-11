@@ -429,6 +429,7 @@ class ActionRegistry:
                 rec["arg2"], rec["arg3"] = o["x"], o["y"]
                 if isinstance(o.get("from"), dict):
                     rec["fromXY"] = [o["from"].get("x"), o["from"].get("y")]
+                rec["pendingBefore"] = o.get("pendingOps") is True
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
@@ -910,6 +911,10 @@ class ActionRegistry:
                     # proof the move was accepted; arrival is the engine's business over the coming turn.
                     elif isinstance(locs, dict) and isinstance(offer.get("fromXY"), list) and isinstance(locs.get(str(offer["arg"])), list) and locs[str(offer["arg"])] != offer["fromXY"]:
                         effect = {"unitMoved": {"unitId": offer["arg"], "toward": [offer["arg2"], offer["arg3"]], "now": locs[str(offer["arg"])], "arrived": False}}
+                    # Or it did not even step (live, turn 66, the same settler again: one move left for a plot
+                    # costing two) but now carries the queued operation it did not have when offered.
+                    elif not offer.get("pendingBefore") and isinstance(rb.get("unitPendingOps"), dict) and rb["unitPendingOps"].get(str(offer["arg"])) == 1:
+                        effect = {"unitMoved": {"unitId": offer["arg"], "toward": [offer["arg2"], offer["arg3"]], "now": (locs or {}).get(str(offer["arg"])), "arrived": False, "queued": True}}
                 elif kind == "FOUND_CITY":
                     cities = rb.get("cityLocations")
                     if isinstance(cities, dict) and [offer["arg2"], offer["arg3"]] in cities.values():

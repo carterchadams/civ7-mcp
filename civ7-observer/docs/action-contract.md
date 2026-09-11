@@ -422,3 +422,7 @@ commendations. Only five `UnitAbilities` rows name a command or operation (`RESE
 next turn, so arrival never read true and the seat stopped on an unknown outcome. A move whose unit
 has left its plot is confirmed as accepted (`unitMoved`, `arrived: false`); arrival stays the
 positive signal when it comes.
+
+The same settler then failed to step at all (one move left for a plot costing two, though the engine's
+path had said one turn): the queued operation it did not have when offered (`unitPendingOps`) is the
+proof the order was accepted, reported as `queued: true`.
