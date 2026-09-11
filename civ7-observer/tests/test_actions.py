@@ -966,3 +966,17 @@ def test_attribute_purchase_confirms_on_the_node_state_and_consider_on_the_notif
         ca = next(o for o in out["offers"] if o["kind"] == "consider_attributes")
         res2 = reg.perform(gs, action_id=ca["actionId"], request_id="ca-1", player=1, mode="singleplayer")
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"attributeNotificationCleared": True}
+
+
+def test_celebration_offer_and_confirmation(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CHOOSE_GOLDEN_AGE", "arg": 5001, "pre": 2, "typeKey": "GOLDEN_AGE_CR_1", "displayName": "Classical Republic", "description": "+100 Influence", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHOOSE_GOLDEN_AGE", "arg": 5001, "choicesLeft": 2, "matches": False}}
+    rb = {**RB, "goldenAgeChoices": 0, "blockingNotifications": []}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        ce = next(o for o in out["offers"] if o["kind"] == "choose_celebration")
+        assert ce["description"] == "+100 Influence" and "arg" not in ce
+        res = reg.perform(gs, action_id=ce["actionId"], request_id="ce-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"celebrationChosen": 5001}

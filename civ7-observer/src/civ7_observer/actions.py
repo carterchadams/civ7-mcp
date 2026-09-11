@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -349,7 +349,7 @@ class ActionRegistry:
                 for k in ("description", "celebration", "effects", "unlocksTraditions"):
                     if k in o:
                         entry[k] = o[k]
-            if kind == "FOUND_PANTHEON" and "description" in o:
+            if kind in ("FOUND_PANTHEON", "CHOOSE_GOLDEN_AGE") and "description" in o:
                 entry["description"] = o["description"]
             if kind == "CHOOSE_NARRATIVE_STORY_DIRECTION":
                 if not isinstance(o.get("arg2"), int):
@@ -493,6 +493,11 @@ class ActionRegistry:
                     plots = rb.get("expandPlots")
                     if isinstance(plots, dict) and isinstance(plots.get(str(offer["arg"])), list) and offer["pre"] not in plots[str(offer["arg"])]:
                         effect = {"populationPlaced": {"cityId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "plotIndex": offer["pre"]}}
+                elif kind == "CHOOSE_GOLDEN_AGE":
+                    left = rb.get("goldenAgeChoices")
+                    notes = rb.get("blockingNotifications")
+                    if left == 0 or (isinstance(notes, list) and "NOTIFICATION_CHOOSE_GOLDEN_AGE" not in notes):
+                        effect = {"celebrationChosen": offer["arg"]}
                 elif kind == "BUY_ATTRIBUTE_TREE_NODE":
                     nodes = rb.get("attributeNodes")
                     st = nodes.get(str(offer["arg"])) if isinstance(nodes, dict) else None

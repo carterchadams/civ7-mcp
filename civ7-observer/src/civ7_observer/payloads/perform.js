@@ -211,6 +211,22 @@
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
     return JSON.stringify(result);
   }
+  if (KIND === "CHOOSE_GOLDEN_AGE") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "celebration argument is not an integer");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof player.Culture.getGoldenAgeChoices !== "function") return refuse("API_CONTRACT_MISMATCH", "celebration operation contract unavailable");
+    const garow = GameInfo.GoldenAges.lookup(ARG);
+    if (!garow || typeof garow.GoldenAgeType !== "string") return refuse("UNKNOWN_ACTION", "type is not a celebration definition");
+    let gachoices = null; try { gachoices = player.Culture.getGoldenAgeChoices(); } catch (e) { gachoices = null; }
+    if (!Array.isArray(gachoices) || gachoices.length !== PRE || (gachoices.indexOf(garow.GoldenAgeType) === -1 && gachoices.indexOf(ARG) === -1)) return refuse("ACTION_EXPIRED", "that celebration is no longer among the offered choices");
+    const args = { GoldenAgeType: ARG };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that celebration choice");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let left = null; try { const l = player.Culture.getGoldenAgeChoices(); left = Array.isArray(l) ? l.length : null; } catch (e) { left = null; }
+    result.readback = { kind: KIND, arg: ARG, choicesLeft: left, matches: left === 0 };
+    return JSON.stringify(result);
+  }
   if (KIND === "BUY_ATTRIBUTE_TREE_NODE") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "attribute node argument is not an integer");
     if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "attribute operation contract unavailable");

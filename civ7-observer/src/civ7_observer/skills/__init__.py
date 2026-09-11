@@ -33,6 +33,7 @@ DECISION_SKILL = {
     "pantheon": "civ7-religion-and-great-works",
     "government": "civ7-happiness-and-government",
     "attributes": "civ7-research-and-civics",
+    "celebration": "civ7-happiness-and-government",
     "end_turn": "civ7-turn-management",
 }
 ALWAYS = "civ7-turn-management"

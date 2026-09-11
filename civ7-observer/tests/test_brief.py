@@ -214,3 +214,11 @@ def test_attribute_notification_is_a_supported_attributes_decision(tmp_path):
     assert kinds == ["policies", "attributes"] or kinds == ["attributes"]
     attributes = next(d for d in b["decisions"] if d["kind"] == "attributes")
     assert attributes["options"][0]["wildcardPoints"] == 2 and "wildcard" in attributes["note"]
+
+
+def test_golden_age_notification_is_a_supported_celebration_decision(tmp_path):
+    ga = [{"kind": "CHOOSE_GOLDEN_AGE", "arg": 5001, "pre": 2, "typeKey": "GOLDEN_AGE_CR_1", "displayName": "Classical Republic", "description": "+100 Influence", "canStart": True}]
+    payload = offers_with(ga, end_can_start=False, blocking="CULTURE")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_GOLDEN_AGE"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None and [d["kind"] for d in b["decisions"] if d["required"]] == ["celebration"]

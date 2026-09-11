@@ -30,6 +30,8 @@ BLOCKER_DECISION = {
     "CONSIDER_GOVERNMENT_CHANGE": "government",
     "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
     "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL": "attributes",
+    "CHOOSE_GOLDEN_AGE": "celebration",
+    "NOTIFICATION_CHOOSE_GOLDEN_AGE": "celebration",
     # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
     # notification's type (live: the civic blocker on turn 8 came back as a raw value), so every
     # supported decision is reachable under its notification name too.
@@ -64,6 +66,7 @@ DECISION_OF_KIND = {
     "change_government": "government",
     "buy_attribute": "attributes",
     "consider_attributes": "attributes",
+    "choose_celebration": "celebration",
     "end_turn": "end_turn",
 }
 

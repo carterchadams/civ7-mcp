@@ -851,3 +851,46 @@ test("perform BUY_ATTRIBUTE_TREE_NODE checks the tree, the node state and canSta
   const c = runPerform(g, "CONSIDER_ASSIGN_ATTRIBUTE", 0, { pre: 0 });
   assert.equal(c.outcome, "sent");
 });
+
+// ---- celebration (golden age) choice
+function withCelebration(g, { choices = ["GOLDEN_AGE_CR_1", "GOLDEN_AGE_CR_2"], allowed = [5001, 5002] } = {}) {
+  const cu = g.Players.get(1).Culture;
+  let left = choices.slice();
+  const rows = [{ $hash: 5001, GoldenAgeType: "GOLDEN_AGE_CR_1", Name: "LOC_CR", Description: "LOC_CR1_D" }, { $hash: 5002, GoldenAgeType: "GOLDEN_AGE_CR_2", Name: "LOC_CR", Description: "LOC_CR2_D" }];
+  g.GameInfo.GoldenAges = { lookup: (k) => rows.find((r) => r.$hash === k || r.GoldenAgeType === k) ?? null };
+  g.PlayerOperationTypes.CHOOSE_GOLDEN_AGE = 1273802547;
+  cu.getGoldenAgeChoices = () => left.slice();
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 1273802547) return inner.canStart(pid, op, args, show); g._log.push(`ccanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: allowed.includes(args.GoldenAgeType) }; },
+    sendRequest: (pid, op, args) => { if (op !== 1273802547) return inner.sendRequest(pid, op, args); g._log.push(`csendRequest(${pid},${JSON.stringify(args)})`); left = []; },
+  };
+  return g;
+}
+
+test("celebration offers hash the type strings the culture component lists, with description and native legality", () => {
+  const log = [];
+  const g = withCelebration(world({ log }), { allowed: [5001] }); g._log = log;
+  const c = runOffers(g).offers.filter((o) => o.kind === "CHOOSE_GOLDEN_AGE");
+  assert.deepEqual(c.map((o) => [o.arg, o.pre, o.typeKey, o.displayName, o.description, o.canStart]), [[5001, 2, "GOLDEN_AGE_CR_1", "LOC_CR", "LOC_CR1_D", true], [5002, 2, "GOLDEN_AGE_CR_2", "LOC_CR", "LOC_CR2_D", false]]);
+  assert.ok(log.filter((e) => e.startsWith("ccanStart(")).every((e) => /"GoldenAgeType":500[12]/.test(e)), "the hash, never the string, is sent");
+});
+
+test("perform CHOOSE_GOLDEN_AGE re-checks the choice list and canStart, sends the hash, and reads back the emptied list", () => {
+  const log = [];
+  const g = withCelebration(world({ log })); g._log = log;
+  const r = runPerform(g, "CHOOSE_GOLDEN_AGE", 5001, { pre: 2 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CHOOSE_GOLDEN_AGE", arg: 5001, choicesLeft: 0, matches: true });
+  assert.ok(log.find((e) => e.startsWith("csendRequest(1,") && e.includes('"GoldenAgeType":5001')));
+  for (const [label, mk, hash, pre] of [
+    ["not offered", () => withCelebration(world({ log: [] }), { choices: ["GOLDEN_AGE_CR_2"] }), 5001, 1],
+    ["list changed", () => withCelebration(world({ log: [] })), 5001, 1],
+    ["canStart false", () => withCelebration(world({ log: [] }), { allowed: [] }), 5001, 2],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerform(h, "CHOOSE_GOLDEN_AGE", hash, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("csendRequest")), `${label}: must not send`);
+  }
+});

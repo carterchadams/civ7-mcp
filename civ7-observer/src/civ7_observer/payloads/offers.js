@@ -262,6 +262,19 @@
         offers.push({ kind: "CONSIDER_ASSIGN_ATTRIBUTE", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
       }
     }
+    if (isInt(PlayerOperationTypes.CHOOSE_GOLDEN_AGE) && typeof player.Culture.getGoldenAgeChoices === "function" && GameInfo.GoldenAges) {
+      // Celebration: the shipped chooser lists Culture.getGoldenAgeChoices() (type strings) and sends
+      // CHOOSE_GOLDEN_AGE {GoldenAgeType: hash} after canStart.
+      let choices = null; try { choices = player.Culture.getGoldenAgeChoices(); } catch (e) { choices = null; }
+      if (Array.isArray(choices)) {
+        for (const c of choices) {
+          const row = typeof c === "string" || isInt(c) ? GameInfo.GoldenAges.lookup(c) : null;
+          if (!row || !isInt(row.$hash)) continue;
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHOOSE_GOLDEN_AGE, { GoldenAgeType: row.$hash }, false);
+          offers.push({ kind: "CHOOSE_GOLDEN_AGE", arg: row.$hash, pre: choices.length, typeKey: typeof row.GoldenAgeType === "string" ? row.GoldenAgeType : null, displayName: compose(row.Name), description: compose(row.Description), canStart: !!(check && check.Success === true) });
+        }
+      }
+    }
     if (isInt(PlayerOperationTypes.CHANGE_GOVERNMENT) && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate) && GameInfo.Governments && typeof GameInfo.Governments[Symbol.iterator] === "function") {
       // Government: the shipped chooser lists StartingGovernments while none is held and sends
       // CHANGE_GOVERNMENT {GovernmentType: $index, Action: Activate} after canStart.
