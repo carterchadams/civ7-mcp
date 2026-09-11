@@ -1321,7 +1321,9 @@ function withLegacies(g, { deck = [], points = 3, usable = true, placement = fal
     { id: "CARD_B", name: "LOC_CB", description: "LOC_CB_D", cost: [{ category: 1, value: 2 }], effects: [{ id: "EFF_B", amount: 1, isPlacementEffect: placement }] },
   ];
   let inDeck = deck.slice(); const applied = {};
-  me.AdvancedStart = { getAvailableCards: () => cards, getCards: () => cards.filter((c) => inDeck.includes(c.id)), getLegacyPoints: () => [{ category: 1, value: points }] };
+  // the engine wraps a deck entry: {id: <instance>, info: {<the card>}}
+  let instance = 0;
+  me.AdvancedStart = { getAvailableCards: () => cards, getCards: () => cards.filter((c) => inDeck.includes(c.id)).map((c) => ({ id: ++instance, info: c })), getLegacyPoints: () => [{ category: 1, value: points }] };
   g.Database = { makeHash: (s) => { let h = 0; for (const ch of s) h = (h * 31 + ch.charCodeAt(0)) | 0; return h; } };
   g.PlayerOperationTypes.ADVANCED_START_MODIFY_DECK = 214839009; g.PlayerOperationTypes.ADVANCED_START_USE_EFFECT = 1398940173; g.PlayerOperationTypes.ADVANCED_START_MARK_COMPLETED = 867990583;
   g.Game.Notifications.getEndTurnBlockingType = () => 780; g.Game.Notifications.getIdsForPlayer = () => [{ owner: 1, id: 9, type: 20 }]; g.Game.Notifications.find = () => ({ Type: 4, BlocksTurnAdvancement: true }); g.Game.Notifications.getTypeName = () => "NOTIFICATION_AGE_TRANSITION";
@@ -1361,7 +1363,7 @@ test("perform the legacy sequence: add a card, apply its effect, then finish, ea
   const log = [];
   const { g, hash } = withLegacies(world({ log })); g._log = log;
   const a = runPerform(g, "ADVANCED_START_MODIFY_DECK", hash("CARD_A"), { pre: 0 });
-  assert.equal(a.refused, null); assert.deepEqual(a.readback, { kind: "ADVANCED_START_MODIFY_DECK", arg: hash("CARD_A"), deck: ["CARD_A"], matches: true });
+  assert.equal(a.refused, null); assert.deepEqual(a.readback, { kind: "ADVANCED_START_MODIFY_DECK", arg: hash("CARD_A"), deck: ["CARD_A"], matches: true }, "the deck entry's wrapped card id is what counts");
   assert.equal(runPerform(g, "ADVANCED_START_MARK_COMPLETED", 0, { pre: 1 }).refused.code, "ACTION_NOT_STARTABLE", "the effect is still unapplied");
   const e = runPerformArgs(g, "ADVANCED_START_USE_EFFECT", hash("EFF_A"), hash("CARD_A"), 0, { pre: 1 });
   assert.equal(e.refused, null); assert.equal(e.outcome, "sent");

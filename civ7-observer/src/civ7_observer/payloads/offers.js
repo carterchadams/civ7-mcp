@@ -425,10 +425,13 @@
       // New age: the shipped legacies screen adds cards to the deck (ADVANCED_START_MODIFY_DECK ADD), then on
       // confirm uses every selected card's effects (ADVANCED_START_USE_EFFECT per effect) and marks the deck
       // completed. Card and effect ids are strings; their Database.makeHash is the integer handle here.
+      // A deck entry wraps the card: {id: <instance>, info: {<the card>}}, while an available card is the
+      // card itself (live: the pick registered but read back as missing because the instance id was compared).
+      const cardOf = (c) => (c && c.info ? c.info : c);
       const A = player.AdvancedStart;
       const available = A.getAvailableCards(); const deck = A.getCards();
       if (!Array.isArray(available) || !Array.isArray(deck)) throw new Error("advanced start card contract unavailable");
-      const deckIds = deck.map((c) => c && c.id).filter((x) => typeof x === "string");
+      const deckIds = deck.map((c) => cardOf(c) && cardOf(c).id).filter((x) => typeof x === "string");
       let points = null; try { const lp = A.getLegacyPoints(); points = Array.isArray(lp) ? lp.reduce((s, x) => s + (x && isInt(x.value) ? x.value : 0), 0) : null; } catch (e) { points = null; }
       const costOf = (c) => Array.isArray(c.cost) ? c.cost.reduce((s, x) => s + (x && isInt(x.value) ? x.value : 0), 0) : null;
       for (const c of available) {
@@ -439,7 +442,8 @@
           cost: costOf(c), pointsAvailable: points, needsPlacement: placement, canStart: !!(check && check.Success === true) && !placement });
       }
       let usable = 0;
-      for (const c of deck) {
+      for (const entry of deck) {
+        const c = cardOf(entry);
         if (!c || typeof c.id !== "string" || !Array.isArray(c.effects)) continue;
         for (const e of c.effects) {
           if (!e || typeof e.id !== "string") continue;
