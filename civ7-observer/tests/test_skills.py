@@ -42,6 +42,7 @@ def test_local_friction_card_is_available_and_not_generated():
     (["attributes"], ["civ7-turn-management", "civ7-research-and-civics"]),
     (["celebration"], ["civ7-turn-management", "civ7-happiness-and-government"]),
     (["resources"], ["civ7-turn-management", "civ7-treasury-and-resources"]),
+    (["town_project"], ["civ7-turn-management", "civ7-towns-and-cities"]),
     (["promotion"], ["civ7-turn-management", "civ7-commanders-and-logistics"]),
     (["end_turn"], ["civ7-turn-management"]),
     ([], ["civ7-turn-management"]),

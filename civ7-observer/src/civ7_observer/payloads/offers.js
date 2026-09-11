@@ -181,6 +181,24 @@
           reason: ok ? null : "the game refuses founding on this unit's current plot (the engine gives no detail; typical causes are water or navigable-river tiles, and plots too close to another settlement); move the unit first" });
       }
     }
+    if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.CHANGE_GROWTH_MODE) && typeof GrowthTypes !== "undefined" && isInt(GrowthTypes.PROJECT) && GameInfo.Projects) {
+      // A town specialises through CHANGE_GROWTH_MODE {Type: PROJECT, ProjectType, City}, not the build
+      // queue (live: every BUILD of a project was refused for a town and accepted for a city).
+      for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true) continue;
+        const cityId = c.id;
+        const cur = c.Growth && isInt(c.Growth.projectType) ? c.Growth.projectType : -1;
+        for (const pr of GameInfo.Projects) {
+          if (!pr || !isInt(pr.$hash) || typeof pr.ProjectType !== "string") continue;
+          const gargs = { Type: GrowthTypes.PROJECT, ProjectType: pr.$hash, City: c.id.id };
+          const check = Game.CityCommands.canStart(cityId, CityCommandTypes.CHANGE_GROWTH_MODE, gargs, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "CHOOSE_TOWN_PROJECT", arg: c.id.id, arg2: pr.$hash, pre: cur, cityId: c.id.id, cityName: compose(c.name),
+            typeKey: pr.ProjectType, displayName: compose(pr.Name), description: compose(pr.Description),
+            cost: isInt(pr.Cost) ? pr.Cost : null, townDefault: pr.TownDefault === true, upgradeToCity: pr.UpgradeToCity === true, canStart: true });
+        }
+      }
+    }
     if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.EXPAND)) {
       // New population placement: the shipped acquire-tile mode asks canStart(EXPAND, {}) for the
       // claimable plots and the improvement each would receive, then sends EXPAND {X, Y}.

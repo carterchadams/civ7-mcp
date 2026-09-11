@@ -1033,3 +1033,17 @@ def test_promotion_poll_does_not_confirm_while_the_count_is_unchanged(tmp_path):
         with pytest.raises(service.ObserverError) as info:
             reg.perform(gs, action_id=pu["actionId"], request_id="pu-2", player=1, mode="singleplayer")
     assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_town_project_offer_and_confirmation(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CHOOSE_TOWN_PROJECT", "arg": 131073, "arg2": 9301, "pre": -1, "cityId": 131073, "cityName": "Sendai", "typeKey": "PROJECT_TOWN_FORT", "displayName": "Fort Town", "description": "+5 healing", "cost": 120, "townDefault": False, "upgradeToCity": False, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHOOSE_TOWN_PROJECT", "arg": 131073, "project": 9301, "observed": -1, "matches": False}}
+    rb = {**RB, "townProjects": {"131073": 9301}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        tp = next(o for o in out["offers"] if o["kind"] == "town_project")
+        assert tp["cityName"] == "Sendai" and tp["description"] == "+5 healing" and "arg" not in tp and "arg2" not in tp
+        res = reg.perform(gs, action_id=tp["actionId"], request_id="tp-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"townProject": {"cityId": 131073, "projectType": 9301}}

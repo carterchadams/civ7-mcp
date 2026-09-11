@@ -142,6 +142,27 @@
     result.readback = { kind: KIND, arg: ARG, at: { x: ARG2, y: ARG3 }, matches: founded };
     return JSON.stringify(result);
   }
+  if (KIND === "CHOOSE_TOWN_PROJECT") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "town project arguments are not integers");
+    if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.CHANGE_GROWTH_MODE) || typeof GrowthTypes === "undefined" || !isInt(GrowthTypes.PROJECT)) return refuse("API_CONTRACT_MISMATCH", "town project contract unavailable");
+    let town = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { town = c; break; } } } catch (e) { town = null; }
+    if (!town) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    if (town.isTown !== true) return refuse("ACTION_NOT_STARTABLE", "that settlement is not a town");
+    const prow = GameInfo.Projects.lookup(ARG2);
+    if (!prow || typeof prow.ProjectType !== "string") return refuse("UNKNOWN_ACTION", "type is not a project definition");
+    const curp = town.Growth && isInt(town.Growth.projectType) ? town.Growth.projectType : -1;
+    if (curp !== PRE) return refuse("ACTION_EXPIRED", "the town's project changed since the offer was made");
+    const townId = town.id;
+    const growthArgs = { Type: GrowthTypes.PROJECT, ProjectType: ARG2, City: ARG };
+    const gcheck = Game.CityCommands.canStart(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false);
+    if (!gcheck || gcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that town project");
+    Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs);
+    result.outcome = "sent";
+    let after = null; try { after = town.Growth.projectType; } catch (e) { after = null; }
+    result.readback = { kind: KIND, arg: ARG, project: ARG2, observed: isInt(after) ? after : null, matches: after === ARG2 };
+    return JSON.stringify(result);
+  }
   if (KIND === "EXPAND_CITY") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "expand arguments are not integers");
     if (typeof CityCommandTypes === "undefined" || !isInt(CityCommandTypes.EXPAND)) return refuse("API_CONTRACT_MISMATCH", "CityCommandTypes.EXPAND unavailable");

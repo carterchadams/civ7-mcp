@@ -266,3 +266,13 @@ def test_a_blocked_settler_is_pointed_at_the_per_unit_options_tool(tmp_path):
     b, _, _ = build(tmp_path, offers_with(UNITS + blocked, end_can_start=False, blocking="UNITS"))
     settle = next(d for d in b["decisions"] if d["kind"] == "settle")
     assert "get_unit_options" in settle["note"]
+
+
+def test_town_project_notification_is_a_supported_decision(tmp_path):
+    tp = [{"kind": "CHOOSE_TOWN_PROJECT", "arg": 131073, "arg2": 9301, "pre": -1, "cityId": 131073, "cityName": "Sendai", "typeKey": "PROJECT_TOWN_FORT", "displayName": "Fort Town", "description": "+5 healing", "cost": 120, "townDefault": False, "upgradeToCity": False, "canStart": True}]
+    payload = offers_with(tp, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_TOWN_PROJECT"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "town_project")
+    assert d["required"] is True and d["options"][0]["displayName"] == "Fort Town"

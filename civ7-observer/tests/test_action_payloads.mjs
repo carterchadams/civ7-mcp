@@ -1057,3 +1057,56 @@ test("a plot the bound player's own unit stands on is still offered", () => {
   g.Game.Combat = { getBestDefender: () => ({ owner: 1, id: 77, type: 1 }) };
   assert.ok(runOffers(g).offers.filter((o) => o.kind === "MOVE_UNIT").length > 0);
 });
+
+// ---- town projects (a town specialises through the growth mode, not the build queue)
+function withTown(g, { isTown = true, current = -1, allowed = [9301], mode = "PROJECT" } = {}) {
+  const town = { id: { owner: 1, id: 131073, type: 1 }, owner: 1, name: "LOC_T", isTown, location: { x: 5, y: 5 },
+    Growth: { projectType: current, growthType: -1126871330, isReadyToPlacePopulation: true },
+    BuildQueue: { currentProductionTypeHash: -1, isEmpty: true, _q: [], getQueue() { return this._q.slice(); } },
+    Resources: { getAssignedResourcesCap: () => 1, getTotalCountAssignedResources: () => 0, getAssignedResources: () => [] } };
+  g.Players.get(1).Cities = { getCities: () => [town] };
+  const rows = [{ $hash: 9301, ProjectType: "PROJECT_TOWN_FORT", Name: "LOC_FORT", Description: "LOC_FORT_D", Cost: 120, TownDefault: false, UpgradeToCity: false },
+                { $hash: 9302, ProjectType: "PROJECT_TOWN_MINING", Name: "LOC_MINE", Description: "LOC_MINE_D", Cost: 120, TownDefault: true, UpgradeToCity: false }];
+  g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
+  g.GrowthTypes = { INVALID: 0, EXPAND: -1126871330, MIGRATE: 1308026452, PROJECT: -284569333 };
+  g.CityCommandTypes = { EXPAND: 7771, CHANGE_GROWTH_MODE: -580125556 };
+  g.Game.CityCommands = {
+    canStart: (cid, cmd, args, show) => { g._log.push(`tcanStart(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)},${show})`); if (cmd !== -580125556) return { Success: false }; return { Success: allowed.includes(args.ProjectType) && args.Type === g.GrowthTypes[mode] }; },
+    sendRequest: (cid, cmd, args) => { g._log.push(`tsendRequest(${JSON.stringify(cid)},${cmd},${JSON.stringify(args)})`); town.Growth.projectType = args.ProjectType; },
+  };
+  return g;
+}
+
+test("town project offers list the projects the growth-mode command accepts, with cost and description", () => {
+  const log = [];
+  const g = withTown(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  const tp = r.offers.filter((o) => o.kind === "CHOOSE_TOWN_PROJECT");
+  assert.deepEqual(tp.map((o) => [o.arg, o.arg2, o.pre, o.cityName, o.typeKey, o.displayName, o.description, o.cost, o.townDefault, o.canStart]),
+    [[131073, 9301, -1, "LOC_T", "PROJECT_TOWN_FORT", "LOC_FORT", "LOC_FORT_D", 120, false, true]]);
+  const growthChecks = log.filter((e) => e.startsWith("tcanStart(") && e.includes(",-580125556,"));
+  assert.ok(growthChecks.length > 0 && growthChecks.every((e) => e.includes('"Type":-284569333') && e.includes('"City":131073') && e.endsWith(",false)")));
+  assert.ok(!log.some((e) => e.startsWith("tsendRequest")));
+  const city = withTown(withUnits(world({ log: [] }), []), { isTown: false }); city._log = [];
+  assert.equal(runOffers(city).offers.filter((o) => o.kind === "CHOOSE_TOWN_PROJECT").length, 0, "a city is not a town");
+});
+
+test("perform CHOOSE_TOWN_PROJECT re-checks the town, its current project and canStart, then reads back", () => {
+  const log = [];
+  const g = withTown(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "CHOOSE_TOWN_PROJECT", 131073, 9301, 0, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "CHOOSE_TOWN_PROJECT", arg: 131073, project: 9301, observed: 9301, matches: true });
+  for (const [label, mk, cid, ph, pre] of [
+    ["unknown settlement", () => withTown(withUnits(world({ log: [] }), [])), 7, 9301, -1],
+    ["not a town", () => withTown(withUnits(world({ log: [] }), []), { isTown: false }), 131073, 9301, -1],
+    ["project changed", () => withTown(withUnits(world({ log: [] }), [])), 131073, 9301, 42],
+    ["not a project", () => withTown(withUnits(world({ log: [] }), [])), 131073, 4242, -1],
+    ["canStart false", () => withTown(withUnits(world({ log: [] }), []), { allowed: [] }), 131073, 9301, -1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "CHOOSE_TOWN_PROJECT", cid, ph, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
+  }
+});
