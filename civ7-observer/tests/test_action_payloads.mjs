@@ -1164,6 +1164,21 @@ test("a settler blocked by the minimum distance is told so, and one blocked for 
   assert.match(other.reason, /not the minimum-settlement-distance rule/);
 });
 
+test("a town already running a project is not offered another (the engine accepts and then drops it)", () => {
+  const log = [];
+  const g = withCity(withUnits(world({ log }), [])); g._log = log;
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.isTown = true; city.Growth = { projectType: 4242, isReadyToPlacePopulation: false };
+  g.CityCommandTypes = { ...(g.CityCommandTypes || {}), CHANGE_GROWTH_MODE: 7772 };
+  g.GrowthTypes = { EXPAND: 0, PROJECT: 1 };
+  const rows = [{ $hash: 4242, ProjectType: "PROJECT_TOWN_A", Name: "LOC_A" }, { $hash: 4243, ProjectType: "PROJECT_TOWN_B", Name: "LOC_B" }];
+  g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
+  g.Game.CityCommands = { canStart: () => ({ Success: true }), sendRequest: () => { g._log.push("gsend"); } };
+  assert.deepEqual(runOffers(g).offers.filter((o) => o.kind === "CHOOSE_TOWN_PROJECT"), []);
+  city.Growth = { projectType: -1, isReadyToPlacePopulation: false };
+  assert.ok(runOffers(g).offers.filter((o) => o.kind === "CHOOSE_TOWN_PROJECT").length >= 1, "a town with no project is offered one");
+});
+
 // ---- purchasing a unit with the treasury
 function withPurchase(g, { affordable = [99], gold = 800, unitsAfter = 1 } = {}) {
   withCity(g, {});

@@ -272,6 +272,9 @@
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true) continue;
         const cityId = c.id;
         const cur = c.Growth && isInt(c.Growth.projectType) ? c.Growth.projectType : -1;
+        // A town already running a project keeps it: the engine's check accepts a second choice and
+        // then drops it (live, twice on turn 56, both unknown). Only a town with no project is offered.
+        if (cur !== -1) continue;
         for (const pr of GameInfo.Projects) {
           if (!pr || !isInt(pr.$hash) || typeof pr.ProjectType !== "string") continue;
           const gargs = { Type: GrowthTypes.PROJECT, ProjectType: pr.$hash, City: c.id.id };
