@@ -1064,6 +1064,43 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
     assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
 
 
+def test_an_attack_confirms_on_the_unit_spending_its_attack(tmp_path):
+    atk = {"kind": "ATTACK", "arg": 5, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 5, "unitTypeKey": "UNIT_SWORDSMAN",
+           "from": {"x": 10, "y": 10}, "to": {"x": 11, "y": 10}, "plotIndex": 1011, "ranged": False, "attacksRemaining": 1,
+           "damage": 0, "maxDamage": 100, "defender": {"typeKey": "UNIT_ENEMY_WARRIOR", "damage": 30, "maxDamage": 100},
+           "startsWar": False, "terrainKey": "TERRAIN_FLAT", "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [atk]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent",
+                 "readback": {"kind": "ATTACK", "arg": 5, "target": {"x": 11, "y": 10}, "ranged": False, "attacksBefore": 1, "attacksRemaining": 1, "matches": False}}
+    rb = {**RB, "unitAttacks": {"5": 0}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        a = next(o for o in out["offers"] if o["kind"] == "attack")
+        assert a["defender"] == {"typeKey": "UNIT_ENEMY_WARRIOR", "damage": 30, "maxDamage": 100}
+        assert "requiresConfirmation" not in a, "an attack inside an existing war needs no confirmation"
+        assert "arg" not in a and "arg2" not in a
+        res = reg.perform(gs, action_id=a["actionId"], request_id="atk-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"attacked": {"unitId": 5, "x": 11, "y": 10, "attacksRemaining": 0}}
+
+
+def test_an_attack_that_would_start_a_war_is_refused_without_a_confirmation(tmp_path):
+    atk = {"kind": "ATTACK", "arg": 5, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 5, "startsWar": True,
+           "destructive": True, "requiresConfirmation": True, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [atk]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        a = next(o for o in out["offers"] if o["kind"] == "attack")
+        assert "would start a war" in a["guidance"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=a["actionId"], request_id="atk-2", player=1, mode="singleplayer")
+    assert info.value.code == "CONFIRMATION_REQUIRED"
+
+
 def test_a_war_declaration_needs_a_confirmation_and_proves_itself_by_the_relationship(tmp_path):
     war = {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9003, "pre": 500, "expect": "war",
            "typeKey": "DIPLOMACY_ACTION_DECLARE_WAR", "displayName": "Declare War", "targetPlayerId": 0,

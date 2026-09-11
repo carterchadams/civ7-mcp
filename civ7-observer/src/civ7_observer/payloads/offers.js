@@ -408,6 +408,79 @@
         }
       }
     }
+    // ---- attacking
+    // A seat cannot choose a target it cannot see. This block may read the defender standing on a
+    // plot THIS unit can legally attack right now, and of it only the unit's type name and how hurt
+    // it is: exactly the two things the shipped combat preview puts in front of a human before the
+    // same click. No owner, no position beyond the plot already named, nothing off that plot.
+    // BEGIN VETTED DEFENDER SCOPE
+    const defenderOn = (unitId, x, y) => {
+      try {
+        const d = Game.Combat.getBestDefender({ x: x, y: y }, unitId);
+        if (!d || !isInt(d.id)) return null;
+        const target = Units.get(d);
+        if (!target) return null;
+        const health = target.Health;
+        return { typeKey: lookupKey(GameInfo.Units, target.type, "UnitType"),
+                 damage: health && isInt(health.damage) ? health.damage : null,
+                 maxDamage: health && isInt(health.maxDamage) ? health.maxDamage : null };
+      } catch (e) { return null; }
+    };
+    // END VETTED DEFENDER SCOPE
+    if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.MOVE_TO) && isInt(UnitOperationTypes.RANGE_ATTACK) &&
+        typeof UnitOperationMoveModifiers !== "undefined" && isInt(UnitOperationMoveModifiers.ATTACK) &&
+        isInt(UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION) &&
+        typeof RevealedStates !== "undefined" && typeof CombatTypes !== "undefined" &&
+        typeof Units !== "undefined" && typeof Game.Combat !== "undefined") {
+      const ATTACK_MODS = UnitOperationMoveModifiers.ATTACK + UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION;
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const combat = u.Combat;
+        if (!combat || combat.isCombat !== true || combat.canAttack !== true) continue;
+        const attacks = isInt(combat.attacksRemaining) ? combat.attacksRemaining : 0;
+        if (attacks < 1) continue;
+        const unitId = u.id;
+        // The shipped picker's own reach: every plot this unit could strike, ranged or not.
+        const targets = {};
+        try { const reach = Units.getReachableTargets(unitId); if (Array.isArray(reach)) for (const pi of reach) if (isInt(pi)) targets[pi] = true; } catch (e) { /* fall back to adjacency */ }
+        if (Object.keys(targets).length === 0) {
+          for (let d = 0; d < 6; d++) { const loc = GameplayMap.getAdjacentPlotLocation(u.location, d); if (loc && isInt(loc.x) && loc.x >= 0) targets[GameplayMap.getIndexFromXY(loc.x, loc.y)] = true; }
+        }
+        let offered = 0;
+        for (const key of Object.keys(targets)) {
+          if (offered >= 6) break;
+          const pi = Number(key);
+          const loc = GameplayMap.getLocationFromIndex(pi);
+          if (!loc || !isInt(loc.x) || loc.x < 0) continue;
+          if (GameplayMap.getRevealedState(BOUND_PLAYER_ID, loc.x, loc.y) !== RevealedStates.VISIBLE) continue;
+          const defender = defenderOn(unitId, loc.x, loc.y);
+          if (!defender) continue;
+          // The engine's own classifier decides which kind of attack this is, exactly as the shipped
+          // dispatcher does; the payload never guesses from the unit's strengths.
+          let ranged = false;
+          try { ranged = Game.Combat.testAttackInto(unitId, { X: loc.x, Y: loc.y }) === CombatTypes.COMBAT_RANGED; } catch (e) { ranged = false; }
+          const attackArgs = ranged ? { X: loc.x, Y: loc.y } : { X: loc.x, Y: loc.y, Modifiers: ATTACK_MODS };
+          const opType = ranged ? UnitOperationTypes.RANGE_ATTACK : UnitOperationTypes.MOVE_TO;
+          const check = Game.UnitOperations.canStart(unitId, opType, attackArgs, false);
+          if (!check || check.Success !== true) continue;
+          // Striking someone this seat is not yet at war with starts that war.
+          let startsWar = null;
+          try { const w = player.Diplomacy.willMoveStartWar(unitId, { x: loc.x, y: loc.y }); startsWar = w && typeof w.Success === "boolean" ? w.Success : null; } catch (e) { startsWar = null; }
+          offers.push({ kind: "ATTACK", arg: u.id.id, arg2: loc.x, arg3: loc.y, pre: attacks, unitId: u.id.id,
+            unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), from: { x: u.location.x, y: u.location.y },
+            to: { x: loc.x, y: loc.y }, plotIndex: pi, ranged: ranged, attacksRemaining: attacks,
+            strength: isInt(combat.getMeleeStrength) ? combat.getMeleeStrength : (typeof combat.getMeleeStrength === "function" ? combat.getMeleeStrength(false) : null),
+            rangedStrength: isInt(combat.rangedStrength) ? combat.rangedStrength : null,
+            damage: u.Health && isInt(u.Health.damage) ? u.Health.damage : null,
+            maxDamage: u.Health && isInt(u.Health.maxDamage) ? u.Health.maxDamage : null,
+            defender: defender, startsWar: startsWar,
+            destructive: startsWar === true || undefined, requiresConfirmation: startsWar === true || undefined,
+            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
+            canStart: true });
+          offered++;
+        }
+      }
+    }
     // ---- diplomacy
     // A seat cannot choose whom to denounce or trade maps with without knowing who it has met, so
     // this is the one place the payload looks past the bound player. The scope is exactly the shipped

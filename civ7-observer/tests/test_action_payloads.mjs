@@ -1525,6 +1525,113 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- attacking
+function withAttack(g, { defenders = { "1010": { id: 77, owner: 4 } }, ranged = false, canAttack = true, attacksRemaining = 1,
+                         startsWar = false, spend = true, reach = null, opOk = true } = {}) {
+  withMap(g, {});
+  g.CombatTypes = { NO_COMBAT: 0, COMBAT_MELEE: 1, COMBAT_RANGED: 2 };
+  g.GameplayMap = { ...g.GameplayMap, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  g.UnitOperationTypes = { ...g.UnitOperationTypes, RANGE_ATTACK: 1900 };
+  g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
+  const me = g.Players.get(1);
+  const attacker = me.Units.getUnits()[0];
+  attacker.Combat = { isCombat: true, canAttack: canAttack, attacksRemaining: attacksRemaining, rangedStrength: ranged ? 20 : 0, getMeleeStrength: () => 15 };
+  attacker.Health = { damage: 10, maxDamage: 100 };
+  me.Diplomacy = { willMoveStartWar: () => ({ Success: startsWar }) };
+  g.Units = { ...(g.Units || {}), get: (cid) => (cid && cid.id === 77 ? { id: cid, type: 42, Health: { damage: 30, maxDamage: 100 } } : null),
+              getPathTo: g.Units.getPathTo, getReachableTargets: () => (reach === null ? [1010] : reach) };
+  g.GameInfo.Units = table([{ $hash: 42, UnitType: "UNIT_ENEMY_WARRIOR" }, { $hash: 99, UnitType: "UNIT_SCOUT" }]);
+  g.Game.Combat = {
+    getBestDefender: (loc, uid) => { g._log.push(`defender(${loc.x},${loc.y})`); return defenders[String(loc.y * 100 + loc.x)] ?? null; },
+    testAttackInto: (uid, args) => { g._log.push(`testAttackInto(${args.X},${args.Y})`); return ranged ? 2 : 1; },
+  };
+  const prevOps = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => {
+      if (op === 1900 || (args && args.Modifiers === 16400)) { g._log.push(`acanStart(${uid.id},${op},${JSON.stringify(args)},${show})`); return { Success: opOk }; }
+      return prevOps.canStart(uid, op, args, show);
+    },
+    sendRequest: (uid, op, args) => {
+      if (op === 1900 || (args && args.Modifiers === 16400)) {
+        g._log.push(`asendRequest(${uid.id},${op},${JSON.stringify(args)})`);
+        if (spend) attacker.Combat = { ...attacker.Combat, attacksRemaining: attacksRemaining - 1 };
+        return;
+      }
+      return prevOps.sendRequest(uid, op, args);
+    },
+  };
+  return g;
+}
+
+test("attack offers name the target plot and what stands on it, and nothing else about it", () => {
+  const log = [];
+  const g = withAttack(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const raw = runOffers(g);
+  assert.equal(raw.refused, null, JSON.stringify(raw.refused));
+  const at = raw.offers.filter((o) => o.kind === "ATTACK");
+  assert.deepEqual(at.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.ranged, o.startsWar]), [[5, 10, 10, 1, false, false]]);
+  assert.deepEqual(at[0].defender, { typeKey: "UNIT_ENEMY_WARRIOR", damage: 30, maxDamage: 100 });
+  assert.deepEqual(at[0].to, { x: 10, y: 10 });
+  // the defender's owner is never exposed, only what a human sees in the combat preview
+  assert.ok(!JSON.stringify(at[0]).includes('"owner"'));
+  assert.ok(!log.some((e) => e.startsWith("asendRequest")), "enumeration must never attack");
+});
+
+test("an attack that would start a war is marked destructive; one against a civilization already at war is not", () => {
+  const g = withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { startsWar: true }); g._log = [];
+  const at = runOffers(g).offers.filter((o) => o.kind === "ATTACK");
+  assert.deepEqual(at.map((o) => [o.startsWar, o.destructive, o.requiresConfirmation]), [[true, true, true]]);
+  const h = withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])); h._log = [];
+  assert.ok(runOffers(h).offers.filter((o) => o.kind === "ATTACK").every((o) => o.destructive === undefined));
+});
+
+test("a unit with no attack left, one that cannot attack, and an empty plot are all withheld", () => {
+  for (const [label, opts] of [["spent", { attacksRemaining: 0 }], ["cannot attack", { canAttack: false }], ["nobody there", { defenders: {} }], ["engine refuses", { opOk: false }]]) {
+    const g = withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), opts); g._log = [];
+    assert.deepEqual(runOffers(g).offers.filter((o) => o.kind === "ATTACK"), [], label);
+  }
+});
+
+test("perform ATTACK sends a melee strike as a move carrying the attack modifiers, and confirms on the attack being spent", () => {
+  const log = [];
+  const g = withAttack(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })])); g._log = log;
+  const r = runPerformArgs(g, "ATTACK", 5, 10, 10, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "ATTACK", arg: 5, target: { x: 10, y: 10 }, ranged: false, attacksBefore: 1, attacksRemaining: 0, matches: true });
+  const send = log.find((e) => e.startsWith("asendRequest("));
+  assert.ok(send.includes('"Modifiers":16400'), "attack plus ignore-unexplored, as the shipped dispatcher sends");
+});
+
+test("perform ATTACK sends a ranged strike as its own operation with no move modifiers at all", () => {
+  const log = [];
+  const g = withAttack(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { ranged: true }); g._log = log;
+  const r = runPerformArgs(g, "ATTACK", 5, 10, 10, { pre: 1 });
+  assert.equal(r.refused, null);
+  assert.equal(r.readback.ranged, true);
+  const send = log.find((e) => e.startsWith("asendRequest("));
+  assert.ok(send.includes(",1900,") && !send.includes("Modifiers"));
+});
+
+test("perform ATTACK refuses an unknown unit, a spent attack, a changed count and a hidden plot without sending", () => {
+  for (const [label, mk, uid, x, y, pre] of [
+    ["unknown unit", () => withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 9, 10, 10, 1],
+    ["no attack left", () => withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { attacksRemaining: 0 }), 5, 10, 10, 0],
+    ["count changed", () => withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 5, 10, 10, 3],
+    ["hidden plot", () => withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { }), 5, 99, 99, 1],
+    ["engine refuses", () => withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { opOk: false }), 5, 10, 10, 1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    if (label === "hidden plot") h.GameplayMap.getRevealedState = () => 0;
+    const rr = runPerformArgs(h, "ATTACK", uid, x, y, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("asendRequest")), `${label}: must not send`);
+  }
+  const none = withAttack(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { spend: false }); none._log = [];
+  const rr = runPerformArgs(none, "ATTACK", 5, 10, 10, { pre: 1 });
+  assert.equal(rr.outcome, "sent");
+  assert.equal(rr.readback.matches, false);
+});
+
 // ---- diplomacy (the only place the payload looks past the bound seat, and only at met players)
 function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2", atWar = [], allied = [], warAfter = [], cancelOk = true, alliedAfter = null } = {}) {
   const me = g.Players.get(1);

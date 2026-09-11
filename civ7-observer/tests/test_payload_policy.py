@@ -79,19 +79,20 @@ MUTATION_ALLOWLIST = (
     # disbanding: destructive, gated behind an explicit confirmation before it ever reaches here
     'Game.UnitCommands.canStart(unitId, UnitCommandTypes.DELETE, delArgs, false)',
     'Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.DELETE, delArgs)',
+    # attacking: the engine's own classifier picks which of the two, and both are sent for a plot the
+    # native check accepts for THIS unit
+    'Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs, false)',
+    'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs)',
+    'Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs, false)',
+    'Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 
-VETTED_BEGIN = "    // BEGIN VETTED MET-PLAYER SCOPE\n"
-VETTED_END = "    // END VETTED MET-PLAYER SCOPE\n"
+VETTED_MARKERS = (("    // BEGIN VETTED MET-PLAYER SCOPE\n", "    // END VETTED MET-PLAYER SCOPE\n"),
+                  ("    // BEGIN VETTED DEFENDER SCOPE\n", "    // END VETTED DEFENDER SCOPE\n"))
 
-# Diplomacy is the one decision a seat cannot make from its own state alone: choosing whom to
-# denounce or trade maps with means knowing who it has met. This block, and only this block, may look
-# past the bound player, and it may take only the three fields below. It is pinned here character for
-# character, so any edit to it -- widening the scope, reading a unit, a city or a yield -- fails the
-# test rather than passing unnoticed.
 VETTED_MET_PLAYER_SCOPE_OFFERS = """    const metPlayers = () => {
       const out = [];
       try {
@@ -113,35 +114,66 @@ VETTED_MET_PLAYER_SCOPE_READBACK = """    diplomaticRelations: player ? t(() => 
 """
 
 # Only these two payloads may carry a vetted block, and only with exactly this text.
-VETTED_SCOPES = {"offers.js": VETTED_MET_PLAYER_SCOPE_OFFERS, "readback.js": VETTED_MET_PLAYER_SCOPE_READBACK}
+
+# Choosing a target means seeing what stands on it. This block may read the defender on a plot the
+# engine says THIS unit can attack right now, and of it only the unit's type name and how hurt it is:
+# the two things the shipped combat preview puts in front of a human before the same click. No owner,
+# no position beyond the plot already named, nothing off that plot.
+VETTED_DEFENDER_SCOPE = """    const defenderOn = (unitId, x, y) => {
+      try {
+        const d = Game.Combat.getBestDefender({ x: x, y: y }, unitId);
+        if (!d || !isInt(d.id)) return null;
+        const target = Units.get(d);
+        if (!target) return null;
+        const health = target.Health;
+        return { typeKey: lookupKey(GameInfo.Units, target.type, "UnitType"),
+                 damage: health && isInt(health.damage) ? health.damage : null,
+                 maxDamage: health && isInt(health.maxDamage) ? health.maxDamage : null };
+      } catch (e) { return null; }
+    };
+"""
+
+# Only these payloads may carry a vetted block, and only with exactly this text. The key is the
+# payload and which marker pair the block sits between.
+VETTED_SCOPES = {
+    ("offers.js", 0): VETTED_MET_PLAYER_SCOPE_OFFERS,
+    ("readback.js", 0): VETTED_MET_PLAYER_SCOPE_READBACK,
+    ("offers.js", 1): VETTED_DEFENDER_SCOPE,
+}
+VETTED_PAYLOADS = {name for name, _ in VETTED_SCOPES}
 
 
 def strip_vetted(source: str, name: str | None = None) -> str:
-    """Replace the vetted met-player block with blank lines, keeping every other line number intact."""
-    start = source.find(VETTED_BEGIN)
-    if start == -1:
-        return source
-    body = start + len(VETTED_BEGIN)
-    end = source.index(VETTED_END, body)
-    expected = VETTED_SCOPES.get(name) if name else next((v for v in VETTED_SCOPES.values() if v == source[body:end]), None)
-    assert expected is not None and source[body:end] == expected, (
-        f"the vetted met-player scope in {name or 'this payload'} has been edited; review it against "
-        "the diplomacy policy before updating VETTED_SCOPES"
-    )
-    return source[:body] + "\n" * source.count("\n", body, end) + source[end:]
+    """Blank out every vetted block, keeping line numbers intact, after checking each is unchanged."""
+    for kind, (begin, end) in enumerate(VETTED_MARKERS):
+        start = source.find(begin)
+        if start == -1:
+            continue
+        body = start + len(begin)
+        stop = source.index(end, body)
+        expected = VETTED_SCOPES.get((name, kind)) if name else next(
+            (v for v in VETTED_SCOPES.values() if v == source[body:stop]), None)
+        assert expected is not None and source[body:stop] == expected, (
+            f"a vetted scope in {name or 'this payload'} has been edited; review it against the "
+            "policy it was written for before updating VETTED_SCOPES"
+        )
+        source = source[:body] + "\n" * source.count("\n", body, stop) + source[stop:]
+    return source
 
 
-@pytest.mark.parametrize("name", sorted(VETTED_SCOPES))
-def test_each_vetted_met_player_scope_is_present_and_unchanged(name):
+@pytest.mark.parametrize(("name", "kind"), sorted(VETTED_SCOPES))
+def test_each_vetted_scope_is_present_and_unchanged(name, kind):
     source = (PAYLOAD_DIR / name).read_text(encoding="utf-8")
-    assert VETTED_BEGIN in source, f"{name} must delimit its met-player scope"
-    strip_vetted(source, name)   # asserts the block matches character for character
+    assert VETTED_MARKERS[kind][0] in source, f"{name} must delimit vetted scope {kind}"
+    strip_vetted(source, name)   # asserts every block in it matches character for character
 
 
 def test_no_other_payload_may_carry_a_vetted_scope():
     for payload in PAYLOAD_DIR.iterdir():
-        if payload.name.endswith(".js") and payload.name not in VETTED_SCOPES:
-            assert VETTED_BEGIN not in payload.read_text(encoding="utf-8"), f"{payload.name} may not exempt itself"
+        if payload.name.endswith(".js") and payload.name not in VETTED_PAYLOADS:
+            text = payload.read_text(encoding="utf-8")
+            for begin, _ in VETTED_MARKERS:
+                assert begin not in text, f"{payload.name} may not exempt itself"
 
 
 def violations(source: str) -> list[str]:
@@ -236,7 +268,28 @@ def test_mutation_payload_uses_only_the_allowlisted_engine_calls(payload):
     assert leftovers == []
 
 
-def test_move_payload_never_sets_attack_or_unexplored_modifiers():
+def _perform_branch(kind: str) -> str:
+    """The body of one KIND branch of perform.js, up to the next one."""
     src = (PAYLOAD_DIR / "perform.js").read_text(encoding="utf-8")
-    assert "Modifiers: 0" in src
-    assert not re.search(r"UnitOperationMoveModifiers\.(ATTACK|DECLARE_WAR|MOVE_IGNORE_UNEXPLORED_DESTINATION|ROUTE_ALLOW_UNEXPLORED)", src)
+    start = src.index(f'if (KIND === "{kind}")')
+    rest = src.index('if (KIND ===', start + 10)
+    return src[start:rest]
+
+
+def test_an_ordinary_move_never_sets_an_attack_or_unexplored_modifier():
+    """Moving and attacking are different actions with different offers. A move that quietly carried
+    the attack modifier would turn "walk here" into "kill whatever is here"."""
+    move = _perform_branch("MOVE_UNIT")
+    assert "Modifiers: 0" in move
+    assert "UnitOperationMoveModifiers" not in move
+
+
+def test_the_attack_modifiers_appear_only_in_the_attack_branch_and_never_declare_war_by_flag():
+    src = (PAYLOAD_DIR / "perform.js").read_text(encoding="utf-8")
+    attack = _perform_branch("ATTACK")
+    # every mention of an attack modifier lives in the attack branch (a guard and the argument)
+    for flag in ("UnitOperationMoveModifiers.ATTACK", "UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION"):
+        assert src.count(flag) == attack.count(flag) == 2, f"{flag} appears outside the attack branch"
+    # and exactly one set of arguments is ever built from them
+    assert attack.count("const meleeArgs") == 1
+    assert not re.search(r"UnitOperationMoveModifiers\.(DECLARE_WAR|ROUTE_ALLOW_UNEXPLORED)", src)

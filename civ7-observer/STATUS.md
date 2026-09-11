@@ -17,7 +17,7 @@ observation-only any more: `act perform` mutates the running game.
 |---|---|
 | read-only observation of one bound seat (settlements, units, technology, civics, visible map) | working, live-verified |
 | stdio MCP server exposing `get_observation` / `get_status` | working, live-verified |
-| constrained native actions (research, civic, standing research and civic goals, skip unit, standing unit orders (fortify, alert, sleep, heal), move unit, produce unit, building with placement or city project, found city, place new population, activate and confirm traditions, narrative story choice, found pantheon, change government, buy and consider attribute points, assign resources, choose celebration, promote unit, choose town project, purchase unit, purchase building with placement, promote town to city, crisis cards, age-transition civilization choice and finish, new-age legacy cards, first-contact greeting, trade route, influence-priced diplomatic actions against met civilizations, declare war and form or end an alliance, assign specialists, disband unit (both destructive ones confirmation-gated), end turn) | working, live-verified |
+| constrained native actions (research, civic, standing research and civic goals, skip unit, standing unit orders (fortify, alert, sleep, heal), move unit, produce unit, building with placement or city project, found city, place new population, activate and confirm traditions, narrative story choice, found pantheon, change government, buy and consider attribute points, assign resources, choose celebration, promote unit, choose town project, purchase unit, purchase building with placement, promote town to city, crisis cards, age-transition civilization choice and finish, new-age legacy cards, first-contact greeting, trade route, influence-priced diplomatic actions against met civilizations, attack (melee and ranged), declare war and form or end an alliance, assign specialists, disband unit (both destructive ones confirmation-gated), end turn) | working, live-verified |
 | compact turn brief (`get_turn_brief`): the required decision, bounded options, every unit listed, explicit pause | working, live-verified (~4-5 KB) |
 | actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
 | agent runner: a model plays one turn of one bound seat (`play`, direct API) | working, offline-tested only |
@@ -107,7 +107,7 @@ forward reload is not detected; after any load the host must be rebound explicit
    watches for a seat's turn or drives the hotseat curtain (agent seats play under it).
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
-3. The action catalog covers 41 of the game's decision kinds (pantheon and unit promotion not yet observed live); see `../plans/civ7-player-actions.md`
+3. The action catalog covers 42 of the game's decision kinds (pantheon and unit promotion not yet observed live); see `../plans/civ7-player-actions.md`
    (untracked) for the full inventory and `docs/action-contract.md` for what is implemented.
 4. Concealment behind the stock hotseat curtain is verified for consecutive agent seats (a 4-seat
    all-agent game); blocking popups, diplomacy and disconnect are not.

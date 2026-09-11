@@ -258,6 +258,43 @@
     result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, queuedAt: PRE, queueLength: Array.isArray(after) ? after.length : null, matches: queuedC };
     return JSON.stringify(result);
   }
+  if (KIND === "ATTACK") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "attack arguments are not integers");
+    if (!isInt(UnitOperationTypes.MOVE_TO) || !isInt(UnitOperationTypes.RANGE_ATTACK)) return refuse("API_CONTRACT_MISMATCH", "the attack operations are unavailable");
+    if (typeof UnitOperationMoveModifiers === "undefined" || !isInt(UnitOperationMoveModifiers.ATTACK) || !isInt(UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION)) return refuse("API_CONTRACT_MISMATCH", "the attack move modifiers are unavailable");
+    if (typeof Game.Combat === "undefined" || typeof Game.Combat.testAttackInto !== "function") return refuse("API_CONTRACT_MISMATCH", "the combat classifier is unavailable");
+    let attacker = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { attacker = u; break; } } } catch (e) { attacker = null; }
+    if (!attacker) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const acombat = attacker.Combat;
+    if (!acombat || acombat.isCombat !== true) return refuse("ACTION_NOT_STARTABLE", "unit cannot fight");
+    if (!isInt(acombat.attacksRemaining) || acombat.attacksRemaining !== PRE) return refuse("ACTION_EXPIRED", "the unit's remaining attacks changed since the offer was made");
+    if (acombat.attacksRemaining < 1) return refuse("ACTION_NOT_STARTABLE", "unit has no attack left this turn");
+    if (GameplayMap.getRevealedState(BOUND_PLAYER_ID, ARG2, ARG3) !== RevealedStates.VISIBLE) return refuse("ACTION_NOT_STARTABLE", "the target plot is not currently visible to the bound player");
+    const aUnitId = attacker.id;
+    let isRanged = false;
+    try { isRanged = Game.Combat.testAttackInto(aUnitId, { X: ARG2, Y: ARG3 }) === CombatTypes.COMBAT_RANGED; } catch (e) { isRanged = false; }
+    const rangedArgs = { X: ARG2, Y: ARG3 };
+    const meleeArgs = { X: ARG2, Y: ARG3, Modifiers: UnitOperationMoveModifiers.ATTACK + UnitOperationMoveModifiers.MOVE_IGNORE_UNEXPLORED_DESTINATION };
+    let sent = false;
+    if (isRanged) {
+      const rcheck = Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs, false);
+      if (!rcheck || rcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the ranged attack");
+      Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.RANGE_ATTACK, rangedArgs);
+      sent = true;
+    } else {
+      const mcheck = Game.UnitOperations.canStart(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs, false);
+      if (!mcheck || mcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the attack");
+      Game.UnitOperations.sendRequest(aUnitId, UnitOperationTypes.MOVE_TO, meleeArgs);
+      sent = true;
+    }
+    if (!sent) return refuse("ACTION_NOT_STARTABLE", "no attack was dispatched");
+    result.outcome = "sent";
+    let left = null; try { left = attacker.Combat.attacksRemaining; } catch (e) { left = null; }
+    result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, ranged: isRanged, attacksBefore: PRE,
+      attacksRemaining: isInt(left) ? left : null, matches: isInt(left) && left < PRE };
+    return JSON.stringify(result);
+  }
   if (KIND === "ASSIGN_WORKER") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "specialist arguments are not integers");
     if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
