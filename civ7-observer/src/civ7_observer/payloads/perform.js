@@ -523,8 +523,20 @@
     if (!project) return refuse("ACTION_EXPIRED", "the action is no longer available against this target");
     const dTarget = Array.isArray(project.targetList1) ? project.targetList1.find((t) => t && t.targetID === ARG) : null;
     if (!dTarget || typeof dTarget.costYieldD !== "number") return refuse("ACTION_EXPIRED", "the action no longer has a price against this target");
+    let second = null;
+    if (isInt(ARG3) && ARG3 !== 0) {
+      const list2 = Array.isArray(project.targetList2) ? project.targetList2 : [];
+      for (const t2 of list2) { if (t2 && t2.targetID === ARG3 && typeof t2.parameterName === "string") { second = t2; break; } }
+      if (!second) return refuse("ACTION_EXPIRED", "the secondary target is no longer offered for this action");
+    }
+    const withSecond = (shape) => {
+      if (!second) return shape;
+      const out = Object.assign({}, shape);
+      out[["Player3", "Amount2", "Unit", "City"].indexOf(second.parameterName) !== -1 ? second.parameterName : "ID2"] = ARG3;
+      return out;
+    };
     let diploArgs = null;
-    for (const shape of [{ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, Player2: ARG }, { Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, ID: ARG }]) {
+    for (const shape of [withSecond({ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, Player2: ARG }), withSecond({ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, ID: ARG })]) {
       const probe = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false);
       if (probe && probe.Success === true) { diploArgs = shape; break; }
     }
@@ -534,7 +546,7 @@
     let influenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceAfter = null; }
     let nowAtWar = null, nowAllied = null;
     try { nowAtWar = player.Diplomacy.isAtWarWith(ARG) === true; nowAllied = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { nowAtWar = null; nowAllied = null; }
-    result.readback = { kind: KIND, arg: ARG, actionType: ARG2, influenceBefore: PRE, influence: influenceAfter,
+    result.readback = { kind: KIND, arg: ARG, actionType: ARG2, secondary: second ? { parameter: second.parameterName, id: ARG3 } : null, influenceBefore: PRE, influence: influenceAfter,
       wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied,
       matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) };
     return JSON.stringify(result);
@@ -555,6 +567,26 @@
     let recorded = null;
     try { for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && ev.uniqueID === ARG) { recorded = isInt(ev.responseType) ? ev.responseType : null; break; } } } catch (e) { recorded = null; }
     result.readback = { kind: KIND, arg: ARG, response: ARG2, recordedResponse: recorded, matches: recorded === ARG2 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "DECLARE_WAR") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "call-to-arms arguments are not integers");
+    if (ARG === BOUND_PLAYER_ID) return refuse("UNKNOWN_ACTION", "a seat cannot declare war on itself");
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    if (typeof DiplomacyActionTypes === "undefined" || !isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_DECLARE_WAR)) return refuse("API_CONTRACT_MISMATCH", "the war action type is unavailable");
+    let callNow = -1; try { callNow = Game.Diplomacy.getNextCallToArms(BOUND_PLAYER_ID); } catch (e) { callNow = -1; }
+    if (callNow !== PRE || callNow !== ARG2) return refuse("ACTION_EXPIRED", "that call to arms is no longer pending");
+    let metEnemy = null; try { metEnemy = player.Diplomacy.hasMet(ARG); } catch (e) { metEnemy = null; }
+    if (metEnemy !== true) return refuse("UNKNOWN_ACTION", "the enemy is not a civilization this seat has met");
+    let atWarBefore = null; try { atWarBefore = player.Diplomacy.isAtWarWith(ARG) === true; } catch (e) { atWarBefore = null; }
+    if (atWarBefore === true) return refuse("ACTION_EXPIRED", "this seat is already at war with them");
+    const warArgs = { Player1: BOUND_PLAYER_ID, Player2: ARG, Type: DiplomacyActionTypes.DIPLOMACY_ACTION_DECLARE_WAR };
+    const wcheck2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], warArgs, false);
+    if (!wcheck2 || wcheck2.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused joining the war");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], warArgs);
+    result.outcome = "sent";
+    let atWarAfter = null; try { atWarAfter = player.Diplomacy.isAtWarWith(ARG) === true; } catch (e) { atWarAfter = null; }
+    result.readback = { kind: KIND, arg: ARG, callToArms: ARG2, wasAtWar: false, atWar: atWarAfter, matches: atWarAfter === true };
     return JSON.stringify(result);
   }
   if (KIND === "CANCEL_ALLIANCE") {

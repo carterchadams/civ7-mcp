@@ -288,6 +288,16 @@ def test_a_captured_settlement_and_a_city_state_bonus_are_supported_required_dec
     assert b["pause"] is None and next(d for d in b["decisions"] if d["kind"] == "city_state_bonus")["required"] is True
 
 
+def test_a_call_to_arms_is_a_supported_required_decision(tmp_path):
+    war = [{"kind": "DECLARE_WAR", "arg": 7, "arg2": 21, "pre": 21, "callToArms": 21, "allyPlayerId": 0, "allyName": "Abbasid", "targetPlayerId": 7, "targetName": "Meiji Japan", "destructive": True, "requiresConfirmation": True, "canStart": True}]
+    payload = offers_with(war, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_DIPLOMATIC_ALLY_AT_WAR"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "call_to_arms")
+    assert d["required"] is True and d["options"][0]["kind"] == "join_ally_war" and d["options"][0]["allyName"] == "Abbasid" and "cancel_alliance" in d["note"]
+
+
 def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
     """Live, turn 45: six resource assignments and one confirm; the confirm was the option dropped and
     the seat could not end its turn at all, with nothing left to assign."""

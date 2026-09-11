@@ -40,6 +40,12 @@ CONFIRMATION_GUIDANCE = {
         "Liberating hands the settlement back to its founder for nothing. It buys goodwill and costs you the "
         "city; take it only when holding the city would cost more than it is worth."
     ),
+    "join_ally_war": (
+        "Joining an ally's war declares war on their enemy, with everything a war costs: the relationship, "
+        "shared endeavors and trade routes with that civilization end, and their armies may come for you. "
+        "Staying out instead ends the alliance (end alliance with the ally). Join when the ally matters "
+        "more than peace with the enemy and your army can carry it."
+    ),
     "attack": (
         "This attack would start a war with a civilization this seat is not yet fighting. Peace then "
         "needs the other side to agree, and the relationship, any shared endeavors and any trade "
@@ -59,7 +65,7 @@ UNIT_COMMAND_KINDS = {"UPGRADE": False, "PACK_ARMY": False, "ADD_TO_ARMY": True,
                       "REMOVE_FROM_ARMY": True, "UNPACK_ARMY": True, "ACTIVATE_GREAT_PERSON": True}
 
 PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "SET_TECH_TREE_TARGET_NODE": "research_goal", "SET_CULTURE_TREE_TARGET_NODE": "civic_goal", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "PRODUCE_PROJECT": "produce_project", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit", "CHOOSE_TOWN_PROJECT": "town_project", "PURCHASE_UNIT": "purchase_unit", "PURCHASE_CONSTRUCTIBLE": "purchase_constructible", "UPGRADE_TOWN": "promote_town_to_city", "CHOOSE_AGE_CIVILIZATION": "choose_age_civilization", "SET_AGE_TRANSITION_DATA": "finish_age_transition", "ADVANCED_START_MODIFY_DECK": "pick_legacy_card", "ADVANCED_START_MARK_COMPLETED": "finish_legacy_deck", "RESPOND_DIPLOMATIC_FIRST_MEET": "greet_new_civilization", "MAKE_TRADE_ROUTE": "make_trade_route", "SEND_MERCHANT": "send_merchant", "KEEP_CITY": "keep_captured_city", "RAZE_CITY": "raze_captured_city", "LIBERATE_CITY": "liberate_captured_city",
-               "CHOOSE_CITY_STATE_BONUS": "choose_city_state_bonus", "SUPPORT_DIPLOMATIC_ACTION": "support_diplomatic_action", "VIEWED_ADVISOR_WARNING": "acknowledge_advisor_warning", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
+               "CHOOSE_CITY_STATE_BONUS": "choose_city_state_bonus", "SUPPORT_DIPLOMATIC_ACTION": "support_diplomatic_action", "VIEWED_ADVISOR_WARNING": "acknowledge_advisor_warning", "DECLARE_WAR": "join_ally_war", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
                "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
@@ -555,8 +561,10 @@ class ActionRegistry:
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "diplomatic offer without an action type")
                 rec["arg2"] = o["arg2"]
+                if isinstance(o.get("arg3"), int):
+                    rec["arg3"] = o["arg3"]
                 rec["expect"] = o.get("expect")
-                for k in ("typeKey", "displayName", "targetPlayerId", "targetName", "targetIsMajor",
+                for k in ("typeKey", "displayName", "targetPlayerId", "targetName", "targetIsMajor", "secondary",
                           "group", "cost", "costYield", "influenceBalance", "affordable", "expect",
                           "destructive", "requiresConfirmation"):
                     if o.get(k) is not None:
@@ -575,6 +583,15 @@ class ActionRegistry:
                 for k in ("eventId", "answer", "typeKey", "displayName", "description", "proposerPlayerId", "proposerName"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
+            if kind == "DECLARE_WAR":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "call-to-arms offer without its event")
+                rec["arg2"] = o["arg2"]
+                rec["requiresConfirmation"] = True
+                for k in ("callToArms", "allyPlayerId", "allyName", "targetPlayerId", "targetName", "destructive", "requiresConfirmation"):
+                    if o.get(k) is not None:
+                        entry[k] = o[k]
+                entry["guidance"] = CONFIRMATION_GUIDANCE["join_ally_war"]
             if kind == "CANCEL_ALLIANCE":
                 for k in ("targetPlayerId", "targetName", "targetIsMajor", "displayName"):
                     if k in o:
@@ -918,6 +935,11 @@ class ActionRegistry:
                     recorded = responses.get(str(offer["arg"])) if isinstance(responses, dict) else None
                     if isinstance(recorded, int) and not isinstance(recorded, bool) and recorded == offer["arg2"]:
                         effect = {"proposalAnswered": {"eventId": offer["arg"], "response": offer["arg2"]}}
+                elif kind == "DECLARE_WAR":
+                    rel = rb.get("diplomaticRelations")
+                    state = rel.get(str(offer["arg"])) if isinstance(rel, dict) else None
+                    if isinstance(state, dict) and state.get("atWar") is True:
+                        effect = {"joinedAllyWar": {"enemyPlayerId": offer["arg"], "callToArms": offer["arg2"]}}
                 elif kind == "CANCEL_ALLIANCE":
                     rel = rb.get("diplomaticRelations")
                     state = rel.get(str(offer["arg"])) if isinstance(rel, dict) else None

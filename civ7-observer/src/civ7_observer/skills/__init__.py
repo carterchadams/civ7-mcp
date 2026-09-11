@@ -37,6 +37,7 @@ DECISION_SKILL = {
     "pantheon": "civ7-religion-and-great-works",
     "religion": "civ7-religion-and-great-works",
     "capture": "civ7-towns-and-cities",
+    "call_to_arms": "civ7-diplomacy-and-independents",
     "city_state_bonus": "civ7-diplomacy-and-independents",
     "advisor": "civ7-turn-management",
     "government": "civ7-happiness-and-government",

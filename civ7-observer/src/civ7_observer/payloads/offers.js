@@ -723,6 +723,34 @@
             const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, d.operationType, diploArgs, false);
             if (!check || check.Success !== true) continue;
             const cost = Math.floor(t1.costYieldD);
+            // A project that names a second target (another player, a settlement, a unit type, an
+            // amount or an independent) is offered once per target the engine accepts, exactly as
+            // the shipped target-select screen builds it: the parameter name the engine attaches to
+            // the entry decides which argument carries it.
+            const seconds = Array.isArray(d.targetList2) ? d.targetList2 : [];
+            if (seconds.length > 0) {
+              let offeredSeconds = 0;
+              for (const t2 of seconds) {
+                if (!t2 || !isInt(t2.targetID) || typeof t2.parameterName !== "string" || offeredSeconds >= 8) continue;
+                const argsWith = Object.assign({}, diploArgs);
+                argsWith[["Player3", "Amount2", "Unit", "City"].indexOf(t2.parameterName) !== -1 ? t2.parameterName : "ID2"] = t2.targetID;
+                const c2 = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, d.operationType, argsWith, false);
+                if (!c2 || c2.Success !== true) continue;
+                const cost2 = typeof t2.costYieldD === "number" ? Math.floor(t2.costYieldD) : cost;
+                const plot = isInt(t2.targetPlot) && t2.targetPlot >= 0 ? GameplayMap.getLocationFromIndex(t2.targetPlot) : null;
+                offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, arg3: t2.targetID, pre: influence, expect: expect,
+                  destructive: expect === "war" || undefined, requiresConfirmation: expect === "war" || undefined,
+                  typeKey: typeof d.actionTypeName === "string" ? d.actionTypeName : null,
+                  displayName: typeof d.actionDisplayName === "string" ? compose(d.actionDisplayName) : null,
+                  targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major,
+                  secondary: { parameter: t2.parameterName, id: t2.targetID, name: typeof t2.targetName === "string" ? compose(t2.targetName) : null,
+                               at: plot && isInt(plot.x) && plot.x >= 0 ? { x: plot.x, y: plot.y } : null },
+                  group: groupName(d.actionGroup), cost: cost2, costYield: "influence", influenceBalance: influence,
+                  affordable: influence >= cost2, canStart: true });
+                offeredSeconds++;
+              }
+              continue;
+            }
             offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence, expect: expect,
               // War is not undone. The shipped map puts a confirmation in front of it too.
               destructive: expect === "war" || undefined, requiresConfirmation: expect === "war" || undefined,
@@ -760,6 +788,28 @@
             description: typeof ev.description === "string" ? compose(ev.description) : null,
             proposerPlayerId: isInt(ev.initialPlayer) ? ev.initialPlayer : null,
             proposerName: isInt(ev.initialPlayer) ? (names[ev.initialPlayer] || null) : null, canStart: true });
+        }
+      }
+    }
+    // A call to arms: an ally at war asks this seat to join. The shipped screen answers "join" by
+    // declaring war on the ally's enemy and "stay out" by ending the alliance; both operations already
+    // exist here, so the offer names the enemy and the ally and the seat picks either.
+    if (isInt(PlayerOperationTypes.DECLARE_WAR) && typeof DiplomacyActionTypes !== "undefined" && isInt(DiplomacyActionTypes.DIPLOMACY_ACTION_DECLARE_WAR) &&
+        typeof Game.Diplomacy !== "undefined" && typeof Game.Diplomacy.getNextCallToArms === "function") {
+      let callId = -1; try { callId = Game.Diplomacy.getNextCallToArms(BOUND_PLAYER_ID); } catch (e) { callId = -1; }
+      if (isInt(callId) && callId !== -1) {
+        let war = null; try { war = Game.Diplomacy.getDiplomaticEventData(callId); } catch (e) { war = null; }
+        if (war && isInt(war.initialPlayer) && isInt(war.targetPlayer)) {
+          const names = {}; for (const other of metPlayers()) names[other.id] = other.name;
+          for (const [ally, enemy] of [[war.initialPlayer, war.targetPlayer], [war.targetPlayer, war.initialPlayer]]) {
+            let allied = null; try { allied = player.Diplomacy.hasAllied(ally); } catch (e) { allied = null; }
+            if (allied !== true) continue;
+            const warArgs = { Player1: BOUND_PLAYER_ID, Player2: enemy, Type: DiplomacyActionTypes.DIPLOMACY_ACTION_DECLARE_WAR };
+            const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.DECLARE_WAR, warArgs, false);
+            if (!check || check.Success !== true) continue;
+            offers.push({ kind: "DECLARE_WAR", arg: enemy, arg2: callId, pre: callId, callToArms: callId, allyPlayerId: ally, allyName: names[ally] || null,
+              targetPlayerId: enemy, targetName: names[enemy] || null, destructive: true, requiresConfirmation: true, canStart: true });
+          }
         }
       }
     }

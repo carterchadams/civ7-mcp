@@ -49,6 +49,8 @@ BLOCKER_DECISION = {
     "NOTIFICATION_CHOOSE_TOWN_PROJECT": "town_project",
     "NOTIFICATION_CHOOSE_RELIGION": "religion",
     "NOTIFICATION_CONSIDER_RAZE_CITY": "capture",
+    "NOTIFICATION_DIPLOMATIC_ALLY_AT_WAR": "call_to_arms",
+    "DIPLOMATIC_ALLY_AT_WAR": "call_to_arms",
     "CONSIDER_RAZE_CITY": "capture",
     "NOTIFICATION_CHOOSE_CITY_STATE_BONUS": "city_state_bonus",
     "CHOOSE_CITY_STATE_BONUS": "city_state_bonus",
@@ -140,6 +142,7 @@ DECISION_OF_KIND = {
     "start_diplomatic_action": "diplomacy",
     "cancel_alliance": "diplomacy",
     "support_diplomatic_action": "diplomacy",
+    "join_ally_war": "call_to_arms",
     "keep_captured_city": "capture",
     "raze_captured_city": "capture",
     "liberate_captured_city": "capture",
@@ -161,6 +164,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "targetPlayerId", "targetName", "targetIsMajor", "group", "influenceBalance", "currentTarget", "expect",
                  "eventId", "answer", "proposerPlayerId", "proposerName", "beliefClass",
                  "population", "wonders", "isTown", "cityStatePlayerId", "side", "initiatorPlayerId", "support", "notificationId",
+                 "secondary", "callToArms", "allyPlayerId", "allyName",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
                  "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
@@ -207,6 +211,9 @@ DIPLOMATIC_RESPONSE_NOTE = ("another civilization has proposed something to this
 RELIGION_NOTE = ("found a religion: pick any of the named ones still open (the engine refuses those another civilization "
                  "holds), then add beliefs one at a time as `add_belief` options appear, each with its `beliefClass`. "
                  "The turn cannot end until the religion is founded.")
+CALL_TO_ARMS_NOTE = ("an ally at war asks you to join. `join_ally_war` declares war on their enemy (needs confirm=true); "
+                     "staying out means ending the alliance with the ally, which is the `cancel_alliance` option for that "
+                     "civilization under diplomacy. The turn cannot end until one is chosen.")
 CAPTURE_NOTE = ("a settlement was just captured and the turn cannot end until its fate is chosen: keep it (usual), "
                 "raze it (destroys it over several turns; needs confirm=true) or liberate it back to its founder "
                 "(needs confirm=true). The offer shows its population and wonders.")
@@ -344,6 +351,8 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             group["note"] = RELIGION_NOTE
         if decision == "capture":
             group["note"] = CAPTURE_NOTE
+        if decision == "call_to_arms":
+            group["note"] = CALL_TO_ARMS_NOTE
         if decision == "city_state_bonus":
             group["note"] = CITY_STATE_BONUS_NOTE
         if decision == "resources":

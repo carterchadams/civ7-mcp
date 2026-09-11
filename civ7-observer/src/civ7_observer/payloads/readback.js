@@ -32,6 +32,7 @@
     // END VETTED MET-PLAYER SCOPE
     // The answer recorded on each proposal aimed at this seat (-1 while unanswered).
     proposalResponses: player ? t(() => { const m = {}; for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && Number.isInteger(ev.uniqueID) && ev.targetPlayer === BOUND_PLAYER_ID && Number.isInteger(ev.responseType)) m[String(ev.uniqueID)] = ev.responseType; } return m; }) : null,
+    callToArms: t(() => Game.Diplomacy.getNextCallToArms(BOUND_PLAYER_ID)),
     influenceBalance: player ? t(() => Math.floor(player.DiplomacyTreasury.diplomacyBalance)) : null,
     goldBalance: player ? t(() => Math.floor(player.Treasury.goldBalance)) : null,
     // Neither getNumPromotions nor getTotalPromotionsEarned moves when a promotion is taken (both were

@@ -1358,6 +1358,34 @@ def test_city_state_bonus_support_and_advisor_acknowledgement_confirm_on_their_o
         assert r3["confirmedBy"]["effect"] == {"advisorWarningAcknowledged": {"notificationId": 900}}
 
 
+def test_joining_an_allys_war_needs_confirmation_and_confirms_on_being_at_war(tmp_path):
+    war = {"kind": "DECLARE_WAR", "arg": 7, "arg2": 21, "pre": 21, "callToArms": 21, "allyPlayerId": 0, "allyName": "Abbasid", "targetPlayerId": 7, "targetName": "Meiji Japan", "destructive": True, "requiresConfirmation": True, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [war]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "DECLARE_WAR", "arg": 7, "callToArms": 21, "wasAtWar": False, "atWar": False, "matches": False}}
+    rb = {**RB, "diplomaticRelations": {"7": {"atWar": True, "allied": False}}, "callToArms": -1}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        j = next(o for o in out["offers"] if o["kind"] == "join_ally_war")
+        assert j["requiresConfirmation"] is True and "Staying out" in j["guidance"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=j["actionId"], request_id="cta-0", player=1, mode="singleplayer")
+        assert info.value.code == "CONFIRMATION_REQUIRED"
+        res = reg.perform(gs, action_id=j["actionId"], request_id="cta-1", player=1, mode="singleplayer", confirm=True)
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"joinedAllyWar": {"enemyPlayerId": 7, "callToArms": 21}}
+
+
+def test_a_secondary_diplomatic_target_is_bound_and_shown(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9010, "arg3": 65537, "pre": 500, "expect": "influence", "typeKey": "DIPLOMACY_ACTION_ESPIONAGE_STEAL_TECH", "secondary": {"parameter": "City", "id": 65537, "name": "Town", "at": {"x": 3, "y": 4}}, "cost": 90, "costYield": "influence", "canStart": True}]}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)]})
+    with gs:
+        d = next(o for o in reg.list_offers(gs, player=1, mode="singleplayer")["offers"] if o["kind"] == "start_diplomatic_action")
+        assert d["secondary"] == {"parameter": "City", "id": 65537, "name": "Town", "at": {"x": 3, "y": 4}} and "arg3" not in d
+        assert reg._offers[d["actionId"]]["arg3"] == 65537
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 

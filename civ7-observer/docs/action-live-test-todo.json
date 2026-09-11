@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 172,
+          "confirmed": 173,
           "rejected": 0,
           "unknown": 0
         }
@@ -43,7 +43,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 158,
+          "confirmed": 159,
           "rejected": 0,
           "unknown": 0
         }
@@ -103,7 +103,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 521,
+          "confirmed": 524,
           "rejected": 4,
           "unknown": 0
         }
@@ -127,7 +127,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2064,
+          "confirmed": 2077,
           "rejected": 8,
           "unknown": 0
         }
@@ -151,8 +151,8 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1669,
-          "rejected": 10,
+          "confirmed": 1691,
+          "rejected": 12,
           "unknown": 1
         }
       }
@@ -199,7 +199,7 @@
       "expected_evidence": "a confirmed `PRODUCE_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -247,7 +247,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 217,
+          "confirmed": 219,
           "rejected": 0,
           "unknown": 0
         }
@@ -271,7 +271,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 80,
+          "confirmed": 81,
           "rejected": 0,
           "unknown": 0
         }
@@ -487,7 +487,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 69,
+          "confirmed": 76,
           "rejected": 8,
           "unknown": 1
         }
@@ -511,7 +511,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 29,
+          "confirmed": 30,
           "rejected": 0,
           "unknown": 0
         }
@@ -559,7 +559,7 @@
       "expected_evidence": "a confirmed `CHOOSE_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 7,
+          "confirmed": 8,
           "rejected": 2,
           "unknown": 2
         }
@@ -620,7 +620,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "promote_town_to_city"
@@ -629,7 +629,13 @@
       "consequence_class": "low",
       "procedure": "take a `promote_town_to_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-choose_age_civilization",
@@ -787,7 +793,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 8,
+          "confirmed": 14,
           "rejected": 0,
           "unknown": 0
         }
@@ -902,6 +908,24 @@
       "evidence_refs": {}
     },
     {
+      "case_id": "LT-join_ally_war",
+      "action_family": "join_ally_war",
+      "expected_kind": "DECLARE_WAR",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "join_ally_war"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `join_ally_war` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `DECLARE_WAR` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
       "case_id": "LT-unit_order",
       "action_family": "unit_order",
       "expected_kind": "UNIT_ORDER",
@@ -919,7 +943,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 109,
+          "confirmed": 111,
           "rejected": 0,
           "unknown": 0
         }

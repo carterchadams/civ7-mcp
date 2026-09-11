@@ -1276,6 +1276,67 @@ test("perform CANCEL_ALLIANCE refuses an unmet target, itself, a seat with no al
   }
 });
 
+test("a project with secondary targets is offered once per target the engine accepts, carrying the parameter the engine names", () => {
+  const rows = [{ actionType: 9010, actionTypeName: "DIPLOMACY_ACTION_ESPIONAGE_STEAL_TECH", actionDisplayName: "LOC_STEAL", operationType: 560, actionGroup: 5, projectStatus: 1,
+                  targetList1: [{ targetID: 0, costYieldD: 107 }],
+                  targetList2: [{ parameterName: "City", targetID: 65536, targetName: "LOC_CAPITAL", targetPlot: 1234, costYieldD: 107 }, { parameterName: "City", targetID: 65537, targetName: "LOC_TOWN", targetPlot: 1235, costYieldD: 90 }] }];
+  const log = [];
+  const g = withDiplomacy(withUnits(world({ log }), []), { projects: rows }); g._log = log;
+  g.GameplayMap = { ...(g.GameplayMap || {}), getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  const dips = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
+  assert.deepEqual(dips.map((o) => [o.arg, o.arg2, o.arg3, o.cost, o.secondary]), [
+    [0, 9010, 65536, 107, { parameter: "City", id: 65536, name: "LOC_CAPITAL", at: { x: 34, y: 12 } }],
+    [0, 9010, 65537, 90, { parameter: "City", id: 65537, name: "LOC_TOWN", at: { x: 35, y: 12 } }]]);
+  assert.ok(log.some((e) => e.startsWith("dcanStart(") && e.includes('"City":65536')), "the secondary rides the argument the engine named");
+  const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9010, 65537, { pre: 500 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback.secondary, { parameter: "City", id: 65537 });
+  assert.ok(log.find((e) => e.startsWith("dsendRequest(") && e.includes('"City":65537')));
+  const gone = withDiplomacy(withUnits(world({ log: [] }), []), { projects: rows }); gone._log = [];
+  gone.GameplayMap = g.GameplayMap;
+  assert.ok(runPerformArgs(gone, "START_DIPLOMATIC_ACTION", 0, 9010, 99999, { pre: 500 }).refused, "a secondary the engine no longer lists is refused");
+});
+
+// ---- a call to arms from an ally
+function withCallToArms(g, { call = 21, initial = 0, target = 7, allied = [0], warOk = true, warAfter = true } = {}) {
+  g._log = g._log || [];
+  withDiplomacy(g, { allied, met: [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: true, name: "LOC_MEIJI" }] });
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, DECLARE_WAR: 9901 };
+  g.DiplomacyActionTypes = { ...(g.DiplomacyActionTypes || {}), DIPLOMACY_ACTION_DECLARE_WAR: -434781988, DIPLOMACY_ACTION_FORM_ALLIANCE: 769311562 };
+  let pending = call;
+  g.Game.Diplomacy = { ...g.Game.Diplomacy, getNextCallToArms: () => pending, getDiplomaticEventData: (id) => (id === call ? { uniqueID: call, initialPlayer: initial, targetPlayer: target } : null) };
+  const me = g.Players.get(1);
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 9901) return inner.canStart(pid, op, args, show); g._log.push(`wcanStart(${JSON.stringify(args)})`); return { Success: warOk && pid === 1 }; },
+    sendRequest: (pid, op, args) => { if (op !== 9901) return inner.sendRequest(pid, op, args); g._log.push(`wsendRequest(${JSON.stringify(args)})`); if (warAfter) { me.Diplomacy.isAtWarWith = (id) => id === args.Player2; pending = -1; } },
+  };
+  return g;
+}
+
+test("a call to arms offers war on the ally's enemy, needing confirmation, and only while the ally is really an ally", () => {
+  const g = withCallToArms(withUnits(world({ log: [] }), [])); g._log = [];
+  const calls = runOffers(g).offers.filter((o) => o.kind === "DECLARE_WAR");
+  assert.deepEqual(calls.map((o) => [o.arg, o.arg2, o.pre, o.allyPlayerId, o.allyName, o.targetPlayerId, o.targetName, o.requiresConfirmation]), [[7, 21, 21, 0, "LOC_ABBASID", 7, "LOC_MEIJI", true]]);
+  const none = withCallToArms(withUnits(world({ log: [] }), []), { allied: [] }); none._log = [];
+  assert.deepEqual(runOffers(none).offers.filter((o) => o.kind === "DECLARE_WAR"), []);
+  const quiet = withCallToArms(withUnits(world({ log: [] }), []), { call: -1 }); quiet._log = [];
+  assert.deepEqual(runOffers(quiet).offers.filter((o) => o.kind === "DECLARE_WAR"), []);
+});
+
+test("perform DECLARE_WAR for a call to arms declares on the enemy and confirms on being at war", () => {
+  const g = withCallToArms(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runPerformArgs(g, "DECLARE_WAR", 7, 21, 0, { pre: 21 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "DECLARE_WAR", arg: 7, callToArms: 21, wasAtWar: false, atWar: true, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("wsendRequest(") && e.includes('"Player2":7') && e.includes('"Type":-434781988')));
+  for (const [label, mk, enemy, call] of [["call gone", () => withCallToArms(withUnits(world({ log: [] }), []), { call: -1 }), 7, 21], ["other call", () => withCallToArms(withUnits(world({ log: [] }), [])), 7, 22], ["itself", () => withCallToArms(withUnits(world({ log: [] }), [])), 1, 21], ["engine refuses", () => withCallToArms(withUnits(world({ log: [] }), []), { warOk: false }), 7, 21]]) {
+    const h = mk(); h._log = [];
+    assert.ok(runPerformArgs(h, "DECLARE_WAR", enemy, call, 0, { pre: call }).refused, label);
+    assert.ok(!h._log.some((e) => e.startsWith("wsendRequest")), label);
+  }
+});
+
 // ---- specialists (a PLAYER operation taking a plot INDEX, not a city one taking x/y)
 function withSpecialists(g, { slots = null, assignable = [489], applied = true, ready = true } = {}) {
   withCity(g, {});
@@ -2090,7 +2151,7 @@ test("perform START_DIPLOMATIC_ACTION takes the operation from the engine's own 
   const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, influenceBefore: 500, influence: 467,
+  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, secondary: null, influenceBefore: 500, influence: 467,
     wasAtWar: false, atWar: false, wasAllied: false, allied: false, matches: true });
   const send = log.find((e) => e.startsWith("dsendRequest("));
   assert.ok(send.includes(",555,"), "the operation must be the one the listing gave for that project");
