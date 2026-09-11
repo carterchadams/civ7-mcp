@@ -382,3 +382,10 @@ engine outside the windows in which activating and assigning are allowed: every 
 activating a card already active. Both offers therefore appear only in those windows, alongside their
 opposites, which is the shipped behaviour. Neither the pillage nor the religious operations have a
 live case yet: no seat is at war and no seat has trained a missionary.
+
+**Lesson (turn 61, live):** a town-project choice sent on its own is dropped. The shipped chooser sends
+`CONSIDER_TOWN_PROJECT` the moment the focus panel opens, before any choice; three choices sent
+without it went unknown on one town while the engine's check kept saying yes, and the first sent
+after it landed in a third of a second. The payload now sends the consider step first, and
+`keep_town_focus` offers the consider step alone, which clears the "town focus available" blocker
+without changing anything, as opening and closing the panel does.

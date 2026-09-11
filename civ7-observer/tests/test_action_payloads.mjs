@@ -1179,6 +1179,32 @@ test("a town already running a project is not offered another (the engine accept
   assert.ok(runOffers(g).offers.filter((o) => o.kind === "CHOOSE_TOWN_PROJECT").length >= 1, "a town with no project is offered one");
 });
 
+test("a town-project choice is preceded by the consider step the shipped chooser sends on opening, and keeping the focus is offered while the blocker stands", () => {
+  const log = [];
+  const g = withCity(withUnits(world({ log }), [])); g._log = log;
+  const city = g.Players.get(1).Cities.getCities()[0];
+  city.isTown = true; city.Growth = { projectType: -1, isReadyToPlacePopulation: false };
+  g.CityCommandTypes = { ...(g.CityCommandTypes || {}), CHANGE_GROWTH_MODE: 7772 };
+  g.CityOperationTypes = { ...(g.CityOperationTypes || {}), CONSIDER_TOWN_PROJECT: 5552 };
+  g.GrowthTypes = { EXPAND: 0, PROJECT: 1 };
+  const rows = [{ $hash: 4242, ProjectType: "PROJECT_TOWN_FISHING", Name: "LOC_F" }];
+  g.GameInfo.Projects = table(rows); g.GameInfo.Projects[Symbol.iterator] = function* () { yield* rows; };
+  let blocking = true;
+  g.Game.Notifications = { ...g.Game.Notifications, getIdsForPlayer: () => (blocking ? [{ owner: 1, id: 1, type: 9 }] : []), find: () => ({ Type: 9 }), getTypeName: () => "NOTIFICATION_CHOOSE_TOWN_PROJECT", getBlocksTurnAdvancement: () => true, getEndTurnBlockingType: () => 0 };
+  g.Game.CityCommands = { canStart: () => ({ Success: true }), sendRequest: (cid, cmd, args) => { log.push(`growth(${JSON.stringify(args)})`); city.Growth = { projectType: args.ProjectType }; } };
+  const inner = g.Game.CityOperations;
+  g.Game.CityOperations = { canStart: inner.canStart, sendRequest: (cid, op, args) => { if (op === 5552) { log.push("consider"); blocking = false; return; } return inner.sendRequest(cid, op, args); } };
+  const offers = runOffers(g).offers;
+  assert.deepEqual(offers.filter((o) => o.kind === "CONSIDER_TOWN_PROJECT").map((o) => [o.arg, o.cityName]), [[65536, "Cordoba"]]);
+  const r = runPerformArgs(g, "CHOOSE_TOWN_PROJECT", 65536, 4242, 0, { pre: -1 });
+  assert.equal(r.refused, null);
+  const i = log.indexOf("consider"), j = log.findIndex((e) => e.startsWith("growth("));
+  assert.ok(i !== -1 && j !== -1 && i < j, "consider goes out before the choice");
+  blocking = true;
+  const k = runPerformArgs(g, "CONSIDER_TOWN_PROJECT", 65536, 0, 0, { pre: 0 });
+  assert.deepEqual(k.readback, { kind: "CONSIDER_TOWN_PROJECT", arg: 65536, stillBlocking: false, matches: true });
+});
+
 // ---- purchasing a unit with the treasury
 function withPurchase(g, { affordable = [99], gold = 800, unitsAfter = 1 } = {}) {
   withCity(g, {});

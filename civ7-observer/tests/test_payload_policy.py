@@ -56,6 +56,8 @@ MUTATION_ALLOWLIST = (
     'Game.CityCommands.canStart(cityId, CityCommandTypes.CHANGE_GROWTH_MODE, gargs, false)',
     'Game.CityCommands.canStart(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false)',
     'Game.CityCommands.sendRequest(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs)',
+    # opening the town focus, as the shipped chooser does before any choice; also clears the blocker alone
+    'Game.CityOperations.sendRequest(townId, CityOperationTypes.CONSIDER_TOWN_PROJECT, {})',
     'Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false)',
     'Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs)',
     # buying a building: same command, but the placement plot rides along with the constructible
@@ -116,7 +118,7 @@ MUTATION_ALLOWLIST = (
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
     'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b|DESTROY\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.(?!ADVANCED_START_USE_EFFECT\b)[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b|RANGE_ATTACK\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b|CONSIDER_TOWN_PROJECT\b)[A-Z_]+|CityCommandTypes\.(?!EXPAND\b|CHANGE_GROWTH_MODE\b|PURCHASE\b|DESTROY\b)[A-Z_]+|UnitCommandTypes\.(?!PROMOTE\b|MAKE_TRADE_ROUTE\b|DELETE\b)[A-Z_]+|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations|CityCommands|UnitCommands)\.(?:canStart|sendRequest)\([^)]*\)?|Game\.DiplomacyDeals\.(?:clearWorkingDeal|addItemToWorkingDeal|removeItemFromWorkingDeal|sendWorkingDeal)\([^)]*\)|GameContext\.sendTurnComplete\(\)|GameSetup\.set\w+\([^)]*\))")
 
 

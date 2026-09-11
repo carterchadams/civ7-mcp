@@ -663,6 +663,16 @@
         }
       }
     }
+    // ---- keep a town's current focus: clears the town-project blocker without changing anything,
+    // which is what the shipped chooser does the moment it opens.
+    if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.CONSIDER_TOWN_PROJECT)) {
+      let pendingFocus = false;
+      try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && Game.Notifications.getTypeName(n.Type) === "NOTIFICATION_CHOOSE_TOWN_PROJECT" && blocksNow(nid, n)) pendingFocus = true; } } catch (e) { pendingFocus = false; }
+      if (pendingFocus) for (const c of player.Cities.getCities()) {
+        if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID || c.isTown !== true) continue;
+        offers.push({ kind: "CONSIDER_TOWN_PROJECT", arg: c.id.id, pre: 0, cityId: c.id.id, cityName: compose(c.name), canStart: true });
+      }
+    }
     // ---- a town back to growth (A13): the shipped focus list's "growth" entry is CHANGE_GROWTH_MODE
     // with Type EXPAND and no project, and it is the one way to leave a running project.
     if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.CHANGE_GROWTH_MODE) && typeof GrowthTypes !== "undefined" && isInt(GrowthTypes.EXPAND) &&

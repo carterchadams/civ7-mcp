@@ -205,6 +205,11 @@
     const curp = town.Growth && isInt(town.Growth.projectType) ? town.Growth.projectType : -1;
     if (curp !== PRE) return refuse("ACTION_EXPIRED", "the town's project changed since the offer was made");
     const townId = town.id;
+    // The shipped chooser sends CONSIDER_TOWN_PROJECT the moment the focus panel opens, before any
+    // choice; a choice sent without it was dropped by the engine (live, Fukui, turn 61, twice).
+    if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.CONSIDER_TOWN_PROJECT)) {
+      Game.CityOperations.sendRequest(townId, CityOperationTypes.CONSIDER_TOWN_PROJECT, {});
+    }
     const growthArgs = { Type: GrowthTypes.PROJECT, ProjectType: ARG2, City: ARG };
     const gcheck = Game.CityCommands.canStart(townId, CityCommandTypes.CHANGE_GROWTH_MODE, growthArgs, false);
     if (!gcheck || gcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that town project");
@@ -212,6 +217,19 @@
     result.outcome = "sent";
     let after = null; try { after = town.Growth.projectType; } catch (e) { after = null; }
     result.readback = { kind: KIND, arg: ARG, project: ARG2, observed: isInt(after) ? after : null, matches: after === ARG2 };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CONSIDER_TOWN_PROJECT") {
+    if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "town argument is not an integer");
+    if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.CONSIDER_TOWN_PROJECT)) return refuse("API_CONTRACT_MISMATCH", "CONSIDER_TOWN_PROJECT unavailable");
+    let ctown = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { ctown = c; break; } } } catch (e) { ctown = null; }
+    if (!ctown) return refuse("UNKNOWN_ACTION", "settlement is not in the bound player's roster");
+    const townId = ctown.id;
+    Game.CityOperations.sendRequest(townId, CityOperationTypes.CONSIDER_TOWN_PROJECT, {});
+    result.outcome = "sent";
+    let still = null; try { still = Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID).some((nid) => { const n = Game.Notifications.find(nid); return n && Game.Notifications.getTypeName(n.Type) === "NOTIFICATION_CHOOSE_TOWN_PROJECT" && Game.Notifications.getBlocksTurnAdvancement(nid); }); } catch (e) { still = null; }
+    result.readback = { kind: KIND, arg: ARG, stillBlocking: still, matches: still === false };
     return JSON.stringify(result);
   }
   if (KIND === "EXPAND_CITY") {

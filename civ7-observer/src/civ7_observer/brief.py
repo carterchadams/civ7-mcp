@@ -84,6 +84,7 @@ BLOCKER_DECISION = {
 RESOLVING_KINDS = frozenset({
     "consider_resources", "confirm_traditions", "consider_attributes",
     "finish_legacy_deck", "finish_age_transition",
+    "keep_town_focus",
 })
 
 DECISION_OF_KIND = {
@@ -151,6 +152,7 @@ DECISION_OF_KIND = {
     "choose_age_civilization": "age_transition",
     "finish_age_transition": "age_transition",
     "town_project": "town_project",
+    "keep_town_focus": "town_project",
     "assign_resource": "resources",
     "consider_resources": "resources",
     "start_diplomatic_action": "diplomacy",

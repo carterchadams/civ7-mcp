@@ -312,6 +312,8 @@ def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):
     kinds = [o["kind"] for o in d["options"]]
     assert "consider_resources" in kinds, "the only option that clears the blocker was dropped"
     assert kinds[-1] == "consider_resources", "it reads after the choices, not before them"
+    from civ7_observer.brief import RESOLVING_KINDS
+    assert "keep_town_focus" in RESOLVING_KINDS
     assert len(d["options"]) <= 6 and d["omitted"] == d["optionCount"] - len(d["options"])
 
 
