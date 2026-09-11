@@ -8,7 +8,7 @@ import vm from "node:vm";
 
 const here = dirname(fileURLToPath(import.meta.url));
 const raw = readFileSync(join(here, "..", "src", "civ7_observer", "payloads", "observe.js"), "utf8");
-const render = (id, mode) => raw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
+const render = (id, mode) => raw.replaceAll("BOUND_PLAYER_ID", String(id)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("GUARDS_ONLY", "false");
 function run(globals, boundId = 1, mode = "singleplayer") {
   const out = vm.runInContext(render(boundId, mode), vm.createContext({ ...globals }), { timeout: 2000 });
   return JSON.parse(out);

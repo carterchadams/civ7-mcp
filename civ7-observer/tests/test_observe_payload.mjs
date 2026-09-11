@@ -10,7 +10,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const raw = readFileSync(join(here, "..", "src", "civ7_observer", "payloads", "observe.js"), "utf8");
 
 function render(boundId, mode) {
-  return raw.replaceAll("BOUND_PLAYER_ID", String(boundId)).replaceAll("ALLOWED_MODE", JSON.stringify(mode));
+  return raw.replaceAll("BOUND_PLAYER_ID", String(boundId)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("GUARDS_ONLY", "false");
 }
 function run(globals, boundId = 1, mode = "singleplayer") {
   const ctx = vm.createContext({ ...globals });
@@ -207,4 +207,40 @@ test("refuses when UI.isInGame() is not exactly true", () => {
   const g = game();
   delete g.UI;
   assert.equal(run(g, 1).refused?.code, "NOT_IN_GAME");
+});
+
+// ---- Change 6 review: GUARDS_ONLY renders the same guards without reading the roster
+function renderGuards(boundId, mode) {
+  return raw.replaceAll("BOUND_PLAYER_ID", String(boundId)).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("GUARDS_ONLY", "true");
+}
+function runGuards(globals, boundId = 1, mode = "singleplayer") {
+  return JSON.parse(vm.runInContext(renderGuards(boundId, mode), vm.createContext({ ...globals }), { timeout: 2000 }));
+}
+
+test("guards-only run returns eligibility after the guards and reads no roster, progression or map", () => {
+  const log = [];
+  const r = runGuards(game({ log }), 1);
+  assert.equal(r.refused, null);
+  assert.equal(r.guardsOnly, true);
+  assert.equal(r.context.mode, "singleplayer");
+  assert.equal(r.settlements, null);
+  assert.equal(r.units, null);
+  assert.equal(r.technology, null);
+  assert.equal(r.map, null);
+  assert.ok(!log.some((e) => e.startsWith("map.")), `map read in guards-only: ${log}`);
+  assert.ok(log.filter((e) => e.startsWith("Players.get(")).every((e) => e === "Players.get(1)"));
+});
+
+test("guards-only run refuses with the same codes as a full capture", () => {
+  assert.equal(runGuards(game({ flags: HOTSEAT }), 1, "singleplayer").refused.code, "UNSUPPORTED_GAME_MODE");
+  assert.equal(runGuards(game({ turnActive: false }), 1).refused.code, "TURN_NOT_READY");
+  assert.equal(runGuards(game(), 0).refused.code, "WRONG_PLAYER");
+  const g = game(); g.UI.isInGame = () => false;
+  assert.equal(runGuards(g, 1).refused.code, "NOT_IN_GAME");
+});
+
+test("full run is unaffected by the GUARDS_ONLY token being false", () => {
+  const r = run(game(), 1);
+  assert.equal(r.guardsOnly, false);
+  assert.ok(Array.isArray(r.units));
 });

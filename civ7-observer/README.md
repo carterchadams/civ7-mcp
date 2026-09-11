@@ -135,10 +135,14 @@ codex mcp add civ7-observer -- \
 ### Isolated demonstration
 
 `demo/run-demo.sh` runs the plan's demonstration prompt in a separate, non-interactive
-Claude Code session that is given only `mcp__civ7-observer__get_observation` (all other
-tools disallowed, `--strict-mcp-config` so no other MCP servers load). It does not modify
-any global Claude configuration. Run it from the package directory with paths relative
-to it:
+Claude Code session with the built-in tool set disabled (`--tools ""`), only the one MCP
+server from the given config loaded (`--strict-mcp-config`), `get_observation` allowed and
+`get_status` denied. It records a `stream-json` transcript next to the report, prints the
+client's effective tool list and the tool calls actually made, and exits with the
+provider's status so a failed or empty model run is never mistaken for a completed
+demonstration. Inherited user/project settings are still a factor in what the client
+offers; a container sandbox remains later work. It does not modify any global Claude
+configuration. Run it from the package directory with paths relative to it:
 
 ```bash
 civ7-observer/demo/run-demo.sh demo/mcp-hotseat-player1.json runs/demo-1.txt

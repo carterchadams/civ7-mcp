@@ -364,7 +364,9 @@ def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[s
     if data.get("refused") is not None:
         r = _obj(data["refused"], "payload.refused", ("code", "message"))
         raise PayloadRefused(_str(r["code"], "payload.refused.code"), _str(r["message"], "payload.refused.message"))
-    o = _obj(data, "payload", ("payloadVersion", "refused", "context", "settlements", "units", "technology", "civics", "map", "warnings"))
+    if data.get("guardsOnly") is not False:
+        _fail("payload.guardsOnly", "a full observation must come from a full run")
+    o = _obj(data, "payload", ("payloadVersion", "guardsOnly", "refused", "context", "settlements", "units", "technology", "civics", "map", "warnings"))
     ctx = _context(o["context"], "payload.context", bound_player_id)
     bound = ctx["playerId"]
     for name, limit in (("settlements", MAX_SETTLEMENTS), ("units", MAX_UNITS), ("warnings", MAX_WARNINGS)):
@@ -379,6 +381,21 @@ def validate_payload(data: Any, *, bound_player_id: int | None = None) -> dict[s
     civics = _progression(o["civics"], "payload.civics", civics=True)
     game_map = _map(o["map"], "payload.map")
     return {"context": ctx, "settlements": settlements, "units": units, "technology": technology, "civics": civics, "map": game_map, "warnings": warnings}
+
+
+def validate_eligibility(data: Any, *, bound_player_id: int | None = None) -> dict[str, Any]:
+    """Validate a guards-only run. Raises PayloadRefused with the same codes a capture would."""
+    if not isinstance(data, dict):
+        _fail("payload", "expected object")
+    if data.get("payloadVersion") != PAYLOAD_VERSION:
+        _fail("payload.payloadVersion", f"expected {PAYLOAD_VERSION}")
+    if data.get("refused") is not None:
+        r = _obj(data["refused"], "payload.refused", ("code", "message"))
+        raise PayloadRefused(_str(r["code"], "payload.refused.code"), _str(r["message"], "payload.refused.message"))
+    if data.get("guardsOnly") is not True:
+        _fail("payload.guardsOnly", "expected a guards-only run")
+    ctx = _context(data.get("context"), "payload.context", bound_player_id)
+    return {"mode": ctx["mode"], "isTurnActive": ctx["isTurnActive"], "turn": ctx["turn"], "age": ctx["age"]}
 
 
 def build_observation(validated: dict[str, Any], *, session_id: str, observation_id: str, captured_at: str) -> dict[str, Any]:

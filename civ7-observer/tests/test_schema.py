@@ -8,6 +8,7 @@ from civ7_observer import schema
 
 GOOD = {
     "payloadVersion": 1,
+    "guardsOnly": False,
     "refused": None,
     "context": {"turn": 15, "age": 4242, "ageType": "AGE_ANTIQUITY", "playerId": 1, "localPlayerId": 1, "localObserverId": 1, "mode": "singleplayer", "isTurnActive": True},
     "settlements": [
@@ -147,6 +148,24 @@ def test_collection_limits():
     d["units"] = [copy.deepcopy(GOOD["units"][0]) for _ in range(schema.MAX_UNITS + 1)]
     with pytest.raises(schema.InvalidObservation):
         schema.validate_payload(d)
+
+
+def test_guards_only_document_is_rejected_as_a_full_observation():
+    d = copy.deepcopy(GOOD)
+    d["guardsOnly"] = True
+    with pytest.raises(schema.InvalidObservation):
+        schema.validate_payload(d)
+
+
+def test_validate_eligibility_accepts_guards_only_and_refuses_typed():
+    d = {**copy.deepcopy(GOOD), "guardsOnly": True, "settlements": None, "units": None, "technology": None, "civics": None, "map": None}
+    e = schema.validate_eligibility(d, bound_player_id=1)
+    assert e == {"mode": "singleplayer", "isTurnActive": True, "turn": 15, "age": 4242}
+    with pytest.raises(schema.PayloadRefused) as ei:
+        schema.validate_eligibility({**d, "refused": {"code": "TURN_NOT_READY", "message": "x"}, "context": None}, bound_player_id=1)
+    assert ei.value.code == "TURN_NOT_READY"
+    with pytest.raises(schema.InvalidObservation):
+        schema.validate_eligibility({**d, "guardsOnly": False}, bound_player_id=1)
 
 
 def test_refusal_is_typed():

@@ -5,8 +5,9 @@
 // bound id. Returns one JSON string; `refused` is set instead of partial data.
 (() => {
   const ALLOWED = ALLOWED_MODE;
+  const ONLY_GUARDS = GUARDS_ONLY;
   const warnings = [];
-  const result = { payloadVersion: 1, refused: null, context: null, settlements: null, units: null, technology: null, civics: null, map: null, warnings: warnings };
+  const result = { payloadVersion: 1, guardsOnly: ONLY_GUARDS, refused: null, context: null, settlements: null, units: null, technology: null, civics: null, map: null, warnings: warnings };
   const refuse = (code, message) => {
     result.refused = { code: code, message: message };
     return JSON.stringify(result);
@@ -77,6 +78,11 @@
     mode: mode,
     isTurnActive: true
   };
+
+  if (ONLY_GUARDS) {
+    // Eligibility probe for get_status: the same guards, no roster/progression/map reads.
+    return JSON.stringify(result);
+  }
 
   // ---- 2. settlements
   const settlementRecord = (c, i) => {

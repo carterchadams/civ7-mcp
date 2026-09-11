@@ -73,9 +73,19 @@ def test_get_observation_maps_transport_failure_to_error():
     assert out["error"]["code"] == "TARGET_PROBE_FAILED"
 
 
+ELIGIBLE = {"payloadVersion": 1, "guardsOnly": True, "refused": None, "context": {**OBS["context"]}, "settlements": None, "units": None, "technology": None, "civics": None, "map": None, "warnings": []}
+
+
+def eligibility(code=None, message="no"):
+    if code is None:
+        return json.dumps(ELIGIBLE)
+    return json.dumps({**ELIGIBLE, "refused": {"code": code, "message": message}, "context": None})
+
+
 def test_get_status_reports_readiness_without_other_seats():
     ctx = json.dumps(GAME)
-    s, _ = make({"a": [reply(1, ctx)]})
+    # doctor(1) | reopen(1) eligibility(2)
+    s, _ = make({"a": [reply(1, ctx), reply(1, ctx), reply(2, eligibility())]})
     st = tool(s, "get_status").fn()
     assert st["status"] == "IN_GAME" and st["ready"] is True
     assert st["boundPlayerId"] == 1 and st["allowedMode"] == "singleplayer"
@@ -85,15 +95,38 @@ def test_get_status_reports_readiness_without_other_seats():
 
 def test_get_status_not_ready_when_seat_differs():
     ctx = json.dumps(GAME)
-    s, _ = make({"a": [reply(1, ctx)]}, player=0)
+    s, _ = make({"a": [reply(1, ctx), reply(1, ctx)]}, player=0)
     st = tool(s, "get_status").fn()
     assert st["status"] == "IN_GAME" and st["ready"] is False and st["reason"] == "WRONG_PLAYER"
+
+
+@pytest.mark.parametrize("code", ["UNSUPPORTED_GAME_MODE", "TURN_NOT_READY", "NOT_IN_GAME"])
+def test_get_status_not_ready_when_capture_guards_would_refuse(code):
+    ctx = json.dumps(GAME)
+    s, _ = make({"a": [reply(1, ctx), reply(1, ctx), reply(2, eligibility(code))]})
+    st = tool(s, "get_status").fn()
+    assert st["ready"] is False and st["reason"] == code
+    assert st["context"] is not None
+
+
+def test_get_status_not_ready_when_eligibility_probe_fails():
+    ctx = json.dumps(GAME)
+    s, _ = make({"a": [reply(1, ctx), reply(1, ctx), reply(2, "garbage")]})
+    st = tool(s, "get_status").fn()
+    assert st["ready"] is False and st["reason"] == "API_CONTRACT_MISMATCH"
 
 
 def test_get_status_when_debugger_absent():
     s, _ = make({"a": []}, targets=[])
     st = tool(s, "get_status").fn()
-    assert st["ready"] is False and st["status"] == "NO_GAME_TARGET"
+    assert st["ready"] is False and st["status"] == "NO_GAME_TARGET" and st["reason"] == "NO_GAME_TARGET"
+
+
+def test_get_status_ready_reports_mode_and_turn_active():
+    ctx = json.dumps(GAME)
+    s, _ = make({"a": [reply(1, ctx), reply(1, ctx), reply(2, eligibility())]})
+    st = tool(s, "get_status").fn()
+    assert st["ready"] is True and st["eligibility"] == {"mode": "singleplayer", "isTurnActive": True}
 
 
 def test_observation_ids_fresh_and_session_stable_across_calls():

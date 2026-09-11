@@ -42,5 +42,5 @@ const fixtures = {
 };
 const g = fixtures[fixtureName]();
 delete g._me;
-const out = vm.runInContext(raw.replaceAll("BOUND_PLAYER_ID", boundId).replaceAll("ALLOWED_MODE", JSON.stringify(mode)), vm.createContext(g), { timeout: 2000 });
+const out = vm.runInContext(raw.replaceAll("BOUND_PLAYER_ID", boundId).replaceAll("ALLOWED_MODE", JSON.stringify(mode)).replaceAll("GUARDS_ONLY", "false"), vm.createContext(g), { timeout: 2000 });
 process.stdout.write(out);

@@ -10,6 +10,7 @@ from civ7_observer.cdp import CdpError
 
 BOUND_TOKEN = "BOUND_PLAYER_ID"
 MODE_TOKEN = "ALLOWED_MODE"
+GUARDS_TOKEN = "GUARDS_ONLY"
 ALLOWED_MODES = ("singleplayer", "local-hotseat")
 
 
@@ -26,7 +27,7 @@ def load_payload(name: str) -> str:
         raise PayloadMissing(f"packaged payload {name!r} not found") from exc
 
 
-def render_payload(name: str, *, bound_player_id: int, allowed_mode: str | None = None) -> str:
+def render_payload(name: str, *, bound_player_id: int, allowed_mode: str | None = None, guards_only: bool = False) -> str:
     """Substitute the bound engine player id (and optional allowed mode) into a payload."""
     if isinstance(bound_player_id, bool) or not isinstance(bound_player_id, int) or bound_player_id < 0:
         raise ValueError(f"bound player id must be a non-negative integer, got {bound_player_id!r}")
@@ -35,4 +36,6 @@ def render_payload(name: str, *, bound_player_id: int, allowed_mode: str | None 
         if allowed_mode not in ALLOWED_MODES:
             raise ValueError(f"allowed_mode must be one of {ALLOWED_MODES}, got {allowed_mode!r}")
         text = text.replace(MODE_TOKEN, json.dumps(allowed_mode))
+    if GUARDS_TOKEN in text:
+        text = text.replace(GUARDS_TOKEN, "true" if guards_only else "false")
     return text

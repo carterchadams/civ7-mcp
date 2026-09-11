@@ -239,9 +239,14 @@ captures on the expected seat and attempts the other seat.
 | r10-p1-t5 | player 1, turn 5 | ok: 1 settlement(s), 2 unit(s), 39 visible, 198 ms; wrong seat `WRONG_PLAYER`, no file |
 | under-curtain vs after-dismissal (r2) | player 1, turn 1 | every section identical; only the observation id differs |
 
-**Matrix result:** 10 of 10 rounds captured the intended seat with a fresh observation id,
-0 warnings, 178-204 ms per capture; 10 of 10 wrong-seat attempts refused with
-`WRONG_PLAYER` and no file written. Raw rows: `docs/hotseat-matrix.jsonl`.
+**Matrix result so far (corrected count):** the ten rows above are ten *seat captures*
+over **five full hotseat rounds** (game turns 1-5), i.e. five captures of each intended
+player, not the plan's ten rounds. Every capture hit the intended seat with a fresh
+observation id, 0 warnings, 178-204 ms; every wrong-seat attempt was refused with
+`WRONG_PLAYER` and no file written. Raw rows: `docs/hotseat-matrix.jsonl`. The remaining
+five rounds (turns 6-10) are captured below through two **persistent** bound MCP servers
+(`demo/hotseat-watch.py`) so the final delivery path, not only the CLI, is exercised
+across handoffs.
 
 ## Phase 1 definition of done (plan section "Definition of done")
 
@@ -249,7 +254,7 @@ captures on the expected seat and attempts the other seat.
 |---|---|
 | validated observation with all five categories for the configured active player | Changes 3-5 live captures; hotseat matrix above |
 | obtained through the debugger without the LLM seeing executable code | MCP server exposes only `get_observation` / `get_status`, no arguments; payloads are packaged |
-| ordinary and negative hotseat tests pass | matrix: 10 positive, 10 negative, plus the handoff attempt |
+| ordinary and negative hotseat tests pass | matrix: 5 full rounds via CLI (10 positive, 10 negative) plus the handoff attempt; rounds 6-10 via persistent MCP servers below |
 | one LLM client produces an accurate report | demo run 1 (`runs/demo-1.txt`), spot-checked claim by claim |
 | a human-performed change is reflected in the next observation | demo run 2: wonder started and commander moved, both reported |
 | no autonomous gameplay actions | none exist; mutators are blocked by the payload policy test |

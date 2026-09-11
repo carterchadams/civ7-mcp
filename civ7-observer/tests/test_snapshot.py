@@ -33,7 +33,8 @@ def test_snapshot_writes_validated_observation(tmp_path):
 def test_snapshot_sends_rendered_payload_with_mode_and_player(tmp_path):
     _, _, f = run_snapshot(tmp_path, json.dumps(OBS), mode="singleplayer")
     sent = json.loads(f.all_sockets[1].sent[1])["params"]["expression"]
-    assert sent == render_payload("observe.js", bound_player_id=1, allowed_mode="singleplayer")
+    assert sent == render_payload("observe.js", bound_player_id=1, allowed_mode="singleplayer", guards_only=False)
+    assert "GUARDS_ONLY" not in sent
     assert "BOUND_PLAYER_ID" not in sent and "ALLOWED_MODE" not in sent
 
 

@@ -6,6 +6,7 @@ The bound player and allowed mode are fixed at startup and cannot be changed by 
 
 from __future__ import annotations
 
+import json
 import logging
 import threading
 from typing import Any, Callable
@@ -13,9 +14,9 @@ from typing import Any, Callable
 from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
-from civ7_observer import cdp, schema
-from civ7_observer.doctor import DoctorStatus, run_doctor
+from civ7_observer import __version__, cdp, schema
 from civ7_observer.service import ObserverError, open_game_session
+from civ7_observer.payloads import render_payload
 from civ7_observer.snapshot import capture, session_id
 
 log = logging.getLogger(__name__)
@@ -70,21 +71,45 @@ def build_server(
 
     @mcp.tool(name="get_status", description=STATUS_DESCRIPTION, annotations=READ_ONLY)
     def get_status() -> dict[str, Any]:
-        with lock:
-            result = run_doctor(port=port, timeout=timeout, target_id=target_id, discover=discover, session_factory=session_factory)
         st: dict[str, Any] = {
-            "status": str(result.status), "summary": result.summary, "ready": False, "reason": None,
-            "boundPlayerId": bound, "allowedMode": mode, "sessionId": session_id(), "context": result.context,
-            "adapterVersion": result.adapter_version,
+            "status": None, "summary": None, "ready": False, "reason": None, "eligibility": None,
+            "boundPlayerId": bound, "allowedMode": mode, "sessionId": session_id(), "context": None,
+            "adapterVersion": __version__,
         }
-        if result.status is DoctorStatus.IN_GAME:
-            ctx = result.context or {}
-            if ctx.get("localPlayerId") == bound and ctx.get("localObserverId") == bound:
-                st["ready"] = True
-            else:
-                st["reason"] = "WRONG_PLAYER"
-        else:
-            st["reason"] = str(result.status)
+        with lock:
+            try:
+                with open_game_session(port=port, timeout=timeout, target_id=target_id, discover=discover, session_factory=session_factory) as gs:
+                    st["status"] = str(gs.doctor.status)
+                    st["summary"] = gs.doctor.summary
+                    st["context"] = gs.doctor.context
+                    if gs.context.local_player_id != bound or gs.context.local_observer_id != bound:
+                        st["reason"] = "WRONG_PLAYER"
+                        return st
+                    # The capture's own guards (seat, mode flags, active turn, in-game), with no roster read.
+                    value = gs.session.evaluate_readonly(render_payload("observe.js", bound_player_id=bound, allowed_mode=mode, guards_only=True))
+                data = json.loads(value) if isinstance(value, str) else None
+                elig = schema.validate_eligibility(data, bound_player_id=bound)
+            except ObserverError as exc:
+                doctor = exc.extra.get("doctor") if isinstance(exc.extra, dict) else None
+                if doctor:
+                    st["status"], st["summary"], st["context"] = doctor["status"], doctor["summary"], doctor["context"]
+                else:
+                    st["status"] = st["status"] or exc.code
+                    st["summary"] = st["summary"] or exc.message
+                st["reason"] = exc.code
+                return st
+            except schema.PayloadRefused as exc:
+                st["reason"] = exc.code
+                return st
+            except cdp.CdpError as exc:
+                st["status"] = st["status"] or exc.code
+                st["reason"] = exc.code
+                return st
+            except (schema.InvalidObservation, ValueError, TypeError):
+                st["reason"] = "API_CONTRACT_MISMATCH"
+                return st
+        st["ready"] = True
+        st["eligibility"] = {"mode": elig["mode"], "isTurnActive": elig["isTurnActive"]}
         return st
 
     return mcp
