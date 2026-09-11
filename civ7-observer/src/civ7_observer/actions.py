@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -338,6 +338,13 @@ class ActionRegistry:
                 for k in ("cityId", "cityName", "constructibleKey", "constructibleClass", "plotIndex", "placement", "terrainKey", "featureKey", "river", "yields"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "CHANGE_TRADITION":
+                if not isinstance(o.get("arg2"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "tradition offer without a type hash")
+                rec["arg2"] = o["arg2"]
+                for k in ("slot", "slotsTotal", "slotsFree", "description"):
+                    if k in o:
+                        entry[k] = o[k]
             if kind == "PRODUCE_UNIT":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "produce offer without a unit type")
@@ -466,6 +473,13 @@ class ActionRegistry:
                     plots = rb.get("expandPlots")
                     if isinstance(plots, dict) and isinstance(plots.get(str(offer["arg"])), list) and offer["pre"] not in plots[str(offer["arg"])]:
                         effect = {"populationPlaced": {"cityId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "plotIndex": offer["pre"]}}
+                elif kind == "CHANGE_TRADITION":
+                    active = rb.get("activeTraditions")
+                    if isinstance(active, list) and offer["arg2"] in active:
+                        effect = {"traditionActive": offer["arg2"]}
+                elif kind == "CONSIDER_ASSIGN_TRADITIONS":
+                    if isinstance(rb.get("endTurnBlocking"), str) and rb["endTurnBlocking"] != "TRADITIONS":
+                        effect = {"endTurnBlocking": rb["endTurnBlocking"]}
                 elif kind in ("PRODUCE_UNIT", "PRODUCE_CONSTRUCTIBLE"):
                     prod = rb.get("cityProduction")
                     if isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]:

@@ -519,3 +519,69 @@ test("perform PRODUCE_CONSTRUCTIBLE refuses unknown city, non-constructible type
     assert.ok(!log.some((e) => e.startsWith("bsendRequest")), `${label}: must not send`);
   }
 });
+
+// ---- traditions (policy cards): activate into a free slot, then confirm to clear the blocker
+function withTraditions(g, { unlocked = [9001, 9002], active = [], slots = 1, activateOk = true, blockerAfter = 0 } = {}) {
+  const cu = g.Players.get(1).Culture;
+  let actives = active.slice();
+  g.CultureSlotTypes = { NO_CULTURE_SLOT: 0, TRADITION_CULTURE_SLOT: 1, POLICY_CULTURE_SLOT: 2, CRISIS_CULTURE_SLOT: 3 };
+  g.PlayerOperationParameters = { Activate: -1326475004, Deactivate: 1318334332 };
+  g.PlayerOperationTypes.CHANGE_TRADITION = -403962502; g.PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS = 965202866;
+  g.EndTurnBlockingTypes.TRADITIONS = 555;
+  const rows = [{ $hash: 9001, $index: 11, TraditionType: "TRADITION_A", CultureSlotType: "TRADITION_CULTURE_SLOT", Name: "LOC_TA", Description: "LOC_TA_D" }, { $hash: 9002, $index: 12, TraditionType: "TRADITION_B", CultureSlotType: "TRADITION_CULTURE_SLOT", Name: "LOC_TB", Description: "LOC_TB_D" }];
+  g.GameInfo.Traditions = table(rows);
+  cu.getNumCultureSlots = (st) => (st === 1 ? slots : 0);
+  cu.getActiveTraditions = (st) => (st === 1 ? actives.slice() : []);
+  cu.getUnlockedTraditions = (st) => (st === 1 ? unlocked.slice() : []);
+  cu.isTraditionActive = (h) => actives.includes(h);
+  let blocker = 555;
+  g.Game.Notifications.getEndTurnBlockingType = () => blocker;
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== -403962502 && op !== 965202866) return inner.canStart(pid, op, args, show); g._log.push(`tcanStart(${pid},${op},${JSON.stringify(args)},${show})`); return { Success: op === 965202866 ? true : activateOk && actives.length < slots }; },
+    sendRequest: (pid, op, args) => { if (op !== -403962502 && op !== 965202866) return inner.sendRequest(pid, op, args); g._log.push(`tsendRequest(${pid},${op},${JSON.stringify(args)})`); if (op === -403962502) { const row = rows.find((r) => r.$index === args.TraditionType); if (row && activateOk) actives.push(row.$hash); } else { blocker = blockerAfter; } },
+  };
+  return g;
+}
+
+test("tradition offers list unlocked, inactive cards per slot type with slot counts, and the confirm only under the TRADITIONS blocker", () => {
+  const log = [];
+  const g = withTraditions(world({ log, blocking: true }), { active: [9002] }); g._log = log;
+  const r = runOffers(g);
+  const trads = r.offers.filter((o) => o.kind === "CHANGE_TRADITION");
+  assert.deepEqual(trads.map((o) => [o.arg, o.arg2, o.pre, o.slot, o.slotsTotal, o.slotsFree, o.typeKey, o.canStart]), [[11, 9001, 1, "TRADITION_CULTURE_SLOT", 1, 0, "TRADITION_A", false]]);
+  assert.equal(r.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS").length, 1);
+  assert.ok(log.filter((e) => e.startsWith("tcanStart(")).every((e) => e.startsWith("tcanStart(1,") && e.endsWith(",false)")));
+  const g2 = withTraditions(world({ log: [] })); g2._log = []; g2.Game.Notifications.getEndTurnBlockingType = () => 0;
+  const r2 = runOffers(g2);
+  assert.equal(r2.offers.filter((o) => o.kind === "CONSIDER_ASSIGN_TRADITIONS").length, 0, "confirm is offered only while TRADITIONS blocks the turn");
+  assert.ok(r2.offers.filter((o) => o.kind === "CHANGE_TRADITION").every((o) => o.canStart === true && o.slotsFree === 1));
+});
+
+test("perform CHANGE_TRADITION re-checks identity, slot occupancy and canStart, sends Activate, and reads back; CONSIDER clears the blocker", () => {
+  const log = [];
+  const g = withTraditions(world({ log, blocking: true })); g._log = log;
+  const r = runPerformArgs(g, "CHANGE_TRADITION", 11, 9001, 0, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "CHANGE_TRADITION", arg: 11, tradition: 9001, active: true, matches: true });
+  const send = log.find((e) => e.startsWith("tsendRequest(1,-403962502"));
+  assert.ok(send && send.includes('"TraditionType":11,"Action":-1326475004'));
+  const c = runPerform(g, "CONSIDER_ASSIGN_TRADITIONS", 0, { pre: 0 });
+  assert.equal(c.outcome, "sent");
+  assert.deepEqual(c.readback, { kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, blocking: "NONE", matches: true });
+});
+
+test("perform CHANGE_TRADITION refuses a mismatched identity, a changed slot count, an already active card and a canStart refusal without sending", () => {
+  for (const [label, mk, idx, hash, pre] of [
+    ["identity mismatch", () => withTraditions(world({ log: [] })), 12, 9001, 0],
+    ["slot count changed", () => withTraditions(world({ log: [] })), 11, 9001, 1],
+    ["already active", () => withTraditions(world({ log: [] }), { active: [9001] }), 11, 9001, 1],
+    ["canStart false", () => withTraditions(world({ log: [] }), { activateOk: false }), 11, 9001, 0],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "CHANGE_TRADITION", idx, hash, 0, { pre });
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("tsendRequest")), `${label}: must not send`);
+  }
+});

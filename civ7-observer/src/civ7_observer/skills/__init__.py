@@ -26,6 +26,7 @@ DECISION_SKILL = {
     "unit": "civ7-reconnaissance-and-memory",
     "settle": "civ7-settlement-sites",
     "population": "civ7-growth-and-specialists",
+    "policies": "civ7-happiness-and-government",
     "end_turn": "civ7-turn-management",
 }
 ALWAYS = "civ7-turn-management"

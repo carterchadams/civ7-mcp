@@ -177,6 +177,38 @@
     result.readback = { kind: KIND, arg: ARG, unitType: ARG2, observedType: isInt(observed) ? observed : null, matches: observed === ARG2 };
     return JSON.stringify(result);
   }
+  if (KIND === "CHANGE_TRADITION") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "tradition arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof CultureSlotTypes === "undefined" || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Activate)) return refuse("API_CONTRACT_MISMATCH", "tradition operation contract unavailable");
+    const trow = GameInfo.Traditions.lookup(ARG2);
+    if (!trow || trow.$index !== ARG) return refuse("UNKNOWN_ACTION", "tradition identity does not match the offer");
+    const cu = player.Culture;
+    const st = CultureSlotTypes[trow.CultureSlotType];
+    if (!isInt(st)) return refuse("API_CONTRACT_MISMATCH", "tradition slot type unavailable");
+    let activeCount = null; try { activeCount = cu.getActiveTraditions(st).length; } catch (e) { activeCount = null; }
+    if (activeCount !== PRE) return refuse("ACTION_EXPIRED", "the slots of that type changed since the offer was made");
+    if (cu.isTraditionActive(ARG2) === true) return refuse("ACTION_EXPIRED", "that tradition is already active");
+    const args = { TraditionType: ARG, Action: PlayerOperationParameters.Activate };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused activating the tradition");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let nowActive = null; try { nowActive = cu.isTraditionActive(ARG2) === true; } catch (e) { nowActive = null; }
+    result.readback = { kind: KIND, arg: ARG, tradition: ARG2, active: nowActive, matches: nowActive === true };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CONSIDER_ASSIGN_TRADITIONS") {
+    if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");
+    const args = {};
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused confirming traditions");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let bt = null; try { bt = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID); } catch (e) { bt = null; }
+    const bname = (v) => { try { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; } catch (e) { /* fall through */ } return null; };
+    result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
+    return JSON.stringify(result);
+  }
   if (KIND !== "SET_TECH_TREE_NODE" && KIND !== "SET_CULTURE_TREE_NODE") return refuse("UNKNOWN_ACTION", "unsupported operation kind");
   if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "operation argument is not an integer");
   if (!isInt(PlayerOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "operation type unavailable");

@@ -102,10 +102,10 @@ def _end_turn_id(provider):
 
 
 def test_a_pause_stops_the_turn_without_acting(tmp_path):
-    scripts = session_scripts(offers_payload(RESEARCH, end_can_start=False, blocking="TRADITIONS"))
+    scripts = session_scripts(offers_payload(RESEARCH, end_can_start=False, blocking="PANTHEON"))
     provider = FakeProvider([
         ProviderResponse(text="", tool_calls=[ToolCall("1", "get_turn_brief", {})]),
-        ProviderResponse(text="Paused: the game wants a TRADITIONS decision I cannot make.", tool_calls=[]),
+        ProviderResponse(text="Paused: the game wants a PANTHEON decision I cannot make.", tool_calls=[]),
     ])
     r, f = make(tmp_path, scripts, provider)
     result = r.play_turn()

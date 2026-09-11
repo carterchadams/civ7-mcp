@@ -25,6 +25,7 @@ BLOCKER_DECISION = {
     "UNIT_NEEDS_ORDERS": "unit",
     "STACKED_UNITS": "unit",
     "NEW_POPULATION": "population",
+    "TRADITIONS": "policies",
 }
 
 # Public action kinds grouped into the decision a player actually faces.
@@ -39,13 +40,16 @@ DECISION_OF_KIND = {
     # decision a settler actually faces, so it gets its own group and its own skill card.
     "found_city": "settle",
     "expand_city": "population",
+    "activate_tradition": "policies",
+    "confirm_traditions": "policies",
     "end_turn": "end_turn",
 }
 
 OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "turns",
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
-                 "constructibleKey", "constructibleClass", "placement", "plotIndex")
+                 "constructibleKey", "constructibleClass", "placement", "plotIndex",
+                 "slot", "slotsTotal", "slotsFree", "description")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")

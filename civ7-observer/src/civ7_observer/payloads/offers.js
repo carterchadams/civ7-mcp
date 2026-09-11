@@ -39,6 +39,11 @@
   // ---- offers
   const offers = [];
   try {
+    const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
+    const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
+    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
+    if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
+    const blocked = blockingType !== none;
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
     for (const [kind, comp] of kinds) {
       if (!comp || typeof comp.getAllAvailableNodeTypes !== "function") throw new Error(kind + " component unavailable");
@@ -195,11 +200,31 @@
         }
       }
     }
-    const blockingType = Game.Notifications.getEndTurnBlockingType(BOUND_PLAYER_ID);
-    const none = typeof EndTurnBlockingTypes !== "undefined" ? EndTurnBlockingTypes.NONE : null;
-    const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; return String(v); };
-    if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
-    const blocked = blockingType !== none;
+    if (isInt(PlayerOperationTypes.CHANGE_TRADITION) && typeof CultureSlotTypes !== "undefined" && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate)) {
+      // Policies: the shipped policies screen lists unlocked traditions per slot type and sends
+      // CHANGE_TRADITION {TraditionType: $index, Action: Activate} per card, then
+      // CONSIDER_ASSIGN_TRADITIONS {} on confirm, which is what clears the TRADITIONS blocker.
+      const cu = player.Culture;
+      for (const slotName of ["TRADITION_CULTURE_SLOT", "POLICY_CULTURE_SLOT", "CRISIS_CULTURE_SLOT"]) {
+        const st = CultureSlotTypes[slotName];
+        if (!isInt(st)) continue;
+        const total = cu.getNumCultureSlots(st); const active = cu.getActiveTraditions(st); const unlocked = cu.getUnlockedTraditions(st);
+        if (!isInt(total) || !Array.isArray(active) || !Array.isArray(unlocked)) throw new Error("culture slot contract unavailable");
+        for (const hash of unlocked) {
+          if (!isInt(hash)) continue;
+          const row = GameInfo.Traditions.lookup(hash);
+          if (!row || !isInt(row.$index) || cu.isTraditionActive(hash) === true) continue;
+          const targs = { TraditionType: row.$index, Action: PlayerOperationParameters.Activate };
+          const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_TRADITION, targs, false);
+          offers.push({ kind: "CHANGE_TRADITION", arg: row.$index, arg2: hash, pre: active.length, slot: slotName, slotsTotal: total, slotsFree: total - active.length,
+            typeKey: typeof row.TraditionType === "string" ? row.TraditionType : null, displayName: compose(row.Name), description: compose(row.Description), canStart: !!(check && check.Success === true) });
+        }
+      }
+      if (blocked && blockerName(blockingType) === "TRADITIONS" && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS, {}, false);
+        offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
+      }
+    }
     const alreadySent = GameContext.hasSentTurnComplete() === true;
     offers.push({ kind: "END_TURN", arg: 0, pre: 0, canStart: !blocked && !alreadySent, blockingType: blocked ? blockerName(blockingType) : null, alreadySent: alreadySent });
   } catch (e) {

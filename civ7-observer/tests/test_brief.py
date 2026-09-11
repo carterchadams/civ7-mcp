@@ -60,9 +60,9 @@ def test_brief_marks_the_required_decision_from_the_native_blocker(tmp_path):
 
 
 def test_unsupported_blocker_becomes_a_named_pause_with_no_invented_options(tmp_path):
-    b, _, _ = build(tmp_path, offers_with(RESEARCH, end_can_start=False, blocking="TRADITIONS"))
-    assert b["pause"] == {"reason": "UNSUPPORTED_DECISION", "blocking": "TRADITIONS",
-                          "message": "the game requires a TRADITIONS decision, which this catalog cannot make; a human must take the seat and resolve it"}
+    b, _, _ = build(tmp_path, offers_with(RESEARCH, end_can_start=False, blocking="PANTHEON"))
+    assert b["pause"] == {"reason": "UNSUPPORTED_DECISION", "blocking": "PANTHEON",
+                          "message": "the game requires a PANTHEON decision, which this catalog cannot make; a human must take the seat and resolve it"}
     assert all(not d["required"] for d in b["decisions"])
     assert b["endTurn"]["supported"] is False
 
@@ -137,3 +137,15 @@ def test_production_blocker_groups_units_and_buildings_into_one_required_product
     assert [d["kind"] for d in required] == ["production"] and b["pause"] is None
     kinds = [(o["kind"], o.get("displayName"), o.get("cost"), o.get("turns"), o.get("placement"), o.get("to")) for o in required[0]["options"]]
     assert kinds == [("produce_unit", "Warrior", 40, 5, None, None), ("produce_constructible", "Granary", 36, 8, "newUrban", {"x": 4, "y": 4})]
+
+
+def test_traditions_blocker_is_a_supported_policies_decision_with_activation_and_confirm_options(tmp_path):
+    policies = [
+        {"kind": "CHANGE_TRADITION", "arg": 11, "arg2": 9001, "pre": 0, "slot": "TRADITION_CULTURE_SLOT", "slotsTotal": 1, "slotsFree": 1, "typeKey": "TRADITION_A", "displayName": "Trial of Time", "description": "+1 culture", "canStart": True},
+        {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(policies, end_can_start=False, blocking="TRADITIONS"))
+    assert b["pause"] is None and b["endTurn"]["supported"] is True
+    required = [d for d in b["decisions"] if d["required"]]
+    assert [d["kind"] for d in required] == ["policies"]
+    kinds = [(o["kind"], o.get("displayName"), o.get("slot"), o.get("slotsFree"), o.get("description")) for o in required[0]["options"]]
+    assert kinds == [("activate_tradition", "Trial of Time", "TRADITION_CULTURE_SLOT", 1, "+1 culture"), ("confirm_traditions", None, None, None, None)]

@@ -847,3 +847,26 @@ def test_constructible_offers_expose_placement_and_perform_confirms_on_city_prod
     assert res["confirmedBy"]["effect"] == {"cityProduction": {"cityId": 65536, "constructibleType": 501}}
     sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
     assert '"PRODUCE_CONSTRUCTIBLE"' in sent and "const ARG = 65536;" in sent and "const ARG2 = 501;" in sent and "const ARG3 = 404;" in sent
+
+
+def test_tradition_offers_and_confirmation_flow_through_the_registry(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [
+        {"kind": "CHANGE_TRADITION", "arg": 11, "arg2": 9001, "pre": 0, "slot": "TRADITION_CULTURE_SLOT", "slotsTotal": 1, "slotsFree": 1, "typeKey": "TRADITION_A", "displayName": "Trial of Time", "description": "+1 culture", "canStart": True},
+        {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHANGE_TRADITION", "arg": 11, "tradition": 9001, "active": False, "matches": False}}
+    confirmed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "blocking": "TRADITIONS", "matches": False}}
+    rb1 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "TRADITIONS"}
+    rb2 = {**RB, "activeTraditions": [9001], "endTurnBlocking": "NONE"}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb1)), reply(6, json.dumps(confirmed)), reply(7, json.dumps(rb2))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        tr = next(o for o in out["offers"] if o["kind"] == "activate_tradition")
+        assert tr["slot"] == "TRADITION_CULTURE_SLOT" and tr["slotsFree"] == 1 and tr["description"] == "+1 culture" and "arg" not in tr and "arg2" not in tr
+        res = reg.perform(gs, action_id=tr["actionId"], request_id="tr-1", player=1, mode="singleplayer")
+        assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"traditionActive": 9001}
+        sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+        assert '"CHANGE_TRADITION"' in sent and "const ARG = 11;" in sent and "const ARG2 = 9001;" in sent
+        co = next(o for o in out["offers"] if o["kind"] == "confirm_traditions")
+        res2 = reg.perform(gs, action_id=co["actionId"], request_id="tr-2", player=1, mode="singleplayer")
+    assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"endTurnBlocking": "NONE"}
