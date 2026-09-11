@@ -76,7 +76,7 @@ def test_stdio_closed_loop_brief_then_act(server, tmp_path):
     ])}
     result = anyio.run(_closed_loop, server.port, 1, "singleplayer", str(tmp_path / "seat1.jsonl"))
     names, brief_doc, receipt = result
-    assert sorted(names) == ["get_action_result", "get_observation", "get_status", "get_turn_brief", "list_actions", "perform_action"]
+    assert sorted(names) == ["get_action_result", "get_observation", "get_plan", "get_status", "get_turn_brief", "list_actions", "load_skill", "perform_action", "report_friction", "update_plan"]
     assert brief_doc["endTurn"]["blocking"] == "RESEARCH"
     assert [d["kind"] for d in brief_doc["decisions"] if d["required"]] == ["research"]
     assert receipt["status"] == "confirmed" and receipt["kind"] == "SET_TECH_TREE_NODE"

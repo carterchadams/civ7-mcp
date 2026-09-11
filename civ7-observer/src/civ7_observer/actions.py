@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -300,7 +300,7 @@ class ActionRegistry:
             rec = {"kind": kind, "arg": o["arg"], "pre": o["pre"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
                    "match": gs.context.game_guid, "generation": generation, "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
-            if kind in ("MOVE_UNIT", "SKIP_UNIT"):
+            if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY"):
                 if isinstance(o.get("unitId"), int):
                     entry["unitId"] = o["unitId"]
                 if isinstance(o.get("from"), dict):
@@ -315,6 +315,12 @@ class ActionRegistry:
                 for k in ("terrainKey", "pathTurns"):
                     if k in o:
                         entry[k] = o[k]
+            if kind == "FOUND_CITY":
+                if not isinstance(o.get("x"), int) or not isinstance(o.get("y"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "found-city offer without coordinates")
+                rec["arg2"], rec["arg3"] = o["x"], o["y"]
+                if "terrainKey" in o:
+                    entry["terrainKey"] = o["terrainKey"]
             if kind == "PRODUCE_UNIT":
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "produce offer without a unit type")
@@ -435,6 +441,10 @@ class ActionRegistry:
                     locs = rb.get("unitLocations")
                     if isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]:
                         effect = {"unitLocation": {"unitId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"]}}
+                elif kind == "FOUND_CITY":
+                    cities = rb.get("cityLocations")
+                    if isinstance(cities, dict) and [offer["arg2"], offer["arg3"]] in cities.values():
+                        effect = {"settlementFounded": {"unitId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"]}}
                 elif kind == "PRODUCE_UNIT":
                     prod = rb.get("cityProduction")
                     if isinstance(prod, dict) and prod.get(str(offer["arg"])) == offer["arg2"]:

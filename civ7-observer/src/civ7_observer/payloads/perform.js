@@ -95,6 +95,25 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
+  if (KIND === "FOUND_CITY") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "found-city arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.FOUND_CITY)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.FOUND_CITY unavailable");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    if (unit.isOnMap !== true || !unit.location || !isInt(unit.location.x)) return refuse("ACTION_NOT_STARTABLE", "unit is not on the map");
+    if (unit.location.x !== ARG2 || unit.location.y !== ARG3 || GameplayMap.getIndexFromXY(unit.location.x, unit.location.y) !== PRE) return refuse("ACTION_EXPIRED", "unit is no longer where it was when founding was offered");
+    const unitId = unit.id;
+    const foundArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    const fcheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false);
+    if (!fcheck || fcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused founding a settlement here");
+    Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, foundArgs);
+    result.outcome = "sent";
+    let founded = false;
+    try { for (const c of player.Cities.getCities()) { if (c && c.location && c.location.x === ARG2 && c.location.y === ARG3) { founded = true; break; } } } catch (e) { founded = false; }
+    result.readback = { kind: KIND, arg: ARG, at: { x: ARG2, y: ARG3 }, matches: founded };
+    return JSON.stringify(result);
+  }
   if (KIND === "PRODUCE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
     if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");

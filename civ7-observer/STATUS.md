@@ -17,13 +17,14 @@ observation-only any more: `act perform` mutates the running game.
 |---|---|
 | read-only observation of one bound seat (settlements, units, technology, civics, visible map) | working, live-verified |
 | stdio MCP server exposing `get_observation` / `get_status` | working, live-verified |
-| constrained native actions (research, civic, skip unit, move unit, produce unit, end turn) | working, live-verified |
+| constrained native actions (research, civic, skip unit, move unit, produce unit, found city, end turn) | working, live-verified |
 | compact turn brief (`get_turn_brief`): the required decision, bounded options, explicit pause | working, live-verified (~4 KB, ~150 ms) |
 | actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
-| agent runner: a model plays one turn of one bound seat (`play`) | working, offline-tested only |
-| skill cards generated from the strategy guide, routed per decision | working, offline-tested only |
-| per-seat plan and friction backlog (`friction`) | working, offline-tested only |
-| scheduler: watching for a seat's turn, seat swapping, driving the curtain | **not implemented** |
+| agent runner: a model plays one turn of one bound seat (`play`, direct API) | working, offline-tested only |
+| seat sessions over MCP: `demo/agent-game.py` plays every seat of a hotseat game with one isolated `claude -p` session per seat turn | working, live (4 agent seats, consecutive turns under the curtain) |
+| skill cards generated from the strategy guide, routed per decision; plan and friction tools over MCP | working, live |
+| per-seat plan and friction backlog (`friction`) | working, live |
+| scheduler inside the game (watching for a seat's turn, driving the curtain) | **not implemented**; the driver sequences seats from outside by reading the seat context |
 | in-game mod, remote seats, containers | **not implemented, deferred** (see release scope) |
 
 ## Commands
@@ -48,7 +49,9 @@ engine player id and must equal both `localPlayerID` and `localObserverID` at th
 
 Read-only by default: `get_observation`, `get_status`. With `--allow-actions` the seat's action
 catalog is added: `get_turn_brief` (start here each turn), `list_actions`, `perform_action`
-(`action_id` + a caller-chosen `request_id` that makes it idempotent) and `get_action_result`.
+(`action_id` + a caller-chosen `request_id` that makes it idempotent) and `get_action_result`, plus
+the runner's own tools, which never touch the game: `load_skill`, `get_plan`, `update_plan` and
+`report_friction` (the seat's plan and friction backlog live in the host workspace).
 A client only ever sees opaque action ids; engine operation names and arguments stay host-side.
 
 ## Host state (persistent, outside the repo)
@@ -95,14 +98,15 @@ forward reload is not detected; after any load the host must be rebound explicit
 
 ## Known gaps and non-claims
 
-1. The runner plays one turn per invocation and has never been run against the live game. There is
-   no scheduler: nothing watches for a seat's turn, swaps seats or drives the hotseat curtain.
+1. One invocation plays one seat turn. `demo/agent-game.py` sequences seats from outside the game by
+   reading the seat context and stops at the first pause or failed turn; nothing inside the game
+   watches for a seat's turn or drives the hotseat curtain (agent seats play under it).
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
-3. The action catalog covers 6 of the game's decision kinds; see `../plans/civ7-player-actions.md`
+3. The action catalog covers 7 of the game's decision kinds; see `../plans/civ7-player-actions.md`
    (untracked) for the full inventory and `docs/action-contract.md` for what is implemented.
-4. Concealment behind the stock hotseat curtain is verified for one agent turn; consecutive agent
-   seats, blocking popups, diplomacy and disconnect are not.
+4. Concealment behind the stock hotseat curtain is verified for consecutive agent seats (a 4-seat
+   all-agent game); blocking popups, diplomacy and disconnect are not.
 5. No end-to-end token/latency measurement for the runner's decision loop. A hand-driven MCP client
    turn (5 moves and an end turn) took 33.5 s.
 6. The debugger listens on `0.0.0.0:9444` on this build. Firewall it on a shared network.

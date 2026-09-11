@@ -72,7 +72,28 @@ it was trying to do, what specifically would have let it decide, and the seat, m
 decision the game was blocking on. `python -m civ7_observer friction --player N` prints that
 backlog; it is the input to the next round of action implementation.
 
+## Playing through the MCP server instead of the direct API
+
+`demo/agent-game.py` plays a whole hotseat game with no API key: for each seat turn it launches an
+isolated `claude -p` session (`--tools ""`, `--strict-mcp-config`) whose only tools belong to one
+MCP server bound to that seat with `--allow-actions`. The server exposes the same six tools the
+in-process runner hands its model, under the same names (`get_turn_brief`, `list_actions`,
+`perform_action`, `load_skill`, `update_plan`, `report_friction`), plus `get_plan`,
+`get_action_result` and `get_observation`. The session's system prompt is assembled by the same
+function (`runner.assemble_system_prompt`) from a read-only brief the driver takes first, so the
+routed cards and the seat's plan are identical to the direct-API path.
+
+The driver never acts on the game. After each seat it reads the seat's journal (did an `END_TURN`
+confirm on this turn?), the seat's friction backlog and the seat context, prints one line per seat
+turn, and stops at the first pause, error, unknown outcome or turn that did not end, so a human can
+look. Runs go to `runs/agent-game/` (`log.jsonl`, and per seat turn the system prompt, the
+stream-json transcript and the closing report).
+
+```
+python demo/agent-game.py --seats 0 1 2 3 --rounds 5 --model sonnet
+```
+
 ## What this does not do
 
-No scheduler: one invocation plays one turn of one seat. Nothing here watches for the seat's turn
-to come up, swaps seats, or drives the hotseat curtain.
+Nothing inside the game watches for a seat's turn or drives the hotseat curtain: agent seats play
+under it, and the driver above sequences seats from outside by reading the seat context.

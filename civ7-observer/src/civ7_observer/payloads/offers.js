@@ -101,6 +101,21 @@
         }
       }
     }
+    if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.FOUND_CITY)) {
+      // Founding happens where the unit stands: the shipped panel sends no target plot for
+      // FOUND_CITY (X/Y stay -9999), so the offer is bound to the unit's current plot instead.
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || !isInt(u.location.y) || u.location.x < 0) continue;
+        const unitId = u.id;
+        const foundArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+        const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false);
+        if (!check || check.Success !== true) continue;   // only units that can found here are offered
+        offers.push({ kind: "FOUND_CITY", arg: u.id.id, x: u.location.x, y: u.location.y, pre: GameplayMap.getIndexFromXY(u.location.x, u.location.y), unitId: u.id.id, from: { x: u.location.x, y: u.location.y },
+          unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(u.location.x, u.location.y), "TerrainType"),
+          movesRemaining: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null, canStart: true });
+      }
+    }
     if (typeof CityOperationTypes !== "undefined" && isInt(CityOperationTypes.BUILD)) {
       const cities = player.Cities.getCities();
       if (!Array.isArray(cities)) throw new Error("getCities() is not an array");

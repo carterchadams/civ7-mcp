@@ -40,8 +40,10 @@ MUTATION_ALLOWLIST = (
     'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.MOVE_TO, moveArgs)',
     'Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false)',
     'Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs)',
+    'Game.UnitOperations.canStart(unitId, UnitOperationTypes.FOUND_CITY, foundArgs, false)',
+    'Game.UnitOperations.sendRequest(unitId, UnitOperationTypes.FOUND_CITY, foundArgs)',
 )
-MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|UnitCommands|CityCommands|PURCHASE|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
+MUTATION_FORBIDDEN = r"\b(PlayerOperationTypes\.[A-Z_]+|UnitOperationTypes\.(?!SKIP_TURN\b|MOVE_TO\b|FOUND_CITY\b)[A-Z_]+|CityOperationTypes\.(?!BUILD\b)[A-Z_]+|UnitCommands|CityCommands|PURCHASE|sendUnreadyTurn|sendRetireRequest|sendPauseRequest|sendGameQuery|revealTree|unlockTradition|purchasePlot|destroy|Network\.)\b"
 ENGINE_CALL = re.compile(r"(Game\.(?:PlayerOperations|UnitOperations|CityOperations)\.(?:canStart|sendRequest)\([^)]*\)?|GameContext\.sendTurnComplete\(\))")
 
 

@@ -24,6 +24,7 @@ DECISION_SKILL = {
     # movement, map memory, information value) is the one that applies. Add the combat card here
     # when attack actions exist.
     "unit": "civ7-reconnaissance-and-memory",
+    "settle": "civ7-settlement-sites",
     "end_turn": "civ7-turn-management",
 }
 ALWAYS = "civ7-turn-management"

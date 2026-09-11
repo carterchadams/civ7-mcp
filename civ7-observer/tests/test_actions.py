@@ -765,3 +765,35 @@ def test_tests_never_use_the_real_host_state_directory():
     """Guard for the conftest isolation: a stray write here could block the user's live game."""
     from civ7_observer.attachment import state_dir
     assert str(state_dir()) != str(Path.home() / ".local" / "state" / "civ7-observer")
+
+
+def test_found_city_offers_expose_the_unit_and_plot_and_perform_confirms_on_a_settlement_there(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "FOUND_CITY", "arg": 65536, "x": 15, "y": 27, "pre": 2715, "unitId": 65536, "from": {"x": 15, "y": 27}, "unitTypeKey": "UNIT_FOUNDER", "terrainKey": "TERRAIN_FLAT", "movesRemaining": 3, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "FOUND_CITY", "arg": 65536, "at": {"x": 15, "y": 27}, "matches": False}}
+    rb = {**RB, "cityLocations": {"65536": [15, 27]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        fc = next(o for o in out["offers"] if o["kind"] == "found_city")
+        assert fc["unitId"] == 65536 and fc["from"] == {"x": 15, "y": 27} and fc["terrainKey"] == "TERRAIN_FLAT" and fc["unitTypeKey"] == "UNIT_FOUNDER"
+        assert "arg" not in fc and "x" not in fc and "pre" not in fc
+        res = reg.perform(gs, action_id=fc["actionId"], request_id="fc-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["source"] == "poll" and res["confirmedBy"]["effect"] == {"settlementFounded": {"unitId": 65536, "x": 15, "y": 27}}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"FOUND_CITY"' in sent and "const ARG = 65536;" in sent and "const ARG2 = 15;" in sent and "const ARG3 = 27;" in sent and "const PRE = 2715;" in sent
+
+
+def test_found_city_poll_needs_a_settlement_on_the_offered_plot(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "FOUND_CITY", "arg": 65536, "x": 15, "y": 27, "pre": 2715, "unitId": 65536, "from": {"x": 15, "y": 27}, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "FOUND_CITY", "arg": 65536, "at": {"x": 15, "y": 27}, "matches": False}}
+    rb = {**RB, "cityLocations": {"65536": [16, 27]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        fc = next(o for o in out["offers"] if o["kind"] == "found_city")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=fc["actionId"], request_id="fc-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"

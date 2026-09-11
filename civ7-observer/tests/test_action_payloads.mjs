@@ -314,3 +314,66 @@ test("perform MOVE_UNIT requires the destination to be exactly VISIBLE at execut
     assert.ok(!log.some((e) => e.startsWith("path(") || e.startsWith("usendRequest")), `${label}: no path lookup or send after refusal: ${log}`);
   }
 });
+
+// ---- found city (where the unit stands; the shipped panel sends no target plot)
+function withFounder(g, units, { foundOk = true, cityAfter = true } = {}) {
+  withUnits(g, units);
+  const cities = [];
+  g.Players.get(1).Cities = { getCities: () => cities };
+  g.UnitOperationTypes.FOUND_CITY = 1463004268;
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]);
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getTerrainType: () => 1 };
+  const inner = g.Game.UnitOperations;
+  g.Game.UnitOperations = {
+    canStart: (uid, op, args, show) => op === 1463004268 ? (g._log.push(`ucanStart(${JSON.stringify(uid)},${op},${JSON.stringify(args)},${show})`), { Success: foundOk && uid.owner === 1 && units.some((u) => u.id.id === uid.id && u.type === 7) }) : inner.canStart(uid, op, args, show),
+    sendRequest: (uid, op, args) => { if (op !== 1463004268) return inner.sendRequest(uid, op, args); g._log.push(`usendRequest(${JSON.stringify(uid)},${op},${JSON.stringify(args)})`); const u = units.find((x) => x.id.id === uid.id); if (u && cityAfter) cities.push({ id: { owner: 1, id: 65536, type: 1 }, location: { x: u.location.x, y: u.location.y } }); },
+  };
+  return g;
+}
+const founder = (id, extra) => unit(id, { type: 7, location: { x: 15, y: 27 }, Movement: { movementMovesRemaining: 3, maxMoves: 3 }, ...extra });
+
+test("found offers exist only for units the native FOUND_CITY canStart accepts, bound to the unit's plot", () => {
+  const log = [];
+  const g = withFounder(world({ log }), [founder(5), unit(6, { location: { x: 1, y: 1 } })]); g._log = log;
+  g.GameInfo.Units = table([{ $hash: 99, UnitType: "UNIT_SCOUT" }, { $hash: 7, UnitType: "UNIT_FOUNDER" }]);
+  const r = runOffers(g);
+  const found = r.offers.filter((o) => o.kind === "FOUND_CITY");
+  assert.deepEqual(found.map((o) => [o.arg, o.x, o.y, o.pre, o.unitId, o.unitTypeKey, o.terrainKey, o.movesRemaining, o.canStart]), [[5, 15, 27, 2715, 5, "UNIT_FOUNDER", "TERRAIN_FLAT", 3, true]]);
+  assert.deepEqual(found[0].from, { x: 15, y: 27 });
+  const checks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1463004268"));
+  assert.equal(checks.length, 2, "one native check per owned unit on the map");
+  assert.ok(checks.every((e) => e.includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1') && e.endsWith(",false)")));
+  assert.ok(!log.some((e) => e.startsWith("usendRequest")));
+});
+
+test("perform FOUND_CITY re-checks the unit's plot and canStart, sends with no target plot, and reads back the new settlement", () => {
+  const log = [];
+  const g = withFounder(world({ log }), [founder(5)]); g._log = log;
+  const r = runPerformArgs(g, "FOUND_CITY", 5, 15, 27, { pre: 2715 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "FOUND_CITY", arg: 5, at: { x: 15, y: 27 }, matches: true });
+  const i = log.findIndex((e) => e.startsWith("ucanStart(") && e.includes("1463004268"));
+  const j = log.findIndex((e) => e.startsWith("usendRequest(") && e.includes("1463004268"));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+  assert.ok(log[j].includes('"X":-9999,"Y":-9999,"UnitAbilityType":-1'));
+});
+
+test("perform FOUND_CITY refuses a moved unit, a stale plot, an unknown unit and a canStart refusal without sending; a missing settlement reads back as no match", () => {
+  for (const [label, mk, uid, x, y, pre] of [
+    ["unit moved since the offer", () => withFounder(world({ log: [] }), [founder(5, { location: { x: 16, y: 27 } })]), 5, 15, 27, 2715],
+    ["stale plot index", () => withFounder(world({ log: [] }), [founder(5)]), 5, 15, 27, 1],
+    ["unknown unit", () => withFounder(world({ log: [] }), [founder(5)]), 9, 15, 27, 2715],
+    ["canStart false", () => withFounder(world({ log: [] }), [founder(5)], { foundOk: false }), 5, 15, 27, 2715],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "FOUND_CITY", uid, x, y, { pre });
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("usendRequest")), `${label}: must not send`);
+  }
+  const log = [];
+  const g = withFounder(world({ log }), [founder(5)], { cityAfter: false }); g._log = log;
+  const r = runPerformArgs(g, "FOUND_CITY", 5, 15, 27, { pre: 2715 });
+  assert.equal(r.outcome, "sent");
+  assert.equal(r.readback.matches, false);
+});

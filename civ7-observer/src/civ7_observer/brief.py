@@ -33,6 +33,9 @@ DECISION_OF_KIND = {
     "produce_unit": "produce_unit",
     "skip_unit": "unit",
     "move_unit": "unit",
+    # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
+    # decision a settler actually faces, so it gets its own group and its own skill card.
+    "found_city": "settle",
     "end_turn": "end_turn",
 }
 

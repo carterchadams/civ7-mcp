@@ -125,6 +125,30 @@ Keep your visible output short: a line per decision saying what you chose and wh
 summary. The skill cards below are your procedures; the rest of the catalog can be loaded on demand."""
 
 
+def assemble_system_prompt(brief: dict[str, Any], workspace: Workspace, *, instructions: str = INSTRUCTIONS) -> str:
+    """The per-turn system prompt: operating instructions, the operating contract, the skill cards
+    routed for this brief's decisions (required first), the friction card, the rules those cards
+    cite, the seat's own plan, and the catalog of every other card. Shared by the in-process runner
+    and any external client that plays a seat through the MCP server."""
+    decisions = [d["kind"] for d in brief.get("decisions", [])]
+    required = next((d["kind"] for d in brief.get("decisions", []) if d.get("required")), None)
+    routed = skills.route(decisions, required=required)
+    rule_ids: list[str] = []
+    for skill_id in routed:
+        for rule_id in skills.index()["skills"].get(skill_id, {}).get("rules", []):
+            if rule_id not in rule_ids:
+                rule_ids.append(rule_id)
+    parts = [instructions, "", skills.operating()]
+    for skill_id in routed:
+        parts.append(skills.card(skill_id))
+    parts.append(skills.card("friction"))
+    if rule_ids:
+        parts.append("# Rules referenced by these skills\n\n" + skills.rules(rule_ids))
+    parts.append("# Your plan\n\n" + workspace.excerpt())
+    parts.append("# Other skill cards you can load\n\n" + skills.catalog())
+    return "\n\n".join(parts)
+
+
 class Runner:
     def __init__(self, *, port: int, timeout: float, player: int, mode: str, provider: Provider,
                  journal_path: Path | None = None, workspace_root: Path | None = None,
@@ -209,23 +233,7 @@ class Runner:
 
     # ---- prompt
     def _system_prompt(self, brief: dict[str, Any]) -> str:
-        decisions = [d["kind"] for d in brief.get("decisions", [])]
-        required = next((d["kind"] for d in brief.get("decisions", []) if d.get("required")), None)
-        routed = skills.route(decisions, required=required)
-        rule_ids: list[str] = []
-        for skill_id in routed:
-            for rule_id in skills.index()["skills"].get(skill_id, {}).get("rules", []):
-                if rule_id not in rule_ids:
-                    rule_ids.append(rule_id)
-        parts = [INSTRUCTIONS, "", skills.operating()]
-        for skill_id in routed:
-            parts.append(skills.card(skill_id))
-        parts.append(skills.card("friction"))
-        if rule_ids:
-            parts.append("# Rules referenced by these skills\n\n" + skills.rules(rule_ids))
-        parts.append("# Your plan\n\n" + self.workspace.excerpt())
-        parts.append("# Other skill cards you can load\n\n" + skills.catalog())
-        return "\n\n".join(parts)
+        return assemble_system_prompt(brief, self.workspace)
 
     # ---- the loop
     def play_turn(self) -> TurnResult:

@@ -93,3 +93,15 @@ def test_brief_is_small(tmp_path):
     assert unit["entityCount"] == 30 and len(unit["entities"]) == brief.DEFAULT_MAX_OPTIONS and unit["entitiesOmitted"] == 24
     research = next(d for d in b["decisions"] if d["kind"] == "research")
     assert research["optionCount"] == 40 and research["omitted"] == 34
+
+
+def test_found_city_offers_form_their_own_settle_decision_alongside_the_required_unit_orders(tmp_path):
+    found = [{"kind": "FOUND_CITY", "arg": 5, "x": 10, "y": 10, "pre": 1010, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_FOUNDER", "terrainKey": "TERRAIN_FLAT", "movesRemaining": 3, "canStart": True}]
+    b, _, _ = build(tmp_path, offers_with(UNITS + found, end_can_start=False, blocking="UNITS"))
+    kinds = {d["kind"]: d for d in b["decisions"]}
+    assert set(kinds) == {"unit", "settle"}
+    assert kinds["unit"]["required"] is True and kinds["settle"]["required"] is False
+    settle = kinds["settle"]
+    assert settle["options"] == [{"actionId": settle["options"][0]["actionId"], "kind": "found_city", "unitTypeKey": "UNIT_FOUNDER", "unitId": 5, "from": {"x": 10, "y": 10}, "terrainKey": "TERRAIN_FLAT"}]
+    assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 10, "y": 10}, "movesRemaining": 3}]
+    assert b["pause"] is None

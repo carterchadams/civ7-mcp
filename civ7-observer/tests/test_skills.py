@@ -33,6 +33,7 @@ def test_local_friction_card_is_available_and_not_generated():
     (["civic"], ["civ7-turn-management", "civ7-research-and-civics"]),
     (["produce_unit"], ["civ7-turn-management", "civ7-production-and-placement"]),
     (["unit"], ["civ7-turn-management", "civ7-reconnaissance-and-memory"]),
+    (["settle"], ["civ7-turn-management", "civ7-settlement-sites"]),
     (["end_turn"], ["civ7-turn-management"]),
     ([], ["civ7-turn-management"]),
     (["research", "unit"], ["civ7-turn-management", "civ7-research-and-civics", "civ7-reconnaissance-and-memory"]),
