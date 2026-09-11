@@ -125,3 +125,15 @@ def test_a_settler_that_cannot_found_here_is_shown_as_an_entity_with_a_note_not_
     assert settle["options"] == [] and settle["optionCount"] == 0 and settle["required"] is False
     assert settle["entities"] == [{"unitId": 5, "typeKey": "UNIT_FOUNDER", "at": {"x": 49, "y": 5}, "movesRemaining": 2, "canFoundHere": False, "terrainKey": "TERRAIN_NAVIGABLE_RIVER"}]
     assert "refused" in settle["note"] and "Move it" in settle["note"]
+
+
+def test_production_blocker_groups_units_and_buildings_into_one_required_production_decision(tmp_path):
+    production = [
+        {"kind": "PRODUCE_UNIT", "arg": 65536, "arg2": 100, "pre": -1, "cityId": 65536, "cityName": "Pārsa", "unitTypeKey": "UNIT_WARRIOR", "displayName": "Warrior", "cost": 40, "turns": 5, "canStart": True},
+        {"kind": "PRODUCE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 404, "x": 4, "y": 4, "pre": -1, "cityId": 65536, "cityName": "Pārsa", "constructibleKey": "BUILDING_GRANARY", "displayName": "Granary", "cost": 36, "turns": 8, "plotIndex": 404, "placement": "newUrban", "terrainKey": "TERRAIN_FLAT", "yields": {"food": 3}, "canStart": True},
+    ]
+    b, _, _ = build(tmp_path, offers_with(production, end_can_start=False, blocking="PRODUCTION"))
+    required = [d for d in b["decisions"] if d["required"]]
+    assert [d["kind"] for d in required] == ["production"] and b["pause"] is None
+    kinds = [(o["kind"], o.get("displayName"), o.get("cost"), o.get("turns"), o.get("placement"), o.get("to")) for o in required[0]["options"]]
+    assert kinds == [("produce_unit", "Warrior", 40, 5, None, None), ("produce_constructible", "Granary", 36, 8, "newUrban", {"x": 4, "y": 4})]

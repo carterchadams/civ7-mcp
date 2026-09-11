@@ -829,3 +829,21 @@ def test_expand_poll_does_not_confirm_while_the_plot_is_still_offered(tmp_path):
         with pytest.raises(service.ObserverError) as info:
             reg.perform(gs, action_id=ex["actionId"], request_id="ex-2", player=1, mode="singleplayer")
     assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_constructible_offers_expose_placement_and_perform_confirms_on_city_production(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PRODUCE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 404, "x": 4, "y": 4, "pre": -1, "cityId": 65536, "cityName": "Pārsa", "constructibleKey": "BUILDING_GRANARY", "constructibleClass": "BUILDING", "displayName": "Granary", "cost": 36, "turns": 8, "plotIndex": 404, "placement": "newUrban", "terrainKey": "TERRAIN_FLAT", "featureKey": None, "river": False, "yields": {"food": 3}, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PRODUCE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plot": {"x": 4, "y": 4, "index": 404}, "observedType": -1, "matches": False}}
+    rb = {**RB, "cityProduction": {"65536": 501}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pc = next(o for o in out["offers"] if o["kind"] == "produce_constructible")
+        assert pc["to"] == {"x": 4, "y": 4} and pc["placement"] == "newUrban" and pc["constructibleKey"] == "BUILDING_GRANARY" and pc["cost"] == 36 and pc["turns"] == 8
+        assert "arg" not in pc and "arg2" not in pc and "arg3" not in pc and "x" not in pc
+        res = reg.perform(gs, action_id=pc["actionId"], request_id="pc-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"cityProduction": {"cityId": 65536, "constructibleType": 501}}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"PRODUCE_CONSTRUCTIBLE"' in sent and "const ARG = 65536;" in sent and "const ARG2 = 501;" in sent and "const ARG3 = 404;" in sent

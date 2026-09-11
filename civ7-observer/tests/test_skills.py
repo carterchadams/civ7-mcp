@@ -31,7 +31,7 @@ def test_local_friction_card_is_available_and_not_generated():
 @pytest.mark.parametrize("kinds, expected", [
     (["research"], ["civ7-turn-management", "civ7-research-and-civics"]),
     (["civic"], ["civ7-turn-management", "civ7-research-and-civics"]),
-    (["produce_unit"], ["civ7-turn-management", "civ7-production-and-placement"]),
+    (["production"], ["civ7-turn-management", "civ7-production-and-placement"]),
     (["unit"], ["civ7-turn-management", "civ7-reconnaissance-and-memory"]),
     (["settle"], ["civ7-turn-management", "civ7-settlement-sites"]),
     (["population"], ["civ7-turn-management", "civ7-growth-and-specialists"]),

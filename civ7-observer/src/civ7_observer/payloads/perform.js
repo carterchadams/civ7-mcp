@@ -135,6 +135,28 @@
     result.readback = { kind: KIND, arg: ARG, plot: { x: ARG2, y: ARG3, index: PRE }, stillOffered: still, matches: still === false };
     return JSON.stringify(result);
   }
+  if (KIND === "PRODUCE_CONSTRUCTIBLE") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
+    if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");
+    let city = null;
+    try { for (const c of player.Cities.getCities()) { if (c && c.id && c.id.id === ARG && c.id.owner === BOUND_PLAYER_ID) { city = c; break; } } } catch (e) { city = null; }
+    if (!city) return refuse("UNKNOWN_ACTION", "city is not in the bound player's roster");
+    const crow = GameInfo.Constructibles.lookup(ARG2);
+    if (!crow || typeof crow.ConstructibleType !== "string") return refuse("UNKNOWN_ACTION", "type is not a constructible definition");
+    if (!city.BuildQueue || city.BuildQueue.currentProductionTypeHash !== PRE) return refuse("ACTION_EXPIRED", "city production changed since the build was offered");
+    const ploc = GameplayMap.getLocationFromIndex(ARG3);
+    if (!ploc || !isInt(ploc.x) || !isInt(ploc.y) || ploc.x < 0 || GameplayMap.getIndexFromXY(ploc.x, ploc.y) !== ARG3) return refuse("ACTION_NOT_STARTABLE", "placement plot is not a valid map plot");
+    const cityId = city.id;
+    const buildArgs = { ConstructibleType: ARG2, X: ploc.x, Y: ploc.y };
+    const bcheck = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
+    if (!bcheck || bcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the build on that plot");
+    Game.CityOperations.sendRequest(cityId, CityOperationTypes.BUILD, buildArgs);
+    result.outcome = "sent";
+    let observed = null;
+    try { observed = city.BuildQueue.currentProductionTypeHash; } catch (e) { observed = null; }
+    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plot: { x: ploc.x, y: ploc.y, index: ARG3 }, observedType: isInt(observed) ? observed : null, matches: observed === ARG2 };
+    return JSON.stringify(result);
+  }
   if (KIND === "PRODUCE_UNIT") {
     if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "production arguments are not integers");
     if (typeof CityOperationTypes === "undefined" || !isInt(CityOperationTypes.BUILD)) return refuse("API_CONTRACT_MISMATCH", "CityOperationTypes.BUILD unavailable");

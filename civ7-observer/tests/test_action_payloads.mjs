@@ -452,3 +452,70 @@ test("perform FOUND_CITY refuses a moved unit, a stale plot, an unknown unit and
   assert.equal(r.outcome, "sent");
   assert.equal(r.readback.matches, false);
 });
+
+// ---- produce constructible (buildings need a placement plot; the plot index rides as arg3)
+function withBuildings(g, { urban = [[3, 4]], expand = [[4, 4], [4, 5]], sentTo = null } = {}) {
+  withCity(g, { sentTo });
+  const rows = [{ $hash: 501, ConstructibleType: "BUILDING_GRANARY", ConstructibleClass: "BUILDING", Name: "LOC_GRANARY" }, { $hash: 502, ConstructibleType: "BUILDING_ALTAR", ConstructibleClass: "BUILDING", Name: "LOC_ALTAR" }];
+  g.GameInfo.Constructibles = table(rows); g.GameInfo.Constructibles[Symbol.iterator] = function* () { yield* rows; };
+  g.GameInfo.Terrains = table([{ $hash: 1, TerrainType: "TERRAIN_FLAT" }]); g.GameInfo.Features = table([]);
+  g.GameInfo.Yields = [{ $hash: 619730924, YieldType: "YIELD_FOOD" }];
+  g.GameplayMap = { getIndexFromXY: (x, y) => y * 100 + x, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }), getTerrainType: () => 1, getFeatureType: () => -1, isRiver: () => false, getYield: () => 3 };
+  const idx = ([x, y]) => y * 100 + x;
+  const city = g.Players.get(1).Cities.getCities()[0];
+  const inner = g.Game.CityOperations;
+  g.Game.CityOperations = {
+    canStart: (cid, op, args, show) => {
+      if (args.ConstructibleType === undefined) return inner.canStart(cid, op, args, show);
+      g._log.push(`bcanStart(${JSON.stringify(cid)},${op},${JSON.stringify(args)},${show})`);
+      if (cid.owner !== 1 || args.ConstructibleType !== 501) return { Success: false };
+      if (args.X === undefined) return { Success: true, Plots: urban.map(idx), ExpandUrbanPlots: expand.map(idx) };
+      return { Success: [...urban, ...expand].some(([x, y]) => x === args.X && y === args.Y) };
+    },
+    sendRequest: (cid, op, args) => { if (args.ConstructibleType === undefined) return inner.sendRequest(cid, op, args); g._log.push(`bsendRequest(${JSON.stringify(cid)},${op},${JSON.stringify(args)})`); city.BuildQueue.currentProductionTypeHash = sentTo ?? args.ConstructibleType; },
+  };
+  city.Production = { getUnitProductionCost: (h) => (h === 99 ? 30 : 40), getConstructibleProductionCost: () => 36 };
+  city.BuildQueue.getTurnsLeft = (h) => (h === 501 ? 8 : 5);
+  return g;
+}
+
+test("production offers carry cost and turns for units, and one placement offer per (building, plot) with urban/newUrban labels", () => {
+  const log = [];
+  const g = withBuildings(withUnits(world({ log }), [])); g._log = log;
+  const r = runOffers(g);
+  const units = r.offers.filter((o) => o.kind === "PRODUCE_UNIT");
+  assert.deepEqual(units.map((o) => [o.unitTypeKey, o.cost, o.turns]), [["UNIT_SCOUT", 30, 5], ["UNIT_WARRIOR", 40, 5]]);
+  const builds = r.offers.filter((o) => o.kind === "PRODUCE_CONSTRUCTIBLE");
+  assert.deepEqual(builds.map((o) => [o.arg, o.arg2, o.arg3, o.x, o.y, o.placement, o.constructibleKey, o.displayName, o.cost, o.turns, o.canStart]),
+    [[65536, 501, 403, 3, 4, "urban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true], [65536, 501, 404, 4, 4, "newUrban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true], [65536, 501, 504, 4, 5, "newUrban", "BUILDING_GRANARY", "LOC_GRANARY", 36, 8, true]]);
+  assert.deepEqual(builds[0].yields, { food: 3 });
+  assert.ok(!builds.some((o) => o.arg2 === 502), "a building the native query refuses is not offered");
+  assert.ok(!log.some((e) => e.startsWith("bsendRequest") || e.startsWith("csendRequest")));
+});
+
+test("perform PRODUCE_CONSTRUCTIBLE derives the plot from its index, checks canStart with X/Y, sends BUILD with placement and reads back", () => {
+  const log = [];
+  const g = withBuildings(withUnits(world({ log }), [])); g._log = log;
+  const r = runPerformArgs(g, "PRODUCE_CONSTRUCTIBLE", 65536, 501, 404, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "PRODUCE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plot: { x: 4, y: 4, index: 404 }, observedType: 501, matches: true });
+  const i = log.findIndex((e) => e.startsWith("bcanStart(") && e.includes('"X":4,"Y":4'));
+  const j = log.findIndex((e) => e.startsWith("bsendRequest(") && e.includes('"ConstructibleType":501,"X":4,"Y":4'));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+});
+
+test("perform PRODUCE_CONSTRUCTIBLE refuses unknown city, non-constructible type, changed production, invalid plot and a refused placement without sending", () => {
+  for (const [label, mk, cid, ct, pi, pre] of [
+    ["unknown city", () => withBuildings(withUnits(world({ log: [] }), [])), 7, 501, 404, -1],
+    ["not a constructible", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 99, 404, -1],
+    ["production changed", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 404, 77],
+    ["invalid plot", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, -5, -1],
+    ["placement refused", () => withBuildings(withUnits(world({ log: [] }), [])), 65536, 501, 909, -1],
+  ]) {
+    const g = mk(); const log = []; g._log = log;
+    const r = runPerformArgs(g, "PRODUCE_CONSTRUCTIBLE", cid, ct, pi, { pre });
+    assert.ok(r.refused, `${label}: expected refusal`);
+    assert.ok(!log.some((e) => e.startsWith("bsendRequest")), `${label}: must not send`);
+  }
+});

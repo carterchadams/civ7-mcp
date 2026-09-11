@@ -12,6 +12,8 @@
     return row && typeof row[field] === "string" ? row[field] : null;
   };
   const compose = (key) => { if (typeof key !== "string") return null; try { const s = Locale.compose(key); return typeof s === "string" ? s : key; } catch (e) { return key; } };
+  const yieldRows = []; try { for (const y of (GameInfo.Yields || [])) { if (y && isInt(y.$hash) && typeof y.YieldType === "string") yieldRows.push(y); } } catch (e) { /* no yield table in this realm */ }
+  const plotYields = (x, y) => { const out = {}; for (const row of yieldRows) { const v = GameplayMap.getYield(x, y, row.$hash, BOUND_PLAYER_ID); if (typeof v === "number") out[row.YieldType.replace("YIELD_", "").toLowerCase()] = v; } return out; };
   const curtain = () => { try { return typeof document !== "undefined" ? document.getElementById("hotseat-screen-curtain") !== null : null; } catch (e) { return null; } };
 
   // ---- guards (same as observe.js)
@@ -125,7 +127,6 @@
     if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.EXPAND)) {
       // New population placement: the shipped acquire-tile mode asks canStart(EXPAND, {}) for the
       // claimable plots and the improvement each would receive, then sends EXPAND {X, Y}.
-      const yieldRows = []; for (const y of GameInfo.Yields) { if (y && isInt(y.$hash) && typeof y.YieldType === "string") yieldRows.push(y); }
       for (const c of player.Cities.getCities()) {
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
         const cityId = c.id;
@@ -140,7 +141,7 @@
           if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0) continue;
           const expandArgs = { X: loc.x, Y: loc.y };
           const check = Game.CityCommands.canStart(cityId, CityCommandTypes.EXPAND, expandArgs, false);
-          const yields = {}; for (const y of yieldRows) { const v = GameplayMap.getYield(loc.x, loc.y, y.$hash, BOUND_PLAYER_ID); if (typeof v === "number") yields[y.YieldType.replace("YIELD_", "").toLowerCase()] = v; }
+          const yields = plotYields(loc.x, loc.y);
           offers.push({ kind: "EXPAND_CITY", arg: c.id.id, x: loc.x, y: loc.y, pre: pi, cityId: c.id.id, cityName: compose(c.name), plotIndex: pi, growthReady: ready,
             improvementKey: isInt(types[i]) ? lookupKey(GameInfo.Constructibles, types[i], "ConstructibleType") : null,
             terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"),
@@ -155,13 +156,42 @@
         if (!c || !c.id || !isInt(c.id.id) || c.id.owner !== BOUND_PLAYER_ID) continue;
         const cityId = c.id;
         const ppre = c.BuildQueue && isInt(c.BuildQueue.currentProductionTypeHash) ? c.BuildQueue.currentProductionTypeHash : -1;
+        const cost = (fn, hash) => { try { const v = c.Production && typeof c.Production[fn] === "function" ? c.Production[fn](hash) : null; return isInt(v) ? v : null; } catch (e) { return null; } };
+        const turnsFor = (hash) => { try { const v = c.BuildQueue && typeof c.BuildQueue.getTurnsLeft === "function" ? c.BuildQueue.getTurnsLeft(hash) : null; return isInt(v) ? v : null; } catch (e) { return null; } };
         for (const row of GameInfo.Units) {
           if (!row || !isInt(row.$hash) || typeof row.UnitType !== "string") continue;
           const buildArgs = { UnitType: row.$hash };
           const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
           if (!check || check.Success !== true) continue;   // only buildable units are offered
           offers.push({ kind: "PRODUCE_UNIT", arg: c.id.id, arg2: row.$hash, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
-            unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null, canStart: true });
+            unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
+            cost: cost("getUnitProductionCost", row.$hash), turns: turnsFor(row.$hash), canStart: true });
+        }
+        // Buildings need a plot: the shipped chooser asks canStart(BUILD, {ConstructibleType}) and the
+        // placement mode then offers `Plots` (existing urban plots) and `ExpandUrbanPlots` (rural plots
+        // that would become urban). One offer per (constructible, plot); the plot index rides as arg3.
+        if (GameInfo.Constructibles && typeof GameInfo.Constructibles[Symbol.iterator] === "function") {
+          for (const row of GameInfo.Constructibles) {
+            if (!row || !isInt(row.$hash) || typeof row.ConstructibleType !== "string") continue;
+            const probe = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, { ConstructibleType: row.$hash }, false);
+            if (!probe || probe.Success !== true) continue;
+            const groups = [["urban", Array.isArray(probe.Plots) ? probe.Plots : []], ["newUrban", Array.isArray(probe.ExpandUrbanPlots) ? probe.ExpandUrbanPlots : []]];
+            for (const [placement, plots] of groups) {
+              for (const pi of plots) {
+                if (!isInt(pi)) continue;
+                const loc = GameplayMap.getLocationFromIndex(pi);
+                if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0) continue;
+                const buildArgs = { ConstructibleType: row.$hash, X: loc.x, Y: loc.y };
+                const check = Game.CityOperations.canStart(cityId, CityOperationTypes.BUILD, buildArgs, false);
+                if (!check || check.Success !== true) continue;
+                offers.push({ kind: "PRODUCE_CONSTRUCTIBLE", arg: c.id.id, arg2: row.$hash, arg3: pi, pre: ppre, cityId: c.id.id, cityName: compose(c.name),
+                  constructibleKey: row.ConstructibleType, constructibleClass: typeof row.ConstructibleClass === "string" ? row.ConstructibleClass : null,
+                  displayName: typeof row.Name === "string" ? compose(row.Name) : null, cost: cost("getConstructibleProductionCost", row.$hash), turns: turnsFor(row.$hash),
+                  x: loc.x, y: loc.y, plotIndex: pi, placement: placement, terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
+                  featureKey: lookupKey(GameInfo.Features, GameplayMap.getFeatureType(loc.x, loc.y), "FeatureType"), river: GameplayMap.isRiver(loc.x, loc.y) === true, yields: plotYields(loc.x, loc.y), canStart: true });
+              }
+            }
+          }
         }
       }
     }

@@ -19,7 +19,7 @@ LOCAL = "civ7_observer.skills.local"
 DECISION_SKILL = {
     "research": "civ7-research-and-civics",
     "civic": "civ7-research-and-civics",
-    "produce_unit": "civ7-production-and-placement",
+    "production": "civ7-production-and-placement",
     # The unit catalog is currently move and skip only, so the reconnaissance card (spending
     # movement, map memory, information value) is the one that applies. Add the combat card here
     # when attack actions exist.

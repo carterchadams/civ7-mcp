@@ -20,7 +20,7 @@ DEFAULT_MAX_OPTIONS = 6
 BLOCKER_DECISION = {
     "RESEARCH": "research",
     "CULTURE": "civic",
-    "PRODUCTION": "produce_unit",
+    "PRODUCTION": "production",
     "UNITS": "unit",
     "UNIT_NEEDS_ORDERS": "unit",
     "STACKED_UNITS": "unit",
@@ -31,7 +31,8 @@ BLOCKER_DECISION = {
 DECISION_OF_KIND = {
     "research": "research",
     "civic": "civic",
-    "produce_unit": "produce_unit",
+    "produce_unit": "production",
+    "produce_constructible": "production",
     "skip_unit": "unit",
     "move_unit": "unit",
     # Founding is a unit's order too (it resolves the UNITS blocker for that unit), but it is the
@@ -43,7 +44,8 @@ DECISION_OF_KIND = {
 
 OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "turns",
                  "unitTypeKey", "unitId", "from", "to", "terrainKey", "pathTurns",
-                 "cityId", "cityName", "improvementKey", "featureKey", "river", "yields")
+                 "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
+                 "constructibleKey", "constructibleClass", "placement", "plotIndex")
 
 BLOCKED_SETTLER_NOTE = ("founding is refused at this unit's current plot; the engine gives no reason (typical causes: water or "
                         "navigable-river tiles, or too close to another settlement). Move it to a plot where a found_city option appears.")
