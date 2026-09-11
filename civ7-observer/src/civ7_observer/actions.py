@@ -46,6 +46,22 @@ CONFIRMATION_GUIDANCE = {
         "Staying out instead ends the alliance (end alliance with the ally). Join when the ally matters "
         "more than peace with the enemy and your army can carry it."
     ),
+    "disperse_independent": (
+        "Dispersing an independent power destroys it for good: its settlement, its people and any suzerain "
+        "bonus another civilization enjoyed are gone, and every civilization courting it will resent this seat. "
+        "Befriending or converting it is usually worth more than the plot it stands on."
+    ),
+    "convert_independent_to_city_state": (
+        "Converting the independent makes it a city-state under this seat's influence, ending its independent "
+        "status permanently and displeasing other civilizations that were befriending it."
+    ),
+    "scorched_earth": (
+        "Scorched earth destroys the improvements around this unit, on the seat's own land included: they must be "
+        "rebuilt at full cost afterwards. It only makes sense to deny a conquering enemy what it is about to take."
+    ),
+    "disperse_clan": (
+        "Dispersing the clan destroys it permanently; nothing is gained back but the plot."
+    ),
     "attack": (
         "This attack would start a war with a civilization this seat is not yet fighting. Peace then "
         "needs the other side to agree, and the relationship, any shared endeavors and any trade "
@@ -71,7 +87,12 @@ PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic
                "DEACTIVATE_TRADITION": "deactivate_tradition", "UNASSIGN_RESOURCE": "unassign_resource", "SWAP_RESOURCES": "swap_resources", "WAKE": "wake_unit", "CANCEL": "cancel_order", "UNIT_ORDER": "unit_order", "DISBAND_UNIT": "disband_unit", "ASSIGN_WORKER": "assign_specialist", "CANCEL_ALLIANCE": "cancel_alliance", "ATTACK": "attack", "UPGRADE": "upgrade_unit", "PACK_ARMY": "pack_army", "ADD_TO_ARMY": "join_army",
                "REMOVE_FROM_ARMY": "leave_army", "UNPACK_ARMY": "unpack_army", "ACTIVATE_GREAT_PERSON": "activate_great_person", "RESPOND_DIPLOMATIC_ACTION": "respond_to_proposal", "FOUND_RELIGION": "found_religion", "ADD_BELIEF": "add_belief", "START_DIPLOMATIC_ACTION": "start_diplomatic_action",
                "SELECT_CAPITAL": "select_capital", "CHOOSE_SYNCRETISM_UNITS": "syncretism_units", "CHOOSE_SYNCRETISM_INFRASTRUCTURE": "syncretism_infrastructure", "CHOOSE_SYNCRETISM_SELF": "syncretism_self",
-               "ADVANCED_START_REMOVE_CARD": "drop_legacy_card", "ADVANCED_START_PLACE_SETTLEMENT": "place_legacy_settlement", "RESETTLE": "resettle"}
+               "ADVANCED_START_REMOVE_CARD": "drop_legacy_card", "ADVANCED_START_PLACE_SETTLEMENT": "place_legacy_settlement", "RESETTLE": "resettle",
+               "REINFORCE_ARMY": "reinforce_army", "REBASE": "rebase", "TELEPORT_TO_CITY": "teleport_to_city", "ESTABLISH_BASE": "establish_base", "DISPERSE_INDEPENDENT": "disperse_independent", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE": "convert_independent_to_city_state", "REPAIR": "repair", "REMOVE_FEATURE": "remove_feature", "REMOVE_IMPROVEMENT": "remove_improvement", "PLANT_FOREST": "plant_forest", "HARVEST_RESOURCE": "harvest_resource", "BUILD_IMPROVEMENT": "build_improvement", "EMBED_LOOKOUT": "embed_lookout", "SEARCH": "search", "AERIAL_RECON": "aerial_recon", "CALL_REINFORCEMENTS": "call_reinforcements", "CONNECT_WITH_ROAD": "connect_with_road", "MOVE_BY_RAIL": "move_by_rail", "UPGRADE_ARMY": "upgrade_army", "FOCUSED_ATTACK_LAND_MELEE": "focused_attack_land_melee", "FOCUSED_ATTACK_LAND_RANGED": "focused_attack_land_ranged", "FOCUSED_ATTACK_SEA_MELEE": "focused_attack_sea_melee", "FOCUSED_ATTACK_SEA_RANGED": "focused_attack_sea_ranged", "FOCUSED_ATTACK_AIR_TO_AIR": "focused_attack_air_to_air", "FOCUSED_ATTACK_AIR_TO_LAND": "focused_attack_air_to_land", "FOCUSED_ATTACK_AIR_BOMB": "focused_attack_air_bomb", "ARMY_OVERRUN": "army_overrun", "COMMANDER_ATTACK": "commander_attack", "STONE_TRAP": "stone_trap", "TREAT_SICK": "treat_sick", "CLAIM_RESOURCE": "claim_resource", "SCORCHED_EARTH": "scorched_earth", "DISPERSE_CLAN": "disperse_clan"}
+# Table-driven unit operations and commands (A19-A22): the offer says whether a plot was bound.
+TABLE_OPERATION_KINDS = frozenset({"REINFORCE_ARMY", "REBASE", "TELEPORT_TO_CITY", "ESTABLISH_BASE", "DISPERSE_INDEPENDENT", "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "REPAIR", "REMOVE_FEATURE", "REMOVE_IMPROVEMENT", "PLANT_FOREST", "HARVEST_RESOURCE", "BUILD_IMPROVEMENT", "EMBED_LOOKOUT", "SEARCH", "AERIAL_RECON", "CALL_REINFORCEMENTS"})
+TABLE_COMMAND_KINDS = frozenset({"CONNECT_WITH_ROAD", "MOVE_BY_RAIL", "UPGRADE_ARMY", "FOCUSED_ATTACK_LAND_MELEE", "FOCUSED_ATTACK_LAND_RANGED", "FOCUSED_ATTACK_SEA_MELEE", "FOCUSED_ATTACK_SEA_RANGED", "FOCUSED_ATTACK_AIR_TO_AIR", "FOCUSED_ATTACK_AIR_TO_LAND", "FOCUSED_ATTACK_AIR_BOMB", "ARMY_OVERRUN", "COMMANDER_ATTACK", "STONE_TRAP", "TREAT_SICK", "CLAIM_RESOURCE", "SCORCHED_EARTH", "DISPERSE_CLAN"})
+
 SYNCRETISM_KINDS = ("CHOOSE_SYNCRETISM_UNITS", "CHOOSE_SYNCRETISM_INFRASTRUCTURE", "CHOOSE_SYNCRETISM_SELF")
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
@@ -406,6 +427,8 @@ class ActionRegistry:
                 if not isinstance(o.get("x"), int) or not isinstance(o.get("y"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "move offer without coordinates")
                 rec["arg2"], rec["arg3"] = o["x"], o["y"]
+                if isinstance(o.get("from"), dict):
+                    rec["fromXY"] = [o["from"].get("x"), o["from"].get("y")]
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
@@ -555,6 +578,20 @@ class ActionRegistry:
                 for k in ("typeKey", "notificationId"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
+            if kind in TABLE_OPERATION_KINDS or kind in TABLE_COMMAND_KINDS:
+                if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", f"{kind} offer without its plot binding")
+                rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
+                rec["expect"] = o.get("expect")
+                if isinstance(o.get("from"), dict):
+                    rec["fromXY"] = [o["from"].get("x"), o["from"].get("y")]
+                for k in ("unitId", "unitTypeKey", "from", "to", "plotIndex", "terrainKey", "movesLeft", "isCommander",
+                          "description", "expect", "destructive", "requiresConfirmation"):
+                    if o.get(k) is not None:
+                        entry[k] = o[k]
+                if o.get("requiresConfirmation"):
+                    rec["requiresConfirmation"] = True
+                    entry["guidance"] = CONFIRMATION_GUIDANCE[PUBLIC_KIND[kind]]
             if kind in ("PILLAGE", "COASTAL_RAID", "PILLAGE_ROUTE", "SPREAD_RELIGION"):
                 if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", f"{kind} offer without a target plot")
@@ -780,7 +817,8 @@ class ActionRegistry:
         # Destroying something the seat owns is not an ordinary move, so it is refused unless the
         # caller asks for it in as many words. The engine raises the same flag on its own command.
         if offer.get("requiresConfirmation") and confirm is not True:
-            raise ObserverError("CONFIRMATION_REQUIRED", DISBAND_GUIDANCE + " Pass confirm=true to this call if that is really what you want.")
+            guidance = CONFIRMATION_GUIDANCE.get(PUBLIC_KIND.get(offer["kind"], ""), DISBAND_GUIDANCE)
+            raise ObserverError("CONFIRMATION_REQUIRED", guidance + " Pass confirm=true to this call if that is really what you want.")
         base = self._base(action_id, request_id, player)
         self._reserve_and_journal(base)
         expression = render_action_payload(bound_player_id=player, allowed_mode=mode, kind=offer["kind"], arg=offer["arg"], expected_turn=offer["turn"], expected_age=offer["age"],
@@ -867,6 +905,11 @@ class ActionRegistry:
                     locs = rb.get("unitLocations")
                     if isinstance(locs, dict) and locs.get(str(offer["arg"])) == [offer["arg2"], offer["arg3"]]:
                         effect = {"unitLocation": {"unitId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"]}}
+                    # The order took but the unit stopped short (live, turn 66: a settler offered a one-turn
+                    # path went one plot and kept the move for the next turn). Having left its plot is the
+                    # proof the move was accepted; arrival is the engine's business over the coming turn.
+                    elif isinstance(locs, dict) and isinstance(offer.get("fromXY"), list) and isinstance(locs.get(str(offer["arg"])), list) and locs[str(offer["arg"])] != offer["fromXY"]:
+                        effect = {"unitMoved": {"unitId": offer["arg"], "toward": [offer["arg2"], offer["arg3"]], "now": locs[str(offer["arg"])], "arrived": False}}
                 elif kind == "FOUND_CITY":
                     cities = rb.get("cityLocations")
                     if isinstance(cities, dict) and [offer["arg2"], offer["arg3"]] in cities.values():
@@ -964,6 +1007,20 @@ class ActionRegistry:
                     warnings = rb.get("advisorWarnings")
                     if isinstance(warnings, list) and offer["arg"] not in warnings:
                         effect = {"advisorWarningAcknowledged": {"notificationId": offer["arg"]}}
+                elif kind in TABLE_OPERATION_KINDS or kind in TABLE_COMMAND_KINDS:
+                    want, unit_key = offer.get("expect"), str(offer["arg"])
+                    locs, moves, on_map, gold = rb.get("unitLocations"), rb.get("unitMoves"), rb.get("unitsOnMap"), rb.get("goldBalance")
+                    gone = isinstance(locs, dict) and unit_key not in locs
+                    now_moves = moves.get(unit_key) if isinstance(moves, dict) else None
+                    label = {"unitId": offer["arg"], "action": PUBLIC_KIND[kind], "at": [offer["arg2"], offer["arg3"]] if offer["arg2"] >= 0 else None}
+                    if want == "used" and (gone or (isinstance(now_moves, int) and not isinstance(now_moves, bool) and now_moves < offer["pre"])):
+                        effect = {"unitActed": {**label, "consumed": gone}}
+                    elif want == "moved" and isinstance(offer.get("fromXY"), list) and isinstance(locs, dict) and isinstance(locs.get(unit_key), list) and locs[unit_key] != offer["fromXY"]:
+                        effect = {"unitMoved": {**label, "now": locs[unit_key]}}
+                    elif want == "offmap" and (gone or (isinstance(on_map, dict) and on_map.get(unit_key) == 0)):
+                        effect = {"unitTravelling": label}
+                    elif want == "gold" and isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]:
+                        effect = {"goldSpent": {**label, "spent": offer["pre"] - gold}}
                 elif kind in ("PILLAGE", "COASTAL_RAID", "PILLAGE_ROUTE"):
                     moves = rb.get("unitMoves")
                     now = moves.get(str(offer["arg"])) if isinstance(moves, dict) else None

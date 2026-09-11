@@ -343,6 +343,72 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, from: PRE, at: now, matches: isInt(now) && now !== PRE };
     return JSON.stringify(result);
   }
+  if (KIND === "REINFORCE_ARMY" || KIND === "REBASE" || KIND === "TELEPORT_TO_CITY" || KIND === "ESTABLISH_BASE" || KIND === "DISPERSE_INDEPENDENT" || KIND === "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE" || KIND === "REPAIR" || KIND === "REMOVE_FEATURE" || KIND === "REMOVE_IMPROVEMENT" || KIND === "PLANT_FOREST" || KIND === "HARVEST_RESOURCE" || KIND === "BUILD_IMPROVEMENT" || KIND === "EMBED_LOOKOUT" || KIND === "SEARCH" || KIND === "AERIAL_RECON" || KIND === "CALL_REINFORCEMENTS") {
+    // Table-driven unit operation: the kind IS the engine's name, validated host-side against the catalog.
+    // A plot bound on the offer (arg2/arg3 >= 0) is sent as {X, Y}; otherwise the no-target sentinel.
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "unit operation arguments are not integers");
+    if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit operation type unavailable");
+    const expect = (KIND === "REINFORCE_ARMY") ? "offmap"
+                 : (KIND === "REBASE" || KIND === "TELEPORT_TO_CITY") ? "moved"
+                 : "used";
+    let actor = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor = u; break; } } } catch (e) { actor = null; }
+    if (!actor) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const stateOf = (u) => expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
+                         : expect === "offmap" ? (u.isOnMap === true ? 1 : 0)
+                         : expect === "gold" ? (player.Treasury && typeof player.Treasury.goldBalance === "number" ? Math.floor(player.Treasury.goldBalance) : 0)
+                         : (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0);
+    if (stateOf(actor) !== PRE) return refuse("ACTION_EXPIRED", "the unit's state changed since the offer was made");
+    const lUnitId = actor.id;
+    const lArgs = (ARG2 >= 0 && ARG3 >= 0) ? { X: ARG2, Y: ARG3 } : { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    const lType = UnitOperationTypes[OP_KIND];
+    const check = Game.UnitOperations.canStart(lUnitId, lType, lArgs, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the unit operation");
+    Game.UnitOperations.sendRequest(lUnitId, lType, lArgs);
+    result.outcome = "sent";
+    let still = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG) { still = u; break; } } } catch (e) { still = null; }
+    const after = still ? stateOf(still) : (expect === "gold" ? stateOf(actor) : null);
+    const matches = expect === "used" ? (still === null || (isInt(after) && after < PRE))
+                  : expect === "offmap" ? (still === null || after === 0)
+                  : expect === "moved" ? (still !== null && isInt(after) && after !== PRE)
+                  : (isInt(after) && after < PRE);
+    result.readback = { kind: KIND, arg: ARG, expect: expect, before: PRE, after: after, present: still !== null, matches: matches };
+    return JSON.stringify(result);
+  }
+  if (KIND === "CONNECT_WITH_ROAD" || KIND === "MOVE_BY_RAIL" || KIND === "UPGRADE_ARMY" || KIND === "FOCUSED_ATTACK_LAND_MELEE" || KIND === "FOCUSED_ATTACK_LAND_RANGED" || KIND === "FOCUSED_ATTACK_SEA_MELEE" || KIND === "FOCUSED_ATTACK_SEA_RANGED" || KIND === "FOCUSED_ATTACK_AIR_TO_AIR" || KIND === "FOCUSED_ATTACK_AIR_TO_LAND" || KIND === "FOCUSED_ATTACK_AIR_BOMB" || KIND === "ARMY_OVERRUN" || KIND === "COMMANDER_ATTACK" || KIND === "STONE_TRAP" || KIND === "TREAT_SICK" || KIND === "CLAIM_RESOURCE" || KIND === "SCORCHED_EARTH" || KIND === "DISPERSE_CLAN") {
+    // Table-driven unit command: the kind IS the engine's name, validated host-side against the catalog.
+    // A plot bound on the offer (arg2/arg3 >= 0) is sent as {X, Y}; otherwise the no-target sentinel.
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "unit command arguments are not integers");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit command type unavailable");
+    const expect = (KIND === "MOVE_BY_RAIL") ? "moved"
+                 : (KIND === "UPGRADE_ARMY") ? "gold"
+                 : "used";
+    let actor = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { actor = u; break; } } } catch (e) { actor = null; }
+    if (!actor) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const stateOf = (u) => expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
+                         : expect === "offmap" ? (u.isOnMap === true ? 1 : 0)
+                         : expect === "gold" ? (player.Treasury && typeof player.Treasury.goldBalance === "number" ? Math.floor(player.Treasury.goldBalance) : 0)
+                         : (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0);
+    if (stateOf(actor) !== PRE) return refuse("ACTION_EXPIRED", "the unit's state changed since the offer was made");
+    const aUnitId2 = actor.id;
+    const aArgs = (ARG2 >= 0 && ARG3 >= 0) ? { X: ARG2, Y: ARG3 } : { X: -9999, Y: -9999, UnitAbilityType: -1 };
+    const aType = UnitCommandTypes[OP_KIND];
+    const check = Game.UnitCommands.canStart(aUnitId2, aType, aArgs, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the unit command");
+    Game.UnitCommands.sendRequest(aUnitId2, aType, aArgs);
+    result.outcome = "sent";
+    let still = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG) { still = u; break; } } } catch (e) { still = null; }
+    const after = still ? stateOf(still) : (expect === "gold" ? stateOf(actor) : null);
+    const matches = expect === "used" ? (still === null || (isInt(after) && after < PRE))
+                  : expect === "offmap" ? (still === null || after === 0)
+                  : expect === "moved" ? (still !== null && isInt(after) && after !== PRE)
+                  : (isInt(after) && after < PRE);
+    result.readback = { kind: KIND, arg: ARG, expect: expect, before: PRE, after: after, present: still !== null, matches: matches };
+    return JSON.stringify(result);
+  }
   if (KIND === "PILLAGE" || KIND === "COASTAL_RAID" || KIND === "PILLAGE_ROUTE" || KIND === "SPREAD_RELIGION") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "operation arguments are not integers");
     if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes[OP_KIND])) return refuse("API_CONTRACT_MISMATCH", "unit operation type unavailable");

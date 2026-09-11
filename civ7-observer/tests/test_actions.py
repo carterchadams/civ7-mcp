@@ -1096,6 +1096,54 @@ def test_a_wake_confirms_through_the_host_read_back_when_the_unit_becomes_ready_
     assert res["confirmedBy"]["effect"] == {"unitCommand": {"unitId": 5, "command": "wake_unit", "was": 0, "now": 1}}
 
 
+@pytest.mark.parametrize("kind,public,expect,arg2,arg3,pre,rb_extra,effect", [
+    ("REPAIR", "repair", "used", -1, -1, 2, {"unitMoves": {"5": 0}, "unitLocations": {"5": [10, 10]}}, {"unitActed": {"unitId": 5, "action": "repair", "at": None, "consumed": False}}),
+    ("CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "convert_independent_to_city_state", "used", 13, 10, 2, {"unitLocations": {}}, {"unitActed": {"unitId": 5, "action": "convert_independent_to_city_state", "at": [13, 10], "consumed": True}}),
+    ("REBASE", "rebase", "moved", 11, 10, 1010, {"unitLocations": {"5": [11, 10]}}, {"unitMoved": {"unitId": 5, "action": "rebase", "at": [11, 10], "now": [11, 10]}}),
+    ("REINFORCE_ARMY", "reinforce_army", "offmap", 11, 10, 1, {"unitLocations": {"5": [-9999, -9999]}, "unitsOnMap": {"5": 0}}, {"unitTravelling": {"unitId": 5, "action": "reinforce_army", "at": [11, 10]}}),
+    ("UPGRADE_ARMY", "upgrade_army", "gold", -1, -1, 500, {"goldBalance": 380}, {"goldSpent": {"unitId": 5, "action": "upgrade_army", "at": None, "spent": 120}}),
+])
+def test_table_driven_unit_actions_bind_their_plot_and_confirm_by_their_own_proof(tmp_path, kind, public, expect, arg2, arg3, pre, rb_extra, effect):
+    o = {"kind": kind, "arg": 5, "arg2": arg2, "arg3": arg3, "pre": pre, "unitId": 5, "expect": expect, "from": {"x": 10, "y": 10}, "canStart": True}
+    if kind == "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE":
+        o["requiresConfirmation"] = True; o["destructive"] = True
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [o]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": kind, "arg": 5, "expect": expect, "before": pre, "after": pre, "present": True, "matches": False}}
+    rb = {**RB, **rb_extra}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    replies = [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3)] + ([ctx_reply(3)] if o.get("requiresConfirmation") else []) + [reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]
+    gs, f = open_session({"a": replies})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        u = next(x for x in out["offers"] if x["kind"] == public)
+        assert "arg" not in u and "arg2" not in u
+        if o.get("requiresConfirmation"):
+            assert u["requiresConfirmation"] is True and "independent" in u["guidance"]
+            with pytest.raises(service.ObserverError) as info:
+                reg.perform(gs, action_id=u["actionId"], request_id="tb-0", player=1, mode="singleplayer")
+            assert info.value.code == "CONFIRMATION_REQUIRED" and "independent" in str(info.value)
+            res = reg.perform(gs, action_id=u["actionId"], request_id="tb-1", player=1, mode="singleplayer", confirm=True)
+        else:
+            res = reg.perform(gs, action_id=u["actionId"], request_id="tb-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == effect
+
+
+def test_a_move_that_stops_short_confirms_on_the_unit_having_left_its_plot(tmp_path):
+    mv = {"kind": "MOVE_UNIT", "arg": 5, "pre": 1010, "unitId": 5, "from": {"x": 10, "y": 10}, "x": 12, "y": 10, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [mv]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "MOVE_UNIT", "arg": 5, "target": {"x": 12, "y": 10}, "location": {"x": 10, "y": 10}, "matches": False}}
+    rb = {**RB, "unitLocations": {"5": [11, 10]}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        m = next(o for o in out["offers"] if o["kind"] == "move_unit")
+        res = reg.perform(gs, action_id=m["actionId"], request_id="mv-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitMoved": {"unitId": 5, "toward": [12, 10], "now": [11, 10], "arrived": False}}
+
+
 def test_a_great_person_needs_a_confirmation_and_confirms_on_being_spent(tmp_path):
     gp = {"kind": "ACTIVATE_GREAT_PERSON", "arg": 6, "arg2": 11, "arg3": 10, "pre": 1, "unitId": 6, "expect": "gone", "canStart": True}
     offers = {**OFFERS, "offers": OFFERS["offers"] + [gp]}
@@ -1758,3 +1806,10 @@ def test_unit_order_confirms_like_a_skip_and_carries_the_wound(tmp_path):
         assert uo["displayName"] == "Heal" and uo["damage"] == 84 and uo["unitId"] == 5 and "arg" not in uo and "arg2" not in uo
         res = reg.perform(gs, action_id=uo["actionId"], request_id="uo-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"unitNoLongerReady": 5}
+
+
+def test_every_public_kind_can_be_rendered_into_the_action_payload():
+    # A kind the catalog offers but the renderer refuses fails at perform time as a host error, after the
+    # offer was made (the age-decision kinds were merged without their renderer entries and would have).
+    from civ7_observer.payloads import ACTION_KINDS
+    assert set(actions.PUBLIC_KIND) == set(ACTION_KINDS)

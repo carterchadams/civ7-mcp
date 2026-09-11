@@ -2862,6 +2862,88 @@ test("a migrant's resettle lists the engine's plots with what each would build a
   assert.ok(g._log.includes('rsendRequest({"X":12,"Y":10})'), "the plot alone, no ability field");
 });
 
+// ---- logistics, commanders, unique abilities and tile work (A19-A22): table-driven, shape read off the engine
+function withTableActions(g, { ops = {}, cmds = {}, gold = 500 } = {}) {
+  // ops/cmds: name -> { plots: [...] | null, ok: true } ; a plot list makes it a plot action
+  withMap(g, {});
+  g.GameplayMap = { ...g.GameplayMap, getLocationFromIndex: (i) => ({ x: i % 100, y: Math.floor(i / 100) }) };
+  const me = g.Players.get(1);
+  me.Treasury = { goldBalance: gold };
+  let nextType = 8000;
+  const opTypes = {}, cmdTypes = {}, byType = {};
+  for (const n of Object.keys(ops)) { opTypes[n] = ++nextType; byType[nextType] = ["op", n]; }
+  for (const n of Object.keys(cmds)) { cmdTypes[n] = ++nextType; byType[nextType] = ["cmd", n]; }
+  g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), ...opTypes };
+  g.UnitCommandTypes = { ...(g.UnitCommandTypes || {}), ...cmdTypes };
+  const make = (prevApi, tableOf) => ({
+    canStart: (uid, t, args, show) => { const hit = byType[t]; if (!hit) return prevApi ? prevApi.canStart(uid, t, args, show) : { Success: false };
+      const row = tableOf(hit[1]); g._log.push(`tcanStart(${hit[1]},${JSON.stringify(args)})`);
+      if (row.ok === false) return { Success: false };
+      if (args.X === undefined) return { Success: true, Plots: row.plots || [] };
+      if (args.X === -9999) return { Success: true, AdditionalDescription: row.detail };
+      return { Success: (row.plots || []).includes(args.Y * 100 + args.X) }; },
+    sendRequest: (uid, t, args) => { const hit = byType[t]; if (!hit) return prevApi ? prevApi.sendRequest(uid, t, args) : undefined;
+      const row = tableOf(hit[1]); g._log.push(`tsendRequest(${hit[1]},${JSON.stringify(args)})`);
+      const u = me.Units.getUnits().find((x) => x.id.id === uid.id);
+      if (row.after === "gone") me.Units = { getUnits: () => me.Units.getUnits().filter((x) => x.id.id !== uid.id) };
+      else if (row.after === "offmap") { u.isOnMap = false; u.location = { x: -9999, y: -9999 }; }
+      else if (row.after === "moved") u.location = { x: args.X, y: args.Y };
+      else if (row.after === "gold") me.Treasury.goldBalance -= 120;
+      else if (row.after !== "nothing") u.Movement.movementMovesRemaining = 0; },
+  });
+  g.Game.UnitOperations = make(g.Game.UnitOperations, (n) => ops[n]);
+  g.Game.UnitCommands = make(g.Game.UnitCommands, (n) => cmds[n]);
+  return g;
+}
+
+test("table-driven operations and commands are plot actions when the engine lists plots and no-target actions when it merely allows them, each saying what proves it; destructive ones need a confirmation", () => {
+  const g = withTableActions(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]),
+    { ops: { REPAIR: { plots: null, detail: "LOC_REPAIR" }, REBASE: { plots: [1011, 1012] }, DISPERSE_INDEPENDENT: { plots: [1013] }, REINFORCE_ARMY: { ok: false } },
+      cmds: { UPGRADE_ARMY: { plots: null, detail: "LOC_UPGRADE_ALL" }, MOVE_BY_RAIL: { plots: [1211] }, SCORCHED_EARTH: { plots: null } } }); g._log = [];
+  const r = runOffers(g).offers;
+  const row = (k) => r.filter((o) => o.kind === k).map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.expect, o.description ?? null, o.requiresConfirmation ?? null, o.to ?? null]);
+  assert.deepEqual(row("REPAIR"), [[5, -1, -1, 2, "used", "LOC_REPAIR", null, null]], "no plots: a no-target action, its moves the precondition");
+  assert.deepEqual(row("REBASE"), [[5, 11, 10, 1010, "moved", null, null, { x: 11, y: 10 }], [5, 12, 10, 1010, "moved", null, null, { x: 12, y: 10 }]], "plots: one offer per engine plot, the unit's plot the precondition");
+  assert.deepEqual(row("DISPERSE_INDEPENDENT"), [[5, 13, 10, 2, "used", null, true, { x: 13, y: 10 }]]);
+  assert.deepEqual(row("REINFORCE_ARMY"), [], "refused by the engine: not offered");
+  assert.deepEqual(row("UPGRADE_ARMY"), [[5, -1, -1, 500, "gold", "LOC_UPGRADE_ALL", null, null]], "the treasury is the precondition of a paid upgrade");
+  assert.deepEqual(row("MOVE_BY_RAIL"), [[5, 11, 12, 1010, "moved", null, null, { x: 11, y: 12 }]]);
+  assert.deepEqual(row("SCORCHED_EARTH"), [[5, -1, -1, 2, "used", null, true, null]]);
+  assert.ok(g._log.includes('tcanStart(REPAIR,{"X":-9999,"Y":-9999,"UnitAbilityType":-1})') && g._log.includes("tcanStart(REPAIR,{})"), "probed with the sentinel, then listed with the empty argument");
+  assert.ok(!g._log.some((e) => e.startsWith("tsendRequest")));
+});
+
+test("perform of a table-driven action sends the bound plot or the sentinel and reads back its own proof: moves used, unit consumed, moved, off the map, or gold paid", () => {
+  const mk = (ops, cmds) => { const g = withTableActions(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { ops, cmds }); g._log = []; return g; };
+  let g = mk({ REPAIR: { plots: null } }, {});
+  let r = runPerformArgs(g, "REPAIR", 5, -1, -1, { pre: 2 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "REPAIR", arg: 5, expect: "used", before: 2, after: 0, present: true, matches: true });
+  assert.ok(g._log.includes('tsendRequest(REPAIR,{"X":-9999,"Y":-9999,"UnitAbilityType":-1})'));
+  g = mk({ CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE: { plots: [1013], after: "gone" } }, {});
+  r = runPerformArgs(g, "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", 5, 13, 10, { pre: 2 });
+  assert.deepEqual([r.readback.present, r.readback.matches], [false, true], "a consumed unit proves a used action");
+  assert.ok(g._log.includes('tsendRequest(CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE,{"X":13,"Y":10})'), "the plot alone, as the shipped interface modes send it");
+  g = mk({ REBASE: { plots: [1011], after: "moved" } }, {});
+  r = runPerformArgs(g, "REBASE", 5, 11, 10, { pre: 1010 });
+  assert.deepEqual([r.readback.after, r.readback.matches], [1011, true]);
+  g = mk({ REINFORCE_ARMY: { plots: [1011], after: "offmap" } }, {});
+  r = runPerformArgs(g, "REINFORCE_ARMY", 5, 11, 10, { pre: 1 });
+  assert.deepEqual([r.readback.after, r.readback.present, r.readback.matches], [0, true, true], "travelling to the army: still in the roster, off the map");
+  g = mk({}, { UPGRADE_ARMY: { plots: null, after: "gold" } });
+  r = runPerformArgs(g, "UPGRADE_ARMY", 5, -1, -1, { pre: 500 });
+  assert.deepEqual([r.readback.before, r.readback.after, r.readback.matches], [500, 380, true]);
+  assert.ok(g._log.includes('tsendRequest(UPGRADE_ARMY,{"X":-9999,"Y":-9999,"UnitAbilityType":-1})'));
+  g = mk({}, { MOVE_BY_RAIL: { plots: [1211], after: "moved" } });
+  assert.equal(runPerformArgs(g, "MOVE_BY_RAIL", 5, 11, 12, { pre: 1010 }).readback.matches, true);
+  g = mk({ REPAIR: { plots: null } }, {});
+  assert.equal(runPerformArgs(g, "REPAIR", 5, -1, -1, { pre: 1 }).refused.code, "ACTION_EXPIRED", "moves changed since the offer");
+  assert.equal(runPerformArgs(g, "REPAIR", 9, -1, -1, { pre: 2 }).refused.code, "UNKNOWN_ACTION");
+  g = mk({ REBASE: { plots: [1011] } }, {});
+  assert.equal(runPerformArgs(g, "REBASE", 5, 15, 15, { pre: 1010 }).refused.code, "ACTION_NOT_STARTABLE", "a plot the engine does not list is refused");
+  assert.ok(!g._log.some((e) => e.startsWith("tsendRequest")));
+});
+
 // ---- first contact (the other player's id comes from the seat's own notification text)
 function withFirstMeet(g, { summary = "You have met [PlayerName:2] of Abbasid Empire.", blocks = true, allow = true, notifId = 108 } = {}) {
   g.PlayerOperationTypes.RESPOND_DIPLOMATIC_FIRST_MEET = -1386024947;

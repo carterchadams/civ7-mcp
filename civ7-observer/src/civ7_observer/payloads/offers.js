@@ -517,6 +517,92 @@
         }
       }
     }
+    // ---- logistics, commanders, unique abilities and tile work (A19-A22). Every one of these goes
+    // through the shipped unit-action loop's two shapes: a no-target send with the
+    // {X:-9999, Y:-9999, UnitAbilityType:-1} sentinel, or a plot picked from the engine's own Plots
+    // list and sent as {X, Y}. Which shape applies is read off the engine, not assumed: a listing that
+    // hands back plots is a plot action, one that merely succeeds is a no-target one (arg2/arg3 -1).
+    // Each row says what would prove it happened: the unit spent moves or was consumed ("used"),
+    // moved ("moved"), left the map to travel ("offmap"), or gold was paid ("gold").
+    {
+      const NO_TARGET = { X: -9999, Y: -9999, UnitAbilityType: -1 };
+      const OPERATIONS = [
+        // [operation, what would prove it, whether it needs an explicit confirmation]
+        ["REINFORCE_ARMY", "offmap", false],
+        ["REBASE", "moved", false],
+        ["TELEPORT_TO_CITY", "moved", false],
+        ["ESTABLISH_BASE", "used", false],
+        ["DISPERSE_INDEPENDENT", "used", true],
+        ["CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE", "used", true],
+        ["REPAIR", "used", false],
+        ["REMOVE_FEATURE", "used", false],
+        ["REMOVE_IMPROVEMENT", "used", false],
+        ["PLANT_FOREST", "used", false],
+        ["HARVEST_RESOURCE", "used", false],
+        ["BUILD_IMPROVEMENT", "used", false],
+        ["EMBED_LOOKOUT", "used", false],
+        ["SEARCH", "used", false],
+        ["AERIAL_RECON", "used", false],
+        ["CALL_REINFORCEMENTS", "used", false]
+      ];
+      const ABILITY_COMMANDS = [
+        ["CONNECT_WITH_ROAD", "used", false],
+        ["MOVE_BY_RAIL", "moved", false],
+        ["UPGRADE_ARMY", "gold", false],
+        ["FOCUSED_ATTACK_LAND_MELEE", "used", false],
+        ["FOCUSED_ATTACK_LAND_RANGED", "used", false],
+        ["FOCUSED_ATTACK_SEA_MELEE", "used", false],
+        ["FOCUSED_ATTACK_SEA_RANGED", "used", false],
+        ["FOCUSED_ATTACK_AIR_TO_AIR", "used", false],
+        ["FOCUSED_ATTACK_AIR_TO_LAND", "used", false],
+        ["FOCUSED_ATTACK_AIR_BOMB", "used", false],
+        ["ARMY_OVERRUN", "used", false],
+        ["COMMANDER_ATTACK", "used", false],
+        ["STONE_TRAP", "used", false],
+        ["TREAT_SICK", "used", false],
+        ["CLAIM_RESOURCE", "used", false],
+        ["SCORCHED_EARTH", "used", true],
+        ["DISPERSE_CLAN", "used", true]
+      ];
+      const stateFor = (u, expect) => expect === "moved" ? (u.location && isInt(u.location.x) && u.location.x >= 0 ? GameplayMap.getIndexFromXY(u.location.x, u.location.y) : -1)
+                                   : expect === "offmap" ? (u.isOnMap === true ? 1 : 0)
+                                   : expect === "gold" ? (player.Treasury && typeof player.Treasury.goldBalance === "number" ? Math.floor(player.Treasury.goldBalance) : 0)
+                                   : (u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : 0);
+      const enumerate = (rows, types, api, kindOf) => {
+        if (typeof types === "undefined" || !api) return;
+        for (const [name, expect, confirm] of rows) {
+          const type = types[name];
+          if (!isInt(type)) continue;
+          for (const u of player.Units.getUnits()) {
+            if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+            const probe = api.canStart(u.id, type, NO_TARGET, false);
+            if (!probe || probe.Success !== true) continue;
+            let plots = Array.isArray(probe.Plots) ? probe.Plots : [];
+            if (plots.length === 0) { const listing = api.canStart(u.id, type, {}, false); if (listing && Array.isArray(listing.Plots)) plots = listing.Plots; }
+            const detail = typeof probe.AdditionalDescription === "string" ? compose(probe.AdditionalDescription) : null;
+            const common = { kind: kindOf(name), arg: u.id.id, pre: stateFor(u, expect), unitId: u.id.id, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), expect: expect,
+              from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+              movesLeft: u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : null,
+              isCommander: u.isCommanderUnit === true, description: detail, canStart: true };
+            if (confirm) { common.requiresConfirmation = true; common.destructive = true; }
+            if (plots.length === 0) { offers.push({ ...common, arg2: -1, arg3: -1 }); continue; }
+            let offeredHere = 0;
+            for (const pi of plots) {
+              if (offeredHere >= 8 || !isInt(pi)) continue;
+              const loc = GameplayMap.getLocationFromIndex(pi);
+              if (!loc || !isInt(loc.x) || loc.x < 0) continue;
+              const at = api.canStart(u.id, type, { X: loc.x, Y: loc.y }, false);
+              if (!at || at.Success !== true) continue;
+              offers.push({ ...common, arg2: loc.x, arg3: loc.y, to: { x: loc.x, y: loc.y }, plotIndex: pi,
+                terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType") });
+              offeredHere++;
+            }
+          }
+        }
+      };
+      enumerate(OPERATIONS, typeof UnitOperationTypes === "undefined" ? undefined : UnitOperationTypes, Game.UnitOperations, (n) => n);
+      enumerate(ABILITY_COMMANDS, typeof UnitCommandTypes === "undefined" ? undefined : UnitCommandTypes, Game.UnitCommands, (n) => n);
+    }
     // ---- pillage, coastal raid, pillage a route (A08). The shipped pillage modes ask canStart with
     // an empty argument for the legal plot set and send the chosen plot; the attack is spent either
     // way, so the unit's own remaining moves and attacks are the proof.

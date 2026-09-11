@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 175,
+          "confirmed": 176,
           "rejected": 0,
           "unknown": 0
         }
@@ -43,7 +43,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 159,
+          "confirmed": 160,
           "rejected": 0,
           "unknown": 0
         }
@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 537,
+          "confirmed": 546,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,7 +139,7 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2155,
+          "confirmed": 2205,
           "rejected": 12,
           "unknown": 0
         }
@@ -163,9 +163,9 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1807,
+          "confirmed": 1878,
           "rejected": 23,
-          "unknown": 1
+          "unknown": 2
         }
       }
     },
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 151,
+          "confirmed": 153,
           "rejected": 2,
           "unknown": 1
         }
@@ -211,7 +211,7 @@
       "expected_evidence": "a confirmed `PRODUCE_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 0,
           "unknown": 0
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 226,
+          "confirmed": 232,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 86,
+          "confirmed": 89,
           "rejected": 0,
           "unknown": 0
         }
@@ -331,7 +331,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 61,
+          "confirmed": 62,
           "rejected": 0,
           "unknown": 2
         }
@@ -355,7 +355,7 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 67,
+          "confirmed": 68,
           "rejected": 0,
           "unknown": 0
         }
@@ -427,7 +427,7 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 13,
+          "confirmed": 14,
           "rejected": 0,
           "unknown": 0
         }
@@ -451,7 +451,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_ATTRIBUTE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 4,
+          "confirmed": 5,
           "rejected": 0,
           "unknown": 0
         }
@@ -499,7 +499,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 79,
+          "confirmed": 82,
           "rejected": 8,
           "unknown": 1
         }
@@ -523,7 +523,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 32,
+          "confirmed": 33,
           "rejected": 0,
           "unknown": 0
         }
@@ -595,7 +595,7 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 6,
+          "confirmed": 12,
           "rejected": 0,
           "unknown": 0
         }
@@ -667,7 +667,7 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 1,
           "unknown": 0
         }
@@ -835,7 +835,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 23,
+          "confirmed": 24,
           "rejected": 5,
           "unknown": 0
         }
@@ -1261,7 +1261,7 @@
       "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 1
         }
@@ -1303,7 +1303,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 157,
+          "confirmed": 191,
           "rejected": 1,
           "unknown": 1
         }
@@ -1724,6 +1724,600 @@
       "evidence_refs": {}
     },
     {
+      "case_id": "LT-reinforce_army",
+      "action_family": "reinforce_army",
+      "expected_kind": "REINFORCE_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "reinforce_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `reinforce_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REINFORCE_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-rebase",
+      "action_family": "rebase",
+      "expected_kind": "REBASE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "rebase"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `rebase` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REBASE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-teleport_to_city",
+      "action_family": "teleport_to_city",
+      "expected_kind": "TELEPORT_TO_CITY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "teleport_to_city"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `teleport_to_city` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `TELEPORT_TO_CITY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-establish_base",
+      "action_family": "establish_base",
+      "expected_kind": "ESTABLISH_BASE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "establish_base"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `establish_base` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ESTABLISH_BASE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-disperse_independent",
+      "action_family": "disperse_independent",
+      "expected_kind": "DISPERSE_INDEPENDENT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "disperse_independent"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `disperse_independent` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `DISPERSE_INDEPENDENT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-convert_independent_to_city_state",
+      "action_family": "convert_independent_to_city_state",
+      "expected_kind": "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "convert_independent_to_city_state"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `convert_independent_to_city_state` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-repair",
+      "action_family": "repair",
+      "expected_kind": "REPAIR",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "repair"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `repair` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REPAIR` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-remove_feature",
+      "action_family": "remove_feature",
+      "expected_kind": "REMOVE_FEATURE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "remove_feature"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `remove_feature` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REMOVE_FEATURE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-remove_improvement",
+      "action_family": "remove_improvement",
+      "expected_kind": "REMOVE_IMPROVEMENT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "remove_improvement"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `remove_improvement` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `REMOVE_IMPROVEMENT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-plant_forest",
+      "action_family": "plant_forest",
+      "expected_kind": "PLANT_FOREST",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "plant_forest"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `plant_forest` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `PLANT_FOREST` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-harvest_resource",
+      "action_family": "harvest_resource",
+      "expected_kind": "HARVEST_RESOURCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "harvest_resource"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `harvest_resource` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `HARVEST_RESOURCE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-build_improvement",
+      "action_family": "build_improvement",
+      "expected_kind": "BUILD_IMPROVEMENT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "build_improvement"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `build_improvement` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `BUILD_IMPROVEMENT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-embed_lookout",
+      "action_family": "embed_lookout",
+      "expected_kind": "EMBED_LOOKOUT",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "embed_lookout"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `embed_lookout` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `EMBED_LOOKOUT` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-search",
+      "action_family": "search",
+      "expected_kind": "SEARCH",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "search"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `search` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SEARCH` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-aerial_recon",
+      "action_family": "aerial_recon",
+      "expected_kind": "AERIAL_RECON",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "aerial_recon"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `aerial_recon` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `AERIAL_RECON` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-call_reinforcements",
+      "action_family": "call_reinforcements",
+      "expected_kind": "CALL_REINFORCEMENTS",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "call_reinforcements"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `call_reinforcements` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CALL_REINFORCEMENTS` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-connect_with_road",
+      "action_family": "connect_with_road",
+      "expected_kind": "CONNECT_WITH_ROAD",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "connect_with_road"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `connect_with_road` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CONNECT_WITH_ROAD` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-move_by_rail",
+      "action_family": "move_by_rail",
+      "expected_kind": "MOVE_BY_RAIL",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "move_by_rail"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `move_by_rail` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `MOVE_BY_RAIL` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-upgrade_army",
+      "action_family": "upgrade_army",
+      "expected_kind": "UPGRADE_ARMY",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "upgrade_army"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `upgrade_army` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `UPGRADE_ARMY` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_land_melee",
+      "action_family": "focused_attack_land_melee",
+      "expected_kind": "FOCUSED_ATTACK_LAND_MELEE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_land_melee"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_land_melee` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_LAND_MELEE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_land_ranged",
+      "action_family": "focused_attack_land_ranged",
+      "expected_kind": "FOCUSED_ATTACK_LAND_RANGED",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_land_ranged"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_land_ranged` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_LAND_RANGED` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_sea_melee",
+      "action_family": "focused_attack_sea_melee",
+      "expected_kind": "FOCUSED_ATTACK_SEA_MELEE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_sea_melee"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_sea_melee` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_SEA_MELEE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_sea_ranged",
+      "action_family": "focused_attack_sea_ranged",
+      "expected_kind": "FOCUSED_ATTACK_SEA_RANGED",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_sea_ranged"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_sea_ranged` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_SEA_RANGED` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_air_to_air",
+      "action_family": "focused_attack_air_to_air",
+      "expected_kind": "FOCUSED_ATTACK_AIR_TO_AIR",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_air_to_air"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_air_to_air` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_TO_AIR` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_air_to_land",
+      "action_family": "focused_attack_air_to_land",
+      "expected_kind": "FOCUSED_ATTACK_AIR_TO_LAND",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_air_to_land"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_air_to_land` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_TO_LAND` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-focused_attack_air_bomb",
+      "action_family": "focused_attack_air_bomb",
+      "expected_kind": "FOCUSED_ATTACK_AIR_BOMB",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "focused_attack_air_bomb"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `focused_attack_air_bomb` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_BOMB` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-army_overrun",
+      "action_family": "army_overrun",
+      "expected_kind": "ARMY_OVERRUN",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "army_overrun"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `army_overrun` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `ARMY_OVERRUN` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-commander_attack",
+      "action_family": "commander_attack",
+      "expected_kind": "COMMANDER_ATTACK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "commander_attack"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `commander_attack` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `COMMANDER_ATTACK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-stone_trap",
+      "action_family": "stone_trap",
+      "expected_kind": "STONE_TRAP",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "stone_trap"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `stone_trap` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `STONE_TRAP` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-treat_sick",
+      "action_family": "treat_sick",
+      "expected_kind": "TREAT_SICK",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "treat_sick"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `treat_sick` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `TREAT_SICK` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-claim_resource",
+      "action_family": "claim_resource",
+      "expected_kind": "CLAIM_RESOURCE",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "claim_resource"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `claim_resource` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `CLAIM_RESOURCE` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-scorched_earth",
+      "action_family": "scorched_earth",
+      "expected_kind": "SCORCHED_EARTH",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "scorched_earth"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `scorched_earth` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `SCORCHED_EARTH` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
+      "case_id": "LT-disperse_clan",
+      "action_family": "disperse_clan",
+      "expected_kind": "DISPERSE_CLAN",
+      "variant": "default",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "disperse_clan"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `disperse_clan` offer when it is strategically sensible",
+      "expected_evidence": "a confirmed `DISPERSE_CLAN` receipt in the seat journal",
+      "evidence_refs": {}
+    },
+    {
       "case_id": "PLAN-A01",
       "action_family": "Captured settlement keep/raze/liberate",
       "expected_kind": null,
@@ -2085,15 +2679,27 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "reinforce_army",
+        "upgrade_army",
+        "army_overrun",
+        "commander_attack",
+        "focused_attack_land_melee",
+        "focused_attack_land_ranged",
+        "focused_attack_sea_melee",
+        "focused_attack_sea_ranged",
+        "focused_attack_air_to_air",
+        "focused_attack_air_to_land",
+        "focused_attack_air_bomb"
+      ],
       "consequence_class": "medium",
       "procedure": "Army reinforcement, focused attacks, overrun",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2102,15 +2708,21 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 3,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "connect_with_road",
+        "move_by_rail",
+        "rebase",
+        "teleport_to_city",
+        "establish_base"
+      ],
       "consequence_class": "medium",
       "procedure": "Roads, rail, bases, rebase, cargo",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2119,15 +2731,22 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "stone_trap",
+        "treat_sick",
+        "claim_resource",
+        "embed_lookout",
+        "search",
+        "aerial_recon"
+      ],
       "consequence_class": "medium",
       "procedure": "Civilization/unit-specific abilities",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {
@@ -2136,15 +2755,27 @@
       "expected_kind": null,
       "variant": "plan-item",
       "priority": 4,
-      "implementation_status": "unimplemented",
+      "implementation_status": "offline_verified",
       "live_status": "not_seen",
       "eligibility": {
         "offered": []
       },
-      "kinds": [],
+      "kinds": [
+        "repair",
+        "remove_feature",
+        "remove_improvement",
+        "plant_forest",
+        "harvest_resource",
+        "build_improvement",
+        "disperse_independent",
+        "convert_independent_to_city_state",
+        "scorched_earth",
+        "disperse_clan",
+        "call_reinforcements"
+      ],
       "consequence_class": "medium",
       "procedure": "Tile actions: repair, remove, plant, disperse",
-      "expected_evidence": "see plans/remaining-player-actions-implementation.md",
+      "expected_evidence": "a confirmed receipt of each listed kind",
       "evidence_refs": {}
     },
     {

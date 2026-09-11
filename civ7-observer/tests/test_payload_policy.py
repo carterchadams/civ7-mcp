@@ -120,6 +120,11 @@ MUTATION_ALLOWLIST = (
     'Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, resourceOp, resArgs)',
     # the six generic unit commands: the kind IS the engine's command name, validated host-side
     # against the catalog, so no caller text ever reaches UnitCommandTypes
+    # table-driven unit operations and commands (A19-A22): the type is the host-substituted kind
+    'Game.UnitOperations.canStart(lUnitId, lType, lArgs, false)',
+    'Game.UnitOperations.sendRequest(lUnitId, lType, lArgs)',
+    'Game.UnitCommands.canStart(aUnitId2, aType, aArgs, false)',
+    'Game.UnitCommands.sendRequest(aUnitId2, aType, aArgs)',
     'Game.UnitCommands.canStart(cUnitId, commandType, cmdArgs, false)',
     'Game.UnitCommands.sendRequest(cUnitId, commandType, cmdArgs)',
 )

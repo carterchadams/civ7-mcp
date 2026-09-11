@@ -48,6 +48,10 @@ PLAN_KINDS = {
     "A12": ["unassign_resource", "swap_resources"], "A13": ["town_growth_mode"], "A14": ["wake_unit", "cancel_order"],
     "A15": ["select_capital"], "A16": ["syncretism_units", "syncretism_infrastructure", "syncretism_self"],
     "A17": ["drop_legacy_card", "place_legacy_settlement"], "A18": ["resettle"],
+    "A19": ["reinforce_army", "upgrade_army", "army_overrun", "commander_attack", "focused_attack_land_melee", "focused_attack_land_ranged", "focused_attack_sea_melee", "focused_attack_sea_ranged", "focused_attack_air_to_air", "focused_attack_air_to_land", "focused_attack_air_bomb"],
+    "A20": ["connect_with_road", "move_by_rail", "rebase", "teleport_to_city", "establish_base"],
+    "A21": ["stone_trap", "treat_sick", "claim_resource", "embed_lookout", "search", "aerial_recon"],
+    "A22": ["repair", "remove_feature", "remove_improvement", "plant_forest", "harvest_resource", "build_improvement", "disperse_independent", "convert_independent_to_city_state", "scorched_earth", "disperse_clan", "call_reinforcements"],
 }
 
 
