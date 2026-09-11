@@ -199,9 +199,9 @@ def test_blocking_notifications_add_required_decisions_beyond_the_single_blocker
 
 def test_an_unmapped_blocking_notification_pauses_even_when_the_blocker_value_is_supported(tmp_path):
     payload = offers_with(RESEARCH, end_can_start=False, blocking="RESEARCH")
-    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_RELIGION"]}
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_WORLD_CONGRESS_VOTE"]}
     b, _, _ = build(tmp_path, payload)
-    assert b["pause"]["reason"] == "UNSUPPORTED_DECISION" and "NOTIFICATION_CHOOSE_RELIGION" in b["pause"]["message"]
+    assert b["pause"]["reason"] == "UNSUPPORTED_DECISION" and "NOTIFICATION_WORLD_CONGRESS_VOTE" in b["pause"]["message"]
 
 
 def test_attribute_notification_is_a_supported_attributes_decision(tmp_path):
@@ -247,6 +247,17 @@ def test_a_pending_proposal_is_a_supported_required_decision_not_a_pause(tmp_pat
     assert d["required"] is True
     assert [(o["answer"], o["proposerName"]) for o in d["options"]] == [("accept", "Abbasid"), ("reject", "Abbasid")]
     assert "proposed" in d["note"]
+
+
+def test_choosing_a_religion_is_a_supported_required_decision_not_a_pause(tmp_path):
+    """Live, turn 52: the religion notification paused play as an unsupported decision."""
+    rel = [{"kind": "FOUND_RELIGION", "arg": 35560851, "pre": -1, "typeKey": "RELIGION_BUDDHISM", "displayName": "Buddhism", "canStart": True}]
+    payload = offers_with(rel, end_can_start=False, blocking="NEW_POPULATION")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_RELIGION"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "religion")
+    assert d["required"] is True and d["options"][0]["kind"] == "found_religion" and "found a religion" in d["note"]
 
 
 def test_the_option_that_clears_a_blocker_survives_a_crowded_group(tmp_path):

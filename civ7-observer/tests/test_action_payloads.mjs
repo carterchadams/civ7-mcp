@@ -1525,6 +1525,64 @@ test("perform of a goal refuses a node the engine will not target and a goal tha
   assert.equal(rr.readback.matches, false);
 });
 
+// ---- founding a religion and adding beliefs
+function withReligion(g, { held = -1, earned = 0, open = [35560851], beliefsOk = [777], applied = true } = {}) {
+  const me = g.Players.get(1);
+  me.Religion = { getReligionType: () => held, getNumBeliefsEarned: () => earned };
+  g.PlayerOperationTypes = { ...g.PlayerOperationTypes, FOUND_RELIGION: 9501, ADD_BELIEF: 9502 };
+  const religions = [{ $hash: 35560851, ReligionType: "RELIGION_BUDDHISM", Name: "LOC_BUD" }, { $hash: 1816441899, ReligionType: "RELIGION_CATHOLICISM", Name: "LOC_CATH" }, { $hash: -547366190, ReligionType: "RELIGION_CUSTOM_1", Name: "LOC_CUSTOM", RequiresCustomName: true }];
+  g.GameInfo.Religions = table(religions); g.GameInfo.Religions[Symbol.iterator] = function* () { yield* religions; };
+  const beliefs = [{ $hash: 777, BeliefType: "BELIEF_BONUS_1", BeliefClassType: "BELIEF_CLASS_ENHANCER", Name: "LOC_B1", Description: "LOC_B1_D" }, { $hash: 778, BeliefType: "BELIEF_BONUS_2", BeliefClassType: "BELIEF_CLASS_FOUNDER", Name: "LOC_B2", Description: "LOC_B2_D" }];
+  g.GameInfo.Beliefs = table(beliefs); g.GameInfo.Beliefs[Symbol.iterator] = function* () { yield* beliefs; };
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => {
+      if (op === 9501) { g._log.push(`relcanStart(${JSON.stringify(args)})`); return { Success: pid === 1 && open.includes(args.ReligionType) }; }
+      if (op === 9502) { g._log.push(`belcanStart(${JSON.stringify(args)})`); return { Success: pid === 1 && beliefsOk.includes(args.BeliefType) }; }
+      return inner.canStart(pid, op, args, show);
+    },
+    sendRequest: (pid, op, args) => {
+      if (op === 9501) { g._log.push(`relsendRequest(${JSON.stringify(args)})`); if (applied) me.Religion.getReligionType = () => args.ReligionType; return; }
+      if (op === 9502) { g._log.push(`belsendRequest(${JSON.stringify(args)})`); if (applied) me.Religion.getNumBeliefsEarned = () => earned + 1; return; }
+      return inner.sendRequest(pid, op, args);
+    },
+  };
+  return g;
+}
+
+test("religion offers list the named religions the engine still allows and never the custom ones; beliefs only once a religion is held", () => {
+  const g = withReligion(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runOffers(g);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "FOUND_RELIGION").map((o) => [o.arg, o.typeKey, o.pre]), [[35560851, "RELIGION_BUDDHISM", -1]]);
+  assert.deepEqual(r.offers.filter((o) => o.kind === "ADD_BELIEF"), [], "no beliefs before a religion exists");
+  const h = withReligion(withUnits(world({ log: [] }), []), { held: 35560851 }); h._log = [];
+  const rh = runOffers(h);
+  assert.deepEqual(rh.offers.filter((o) => o.kind === "FOUND_RELIGION"), [], "a seat with a religion is not offered another");
+  assert.deepEqual(rh.offers.filter((o) => o.kind === "ADD_BELIEF").map((o) => [o.arg, o.beliefClass, o.pre]), [[777, "ENHANCER", 0]]);
+});
+
+test("perform FOUND_RELIGION and ADD_BELIEF confirm on the religion held and the belief count rising", () => {
+  const g = withReligion(withUnits(world({ log: [] }), [])); g._log = [];
+  const r = runPerformArgs(g, "FOUND_RELIGION", 35560851, 0, 0, { pre: -1 });
+  assert.equal(r.refused, null);
+  assert.deepEqual(r.readback, { kind: "FOUND_RELIGION", arg: 35560851, religion: 35560851, matches: true });
+  assert.ok(g._log.find((e) => e.startsWith("relsendRequest(") && e.includes('"ReligionType":35560851')));
+  const h = withReligion(withUnits(world({ log: [] }), []), { held: 35560851 }); h._log = [];
+  const rb = runPerformArgs(h, "ADD_BELIEF", 777, 0, 0, { pre: 0 });
+  assert.deepEqual(rb.readback, { kind: "ADD_BELIEF", arg: 777, beliefsBefore: 0, beliefs: 1, matches: true });
+  for (const [label, mk, kind, arg, pre] of [
+    ["not a religion", () => withReligion(withUnits(world({ log: [] }), [])), "FOUND_RELIGION", 4242, -1],
+    ["religion changed", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851 }), "FOUND_RELIGION", 1816441899, -1],
+    ["engine refuses religion", () => withReligion(withUnits(world({ log: [] }), []), { open: [] }), "FOUND_RELIGION", 35560851, -1],
+    ["belief count changed", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851, earned: 2 }), "ADD_BELIEF", 777, 0],
+    ["engine refuses belief", () => withReligion(withUnits(world({ log: [] }), []), { held: 35560851, beliefsOk: [] }), "ADD_BELIEF", 777, 0],
+  ]) {
+    const x = mk(); x._log = [];
+    assert.ok(runPerformArgs(x, kind, arg, 0, 0, { pre }).refused, `${label}: expected refusal`);
+    assert.ok(!x._log.some((e) => e.includes("sendRequest")), `${label}: must not send`);
+  }
+});
+
 // ---- answering another civilization's proposal
 function withProposal(g, { events = null, answerable = [16], closesAfter = true } = {}) {
   withDiplomacy(g, {});
