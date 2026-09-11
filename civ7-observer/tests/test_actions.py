@@ -1001,3 +1001,35 @@ def test_resource_assignment_confirms_on_the_assignment_map_and_consider_on_the_
         cr = next(o for o in out["offers"] if o["kind"] == "consider_resources")
         res2 = reg.perform(gs, action_id=cr["actionId"], request_id="cr-1", player=1, mode="singleplayer")
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"resourceNotificationCleared": True}
+
+
+def test_promotion_offer_and_confirmation_on_the_units_promotion_count(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionPoints": 1, "commendationPoints": 0, "unitLevel": 2, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "held": 0, "hasPromotion": False, "matches": False}}
+    rb = {**RB, "unitPromotions": {"5": 1}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pu = next(o for o in out["offers"] if o["kind"] == "promote_unit")
+        assert pu["disciplineName"] == "Bastion" and pu["description"] == "+5 defence" and pu["promotionPoints"] == 1 and pu["unitId"] == 5
+        assert "arg" not in pu and "arg2" not in pu and "arg3" not in pu
+        res = reg.perform(gs, action_id=pu["actionId"], request_id="pu-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed"
+    assert res["confirmedBy"]["effect"] == {"unitPromoted": {"unitId": 5, "promotion": 7101, "promotions": 1}}
+    sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
+    assert '"PROMOTE_UNIT"' in sent and "const ARG2 = 7101;" in sent and "const ARG3 = 8101;" in sent
+
+
+def test_promotion_poll_does_not_confirm_while_the_count_is_unchanged(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PROMOTE_UNIT", "arg": 5, "promotion": 7101, "discipline": 8101, "held": 0, "hasPromotion": False, "matches": False}}
+    rb = {**RB, "unitPromotions": {"5": 0}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pu = next(o for o in out["offers"] if o["kind"] == "promote_unit")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=pu["actionId"], request_id="pu-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"

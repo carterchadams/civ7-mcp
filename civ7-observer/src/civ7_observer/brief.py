@@ -30,6 +30,8 @@ BLOCKER_DECISION = {
     "CONSIDER_GOVERNMENT_CHANGE": "government",
     "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
     "NOTIFICATION_CAN_BUY_ATTRIBUTE_SKILL": "attributes",
+    "UNIT_PROMOTION": "promotion",
+    "NOTIFICATION_UNIT_PROMOTION_AVAILABLE": "promotion",
     "CHOOSE_GOLDEN_AGE": "celebration",
     "ASSIGN_NEW_RESOURCES": "resources",
     "NOTIFICATION_ASSIGN_NEW_RESOURCES": "resources",
@@ -69,6 +71,7 @@ DECISION_OF_KIND = {
     "buy_attribute": "attributes",
     "consider_attributes": "attributes",
     "choose_celebration": "celebration",
+    "promote_unit": "promotion",
     "assign_resource": "resources",
     "consider_resources": "resources",
     "end_turn": "end_turn",
@@ -80,7 +83,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "slotsFreeAny", "activatable", "description",
                  "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
-                 "celebration", "effects", "unlocksTraditions", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
+                 "celebration", "effects", "unlocksTraditions", "discipline", "disciplineName", "commendation", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 
 POLICIES_NOTE = ("activate a card into a free slot first (`slotsFreeAny` counts every slot; the engine's canStart, not the "
                  "card's slot type, decides what fits), then confirm_traditions; confirming alone does not clear the blocker "

@@ -113,6 +113,36 @@
         }
       }
     }
+    if (typeof UnitCommandTypes !== "undefined" && isInt(UnitCommandTypes.PROMOTE) && GameInfo.UnitPromotionDisciplineDetails) {
+      // Promotions: the shipped panel pairs a discipline with one of its promotions, gates on
+      // Experience.canEarnPromotion(disciplineType, promotionType, false), and sends PROMOTE with the
+      // hashes of both type strings (row.$hash equals Database.makeHash(type) on this build).
+      for (const u of player.Units.getUnits()) {
+        if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        const e = u.Experience;
+        if (!e || e.canPromote !== true) continue;
+        const held = isInt(e.getNumPromotions) ? e.getNumPromotions : 0;
+        const unitId = u.id;
+        for (const det of GameInfo.UnitPromotionDisciplineDetails) {
+          if (!det || typeof det.UnitPromotionDisciplineType !== "string" || typeof det.UnitPromotionType !== "string") continue;
+          const drow = GameInfo.UnitPromotionDisciplines.lookup(det.UnitPromotionDisciplineType);
+          const prow = GameInfo.UnitPromotions.lookup(det.UnitPromotionType);
+          if (!drow || !prow || !isInt(drow.$hash) || !isInt(prow.$hash)) continue;
+          let earnable = false;
+          try { earnable = e.canEarnPromotion(drow.UnitPromotionDisciplineType, prow.UnitPromotionType, false) === true; } catch (ex) { earnable = false; }
+          if (!earnable) continue;
+          const promoArgs = { PromotionType: prow.$hash, PromotionDisciplineType: drow.$hash };
+          const check = Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false);
+          if (!check || check.Success !== true) continue;
+          offers.push({ kind: "PROMOTE_UNIT", arg: u.id.id, arg2: prow.$hash, arg3: drow.$hash, pre: held, unitId: u.id.id,
+            from: u.location && isInt(u.location.x) && u.location.x >= 0 ? { x: u.location.x, y: u.location.y } : null,
+            unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"), discipline: drow.UnitPromotionDisciplineType, disciplineName: compose(drow.Name),
+            typeKey: prow.UnitPromotionType, displayName: compose(prow.Name), description: compose(prow.Description),
+            commendation: prow.Commendation === true, promotionPoints: isInt(e.getStoredPromotionPoints) ? e.getStoredPromotionPoints : null,
+            commendationPoints: isInt(e.getStoredCommendations) ? e.getStoredCommendations : null, unitLevel: isInt(e.getLevel) ? e.getLevel : null, canStart: true });
+        }
+      }
+    }
     if (typeof UnitOperationTypes !== "undefined" && isInt(UnitOperationTypes.FOUND_CITY)) {
       // Founding happens where the unit stands: the shipped panel sends no target plot for
       // FOUND_CITY (X/Y stay -9999), so the offer is bound to the unit's current plot instead.

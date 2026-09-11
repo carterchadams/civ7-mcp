@@ -232,3 +232,13 @@ def test_new_resources_notification_is_a_supported_resources_decision(tmp_path):
     assert b["pause"] is None
     d = next(d for d in b["decisions"] if d["kind"] == "resources")
     assert d["required"] is True and d["options"][0]["cityCap"] == 1 and "capacity" in d["note"]
+
+
+def test_unit_promotion_notification_is_a_supported_promotion_decision(tmp_path):
+    promo = [{"kind": "PROMOTE_UNIT", "arg": 5, "arg2": 7101, "arg3": 8101, "pre": 0, "unitId": 5, "from": {"x": 10, "y": 10}, "unitTypeKey": "UNIT_ARMY_COMMANDER", "movesRemaining": 2, "discipline": "DISCIPLINE_ARMY_BASTION", "disciplineName": "Bastion", "typeKey": "PROMOTION_A", "displayName": "Fortify", "description": "+5 defence", "commendation": False, "promotionPoints": 1, "unitLevel": 2, "canStart": True}]
+    payload = offers_with(promo, end_can_start=False, blocking="UNIT_PROMOTION")
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None
+    d = next(d for d in b["decisions"] if d["kind"] == "promotion")
+    assert d["required"] is True and d["options"][0]["disciplineName"] == "Bastion" and d["options"][0]["promotionPoints"] == 1
+    assert d["entities"] == [{"unitId": 5, "typeKey": "UNIT_ARMY_COMMANDER", "at": {"x": 10, "y": 10}, "movesRemaining": 2}]

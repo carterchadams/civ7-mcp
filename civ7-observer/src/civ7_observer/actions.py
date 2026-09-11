@@ -17,7 +17,7 @@ from civ7_observer.payloads import load_payload, render_action_payload, render_p
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
 
-PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources"}
+PUBLIC_KIND = {"SET_TECH_TREE_NODE": "research", "SET_CULTURE_TREE_NODE": "civic", "END_TURN": "end_turn", "SKIP_UNIT": "skip_unit", "MOVE_UNIT": "move_unit", "PRODUCE_UNIT": "produce_unit", "FOUND_CITY": "found_city", "EXPAND_CITY": "expand_city", "PRODUCE_CONSTRUCTIBLE": "produce_constructible", "CHANGE_TRADITION": "activate_tradition", "CONSIDER_ASSIGN_TRADITIONS": "confirm_traditions", "CHOOSE_NARRATIVE_STORY_DIRECTION": "narrative_choice", "FOUND_PANTHEON": "found_pantheon", "CHANGE_GOVERNMENT": "change_government", "BUY_ATTRIBUTE_TREE_NODE": "buy_attribute", "CONSIDER_ASSIGN_ATTRIBUTE": "consider_attributes", "CHOOSE_GOLDEN_AGE": "choose_celebration", "ASSIGN_RESOURCE": "assign_resource", "CONSIDER_ASSIGN_RESOURCE": "consider_resources", "PROMOTE_UNIT": "promote_unit"}
 REQUEST_ID = re.compile(r"^[A-Za-z0-9._-]{1,64}$")
 ACTION_ID = re.compile(r"^[A-Za-z0-9_-]{16,64}$")
 FINAL = ("confirmed", "rejected", "unknown")
@@ -300,7 +300,7 @@ class ActionRegistry:
             rec = {"kind": kind, "arg": o["arg"], "pre": o["pre"], "seat": player, "turn": gs.context.turn, "age": gs.context.age,
                    "match": gs.context.game_guid, "generation": generation, "target": gs.doctor.selected["id"], "canStart": o["canStart"]}
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
-            if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY"):
+            if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY", "PROMOTE_UNIT"):
                 if isinstance(o.get("unitId"), int):
                     entry["unitId"] = o["unitId"]
                 if isinstance(o.get("from"), dict):
@@ -356,6 +356,13 @@ class ActionRegistry:
                     raise ObserverError("API_CONTRACT_MISMATCH", "narrative offer without an answer hash")
                 rec["arg2"] = o["arg2"]
                 for k in ("storyId", "storyKey", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable"):
+                    if k in o:
+                        entry[k] = o[k]
+            if kind == "PROMOTE_UNIT":
+                if not isinstance(o.get("arg2"), int) or not isinstance(o.get("arg3"), int):
+                    raise ObserverError("API_CONTRACT_MISMATCH", "promotion offer without a promotion and discipline")
+                rec["arg2"], rec["arg3"] = o["arg2"], o["arg3"]
+                for k in ("discipline", "disciplineName", "description", "commendation", "promotionPoints", "commendationPoints", "unitLevel"):
                     if k in o:
                         entry[k] = o[k]
             if kind == "ASSIGN_RESOURCE":
@@ -508,6 +515,11 @@ class ActionRegistry:
                     plots = rb.get("expandPlots")
                     if isinstance(plots, dict) and isinstance(plots.get(str(offer["arg"])), list) and offer["pre"] not in plots[str(offer["arg"])]:
                         effect = {"populationPlaced": {"cityId": offer["arg"], "x": offer["arg2"], "y": offer["arg3"], "plotIndex": offer["pre"]}}
+                elif kind == "PROMOTE_UNIT":
+                    promos = rb.get("unitPromotions")
+                    held = promos.get(str(offer["arg"])) if isinstance(promos, dict) else None
+                    if isinstance(held, int) and not isinstance(held, bool) and held > offer["pre"]:
+                        effect = {"unitPromoted": {"unitId": offer["arg"], "promotion": offer["arg2"], "promotions": held}}
                 elif kind == "ASSIGN_RESOURCE":
                     assigned = rb.get("resourceAssignments")
                     if isinstance(assigned, dict) and assigned.get(str(offer["arg"])) == offer["arg2"]:

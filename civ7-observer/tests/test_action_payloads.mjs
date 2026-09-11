@@ -956,3 +956,72 @@ test("perform ASSIGN_RESOURCE checks ownership, the pending count and canStart, 
   const c = runPerform(g, "CONSIDER_ASSIGN_RESOURCE", 0, { pre: 0 });
   assert.equal(c.outcome, "sent");
 });
+
+// ---- unit promotion (discipline + promotion pair, hashes only)
+function withPromotions(g, { canPromote = true, earnable = ["PROMOTION_A"], held = 0, allow = true, applies = true } = {}) {
+  const units = [unit(5, { type: 7 })];
+  withUnits(g, units);
+  const promos = [{ $hash: 7101, UnitPromotionType: "PROMOTION_A", Name: "LOC_PA", Description: "LOC_PA_D", Commendation: false }, { $hash: 7102, UnitPromotionType: "PROMOTION_B", Name: "LOC_PB", Description: "LOC_PB_D", Commendation: true }];
+  const discs = [{ $hash: 8101, UnitPromotionDisciplineType: "DISCIPLINE_X", Name: "LOC_DX" }];
+  const byHashOrType = (rows, field) => ({ length: rows.length, lookup: (k) => rows.find((r) => r.$hash === k || r[field] === k) ?? null });
+  g.GameInfo.UnitPromotions = byHashOrType(promos, "UnitPromotionType");
+  g.GameInfo.UnitPromotionDisciplines = byHashOrType(discs, "UnitPromotionDisciplineType");
+  g.GameInfo.UnitPromotionDisciplineDetails = promos.map((p) => ({ UnitPromotionDisciplineType: "DISCIPLINE_X", UnitPromotionType: p.UnitPromotionType }));
+  g.UnitCommandTypes = { PROMOTE: -1259482049, DELETE: 1 };
+  const state = { held, has: {} };
+  units[0].Experience = {
+    canPromote, getNumPromotions: state.held, getStoredPromotionPoints: 1, getStoredCommendations: 0, getLevel: 2,
+    canEarnPromotion: (d, p) => d === "DISCIPLINE_X" && earnable.includes(p),
+    hasPromotion: (d, p) => !!state.has[p],
+  };
+  g.Game.UnitCommands = {
+    canStart: (uid, cmd, args, show) => { g._log.push(`pcanStart(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)},${show})`); return { Success: allow && cmd === -1259482049 && uid.owner === 1 }; },
+    sendRequest: (uid, cmd, args) => { g._log.push(`psendRequest(${JSON.stringify(uid)},${cmd},${JSON.stringify(args)})`); if (applies) { const row = promos.find((p) => p.$hash === args.PromotionType); state.has[row.UnitPromotionType] = true; units[0].Experience.getNumPromotions = state.held + 1; units[0].Experience.hasPromotion = (d, p) => !!state.has[p]; } },
+  };
+  return g;
+}
+
+test("promotion offers pair each earnable promotion with its discipline, carrying points, level and text", () => {
+  const log = [];
+  const g = withPromotions(world({ log })); g._log = log;
+  const r = runOffers(g);
+  const pr = r.offers.filter((o) => o.kind === "PROMOTE_UNIT");
+  assert.deepEqual(pr.map((o) => [o.arg, o.arg2, o.arg3, o.pre, o.unitId, o.discipline, o.disciplineName, o.typeKey, o.displayName, o.description, o.commendation, o.promotionPoints, o.unitLevel, o.canStart]),
+    [[5, 7101, 8101, 0, 5, "DISCIPLINE_X", "LOC_DX", "PROMOTION_A", "LOC_PA", "LOC_PA_D", false, 1, 2, true]]);
+  assert.ok(log.filter((e) => e.startsWith("pcanStart(")).every((e) => e.includes('"PromotionType":7101,"PromotionDisciplineType":8101')), "hashes only, never type strings");
+  assert.ok(!log.some((e) => e.startsWith("psendRequest")));
+  const none = withPromotions(world({ log: [] }), { canPromote: false }); none._log = [];
+  assert.equal(runOffers(none).offers.filter((o) => o.kind === "PROMOTE_UNIT").length, 0, "a unit that cannot promote is never queried");
+});
+
+test("perform PROMOTE_UNIT re-checks the pair, the promotion count and canStart, sends hashes, and reads back", () => {
+  const log = [];
+  const g = withPromotions(world({ log })); g._log = log;
+  const r = runPerformArgs(g, "PROMOTE_UNIT", 5, 7101, 8101, { pre: 0 });
+  assert.equal(r.refused, null);
+  assert.equal(r.outcome, "sent");
+  assert.deepEqual(r.readback, { kind: "PROMOTE_UNIT", arg: 5, promotion: 7101, discipline: 8101, held: 1, hasPromotion: true, matches: true });
+  const i = log.findIndex((e) => e.startsWith("pcanStart("));
+  const j = log.findIndex((e) => e.startsWith("psendRequest("));
+  assert.ok(i !== -1 && j !== -1 && i < j);
+});
+
+test("perform PROMOTE_UNIT refuses an unknown unit, a changed promotion count, a mismatched pair, an unearnable promotion and a canStart refusal without sending", () => {
+  for (const [label, mk, uid, ph, dh, pre] of [
+    ["unknown unit", () => withPromotions(world({ log: [] })), 9, 7101, 8101, 0],
+    ["count changed", () => withPromotions(world({ log: [] })), 5, 7101, 8101, 3],
+    ["not a definition", () => withPromotions(world({ log: [] })), 5, 4242, 8101, 0],
+    ["not earnable", () => withPromotions(world({ log: [] }), { earnable: [] }), 5, 7101, 8101, 0],
+    ["canStart false", () => withPromotions(world({ log: [] }), { allow: false }), 5, 7101, 8101, 0],
+    ["cannot promote", () => withPromotions(world({ log: [] }), { canPromote: false }), 5, 7101, 8101, 0],
+  ]) {
+    const g = mk(); const l = []; g._log = l;
+    const rr = runPerformArgs(g, "PROMOTE_UNIT", uid, ph, dh, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("psendRequest")), `${label}: must not send`);
+  }
+  const g = withPromotions(world({ log: [] }), { applies: false }); g._log = [];
+  const r = runPerformArgs(g, "PROMOTE_UNIT", 5, 7101, 8101, { pre: 0 });
+  assert.equal(r.outcome, "sent");
+  assert.equal(r.readback.matches, false);
+});

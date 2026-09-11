@@ -95,6 +95,34 @@
     result.readback = { kind: KIND, arg: ARG, target: { x: ARG2, y: ARG3 }, location: loc, matches: !!(loc && loc.x === ARG2 && loc.y === ARG3) };
     return JSON.stringify(result);
   }
+  if (KIND === "PROMOTE_UNIT") {
+    if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "promotion arguments are not integers");
+    if (typeof UnitCommandTypes === "undefined" || !isInt(UnitCommandTypes.PROMOTE)) return refuse("API_CONTRACT_MISMATCH", "UnitCommandTypes.PROMOTE unavailable");
+    let unit = null;
+    try { for (const u of player.Units.getUnits()) { if (u && u.id && u.id.id === ARG && u.id.owner === BOUND_PLAYER_ID) { unit = u; break; } } } catch (e) { unit = null; }
+    if (!unit) return refuse("UNKNOWN_ACTION", "unit is not in the bound player's roster");
+    const xp = unit.Experience;
+    if (!xp || xp.canPromote !== true) return refuse("ACTION_NOT_STARTABLE", "unit cannot be promoted");
+    if ((isInt(xp.getNumPromotions) ? xp.getNumPromotions : 0) !== PRE) return refuse("ACTION_EXPIRED", "the unit's promotions changed since the offer was made");
+    const prow = GameInfo.UnitPromotions.lookup(ARG2);
+    const drow = GameInfo.UnitPromotionDisciplines.lookup(ARG3);
+    if (!prow || !drow || typeof prow.UnitPromotionType !== "string" || typeof drow.UnitPromotionDisciplineType !== "string") return refuse("UNKNOWN_ACTION", "promotion or discipline is not a definition");
+    let paired = false;
+    for (const det of GameInfo.UnitPromotionDisciplineDetails) { if (det && det.UnitPromotionType === prow.UnitPromotionType && det.UnitPromotionDisciplineType === drow.UnitPromotionDisciplineType) { paired = true; break; } }
+    if (!paired) return refuse("UNKNOWN_ACTION", "that promotion does not belong to that discipline");
+    let earnable = false;
+    try { earnable = xp.canEarnPromotion(drow.UnitPromotionDisciplineType, prow.UnitPromotionType, false) === true; } catch (e) { earnable = false; }
+    if (!earnable) return refuse("ACTION_NOT_STARTABLE", "the unit can no longer earn that promotion");
+    const unitId = unit.id;
+    const promoArgs = { PromotionType: ARG2, PromotionDisciplineType: ARG3 };
+    const pcheck = Game.UnitCommands.canStart(unitId, UnitCommandTypes.PROMOTE, promoArgs, false);
+    if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the promotion");
+    Game.UnitCommands.sendRequest(unitId, UnitCommandTypes.PROMOTE, promoArgs);
+    result.outcome = "sent";
+    let has = null; try { has = xp.hasPromotion(drow.UnitPromotionDisciplineType, prow.UnitPromotionType) === true; } catch (e) { has = null; }
+    result.readback = { kind: KIND, arg: ARG, promotion: ARG2, discipline: ARG3, held: isInt(xp.getNumPromotions) ? xp.getNumPromotions : null, hasPromotion: has, matches: has === true };
+    return JSON.stringify(result);
+  }
   if (KIND === "FOUND_CITY") {
     if (!isInt(ARG) || !isInt(ARG2) || !isInt(ARG3)) return refuse("UNKNOWN_ACTION", "found-city arguments are not integers");
     if (typeof UnitOperationTypes === "undefined" || !isInt(UnitOperationTypes.FOUND_CITY)) return refuse("API_CONTRACT_MISMATCH", "UnitOperationTypes.FOUND_CITY unavailable");
