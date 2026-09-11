@@ -338,3 +338,10 @@ where it is the target, and the answer is `RESPOND_DIPLOMATIC_ACTION` with the e
 reject response type. The engine's check for an answer keeps succeeding after one is given (live: the first accept read
 as unknown for exactly that reason), so it is no signal; each event carries its own `responseType`,
 `INVALID_RESPONSE` until answered and then the answer given, which is both the offer gate and the proof.
+
+**Lesson (turn 56, live):** an action can hang the game's script thread without the engine itself
+hanging. Founding at one plot never returned, three times running and once with a 40-second deadline,
+while the engine answered other probes in a tenth of a second and nothing was founded. Each retry cost
+a human reconciliation. The registry now keeps a per-match quarantine: an exact action (kind and
+arguments) that has come back unknown twice is still listed but marked not startable with the reason,
+and a human lifts it deliberately with `lift_quarantine`.

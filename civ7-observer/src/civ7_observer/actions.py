@@ -112,6 +112,7 @@ class ActionRegistry:
         self.lock_path = self.shared.lock_path
         self.unresolved_path = self.shared.unresolved_path
         self.inflight_path = self.shared.inflight_path
+        self.quarantine_path = self.shared.dir / "quarantine.json"
         self.generations_path = self.shared.generations_path
         self._recovered: dict[str, dict[str, Any]] = {}
         # constructor: read-only; shared state is only written under the game lock
@@ -182,6 +183,42 @@ class ActionRegistry:
 
     def _write_shared(self, path: Path, data: dict[str, Any]) -> None:
         write_atomic(path, json.dumps(data))
+
+    # An action whose outcome came back unknown twice for the same target is not tried a third time by a
+    # seat on its own: live, a founding at one plot hung the script thread three times running while
+    # the engine stayed responsive, and each retry cost a reconciliation. The record is per match and
+    # per exact target, so the same kind elsewhere is unaffected, and a human lifts it deliberately.
+    QUARANTINE_AFTER = 2
+
+    def _quarantine_key(self, entry: dict[str, Any]) -> str:
+        return ":".join(str(entry.get(k)) for k in ("match", "kind", "arg", "arg2", "arg3"))
+
+    def _record_unknown(self, entry: dict[str, Any]) -> None:
+        table = self._read_shared(self.quarantine_path)
+        key = self._quarantine_key(entry)
+        rec = table.get(key) or {"match": entry.get("match"), "kind": entry.get("kind"), "arg": entry.get("arg"),
+                                 "arg2": entry.get("arg2"), "arg3": entry.get("arg3"), "seat": entry.get("seat"), "unknowns": 0, "requests": []}
+        rec["unknowns"] += 1
+        rec["requests"] = (rec["requests"] + [entry.get("requestId")])[-5:]
+        rec["lastTurn"] = entry.get("turn")
+        table[key] = rec
+        self._write_shared(self.quarantine_path, table)
+
+    def quarantined(self, match: str) -> dict[str, dict[str, Any]]:
+        """Targets in this match that have gone unknown often enough to be withheld from seats."""
+        table = self._read_shared(self.quarantine_path)
+        return {k: v for k, v in table.items() if v.get("match") == match and v.get("unknowns", 0) >= self.QUARANTINE_AFTER}
+
+    def lift_quarantine(self, match: str, kind: str, arg: int, arg2: int = 0, arg3: int = 0) -> bool:
+        """A human decision: let seats try this exact action again."""
+        with self._locked():
+            table = self._read_shared(self.quarantine_path)
+            key = ":".join(str(v) for v in (match, kind, arg, arg2, arg3))
+            if key not in table:
+                return False
+            del table[key]
+            self._write_shared(self.quarantine_path, table)
+            return True
 
     def _mark_unresolved(self, request_id: str, entry: dict[str, Any]) -> None:
         shared = self._read_shared(self.unresolved_path)
@@ -326,6 +363,7 @@ class ActionRegistry:
             raise ObserverError("CONTEXT_CHANGED", "offers were enumerated for a different turn or match")
         generation, reattached = self._generation(gs, advance=True)
         public = []
+        quarantined = self.quarantined(gs.context.game_guid)
         for o in offers:
             kind = o.get("kind")
             if kind not in PUBLIC_KIND or not isinstance(o.get("arg"), int) or not isinstance(o.get("canStart"), bool) or not isinstance(o.get("pre"), int):
@@ -336,6 +374,12 @@ class ActionRegistry:
             if kind == "MAKE_TRADE_ROUTE" and isinstance(o.get("activeRoutes"), int):
                 rec["activeRoutes"] = o["activeRoutes"]
             entry = {"actionId": action_id, "kind": PUBLIC_KIND[kind], "canStart": o["canStart"]}
+            qkey = ":".join(str(v) for v in (gs.context.game_guid, kind, o.get("arg"), o.get("arg2", 0), o.get("arg3", 0)))
+            if qkey in quarantined:
+                rec["canStart"] = entry["canStart"] = False
+                entry["quarantined"] = True
+                entry["reason"] = (f"withheld: this exact action came back unknown {quarantined[qkey]['unknowns']} times in this match "
+                                   f"(a human can lift the quarantine); choose another target")
             if kind in ("MOVE_UNIT", "SKIP_UNIT", "FOUND_CITY", "PROMOTE_UNIT", "MAKE_TRADE_ROUTE", "UNIT_ORDER"):
                 if isinstance(o.get("unitId"), int):
                     entry["unitId"] = o["unitId"]
@@ -907,6 +951,7 @@ class ActionRegistry:
         self._pending.discard(base["requestId"])
         self._results[base["requestId"]] = entry
         if status == "unknown":
+            self._record_unknown(entry)
             self._mark_unresolved(base["requestId"], entry)
         else:
             self._clear_unresolved(base["requestId"])

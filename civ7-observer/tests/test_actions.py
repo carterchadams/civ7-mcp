@@ -1256,6 +1256,45 @@ def test_founding_a_religion_confirms_on_the_religion_held_and_a_belief_on_the_c
     assert res2["status"] == "confirmed" and res2["confirmedBy"]["effect"] == {"beliefAdded": {"belief": 777, "beliefs": 1}}
 
 
+def test_an_action_that_goes_unknown_twice_for_the_same_target_is_quarantined_and_withheld(tmp_path):
+    """Live, turn 56: founding at one plot hung the script thread three times running while the engine
+    stayed responsive, and each retry cost a human reconciliation."""
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "SET_TECH_TREE_NODE", "arg": 701, "observedType": -1, "matches": False}}
+    stale = {**RB, "techResearching": -1}
+    def one_unknown(request_id):
+        gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(stale)) for i in range(actions.READBACK_ATTEMPTS)]})
+        with gs:
+            out = reg.list_offers(gs, player=1, mode="singleplayer")
+            r = next(o for o in out["offers"] if o["kind"] == "research")
+            with pytest.raises(service.ObserverError) as info:
+                reg.perform(gs, action_id=r["actionId"], request_id=request_id, player=1, mode="singleplayer")
+            assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+        reg.reconcile(request_id, "rejected", note="verified nothing happened")
+        return r
+    one_unknown("u-1")
+    # after one unknown the action is still offered
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), ctx_reply(3)]})
+    with gs:
+        r = next(o for o in reg.list_offers(gs, player=1, mode="singleplayer")["offers"] if o["kind"] == "research")
+        assert r["canStart"] is True and "quarantined" not in r
+    one_unknown("u-2")
+    # after two, that exact target is withheld with the reason, and other targets of the same kind are not
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(OFFERS)), ctx_reply(3), ctx_reply(3), ctx_reply(3)]})
+    with gs:
+        offers = reg.list_offers(gs, player=1, mode="singleplayer")["offers"]
+        quarantined = next(o for o in offers if o["kind"] == "research" and o.get("typeKey") == "NODE_TECH_AQ_POTTERY")
+        assert quarantined["canStart"] is False and quarantined["quarantined"] is True and "unknown 2 times" in quarantined["reason"]
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=quarantined["actionId"], request_id="u-3", player=1, mode="singleplayer")
+        assert info.value.code == "ACTION_NOT_STARTABLE"
+    assert list(reg.quarantined(CTX["gameGuid"]).values())[0]["unknowns"] == 2
+    # a human lifts it deliberately
+    assert reg.lift_quarantine(CTX["gameGuid"], "SET_TECH_TREE_NODE", 701) is True
+    assert reg.quarantined(CTX["gameGuid"]) == {}
+    assert reg.lift_quarantine(CTX["gameGuid"], "SET_TECH_TREE_NODE", 701) is False
+
+
 DISBAND_OFFER = {"kind": "DISBAND_UNIT", "arg": 5, "pre": 3, "unitId": 5, "unitTypeKey": "UNIT_SCOUT", "from": {"x": 10, "y": 10},
                  "destructive": True, "requiresConfirmation": True, "warning": ["Are you sure you want to delete Scout?"], "canStart": True}
 
