@@ -175,7 +175,8 @@ test("perform SKIP_UNIT refuses an id that is not in the bound roster and never 
 });
 
 // ---- unit move (adjacent, known plots only, never an attack)
-function withMap(g, { hiddenAt = [], moveOk = true } = {}) {
+function withMap(g, { hiddenAt = [], moveOk = true, unreachable = [] } = {}) {
+  g.Units = { getPathTo: (uid, loc) => { g._log.push(`path(${uid.id},${loc.x},${loc.y})`); return unreachable.some(([ux, uy]) => ux === loc.x && uy === loc.y) ? { plots: [], turns: [], obstacles: [] } : { plots: [1, 2], turns: [1, 1], obstacles: [] }; } };
   g.UnitOperationTypes = { ...(g.UnitOperationTypes || {}), SKIP_TURN: 745019656, MOVE_TO: 1477390184 };
   g.UnitOperationMoveModifiers = { NONE: 0, ATTACK: 16, MOVE_IGNORE_UNEXPLORED_DESTINATION: 16384 };
   g.RevealedStates = { HIDDEN: 0, REVEALED: 1, VISIBLE: 2 };
@@ -191,16 +192,18 @@ function withMap(g, { hiddenAt = [], moveOk = true } = {}) {
   return g;
 }
 
-test("move offers cover adjacent known plots only, with canStart(MOVE_TO) and Modifiers NONE", () => {
+test("move offers cover adjacent known reachable plots only, with canStart(MOVE_TO) and Modifiers NONE", () => {
   const log = [];
-  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]] }); g._log = log;
+  const g = withMap(withUnits(world({ log }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]], unreachable: [[10, 11]] }); g._log = log;
   const r = runOffers(g);
   const moves = r.offers.filter((o) => o.kind === "MOVE_UNIT");
-  assert.equal(moves.length, 5, "six neighbours minus one hidden");
+  assert.equal(moves.length, 4, "six neighbours minus one hidden minus one with no path");
+  assert.ok(!moves.some((o) => o.x === 10 && o.y === 11), "plot with an empty native path must not be offered");
+  assert.ok(moves.every((o) => o.pathTurns === 1));
   assert.ok(moves.every((o) => o.arg === 5 && o.canStart === true && typeof o.x === "number" && typeof o.y === "number" && o.direction >= 0 && o.terrainKey === "TERRAIN_FLAT"));
   assert.ok(!moves.some((o) => o.x === 11 && o.y === 10), "hidden plot must not be offered");
   const moveChecks = log.filter((e) => e.startsWith("ucanStart(") && e.includes("1477390184"));
-  assert.equal(moveChecks.length, 5);
+  assert.equal(moveChecks.length, 4);
   assert.ok(moveChecks.every((e) => e.includes('"Modifiers":0')));
   // visibility is read before canStart for each plot
   for (const o of moves) {
@@ -228,6 +231,7 @@ test("perform MOVE_UNIT refuses non-adjacent, hidden, unknown-unit and canStart-
     ["hidden", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { hiddenAt: [[11, 10]] }), 5, 11, 10],
     ["unknown unit", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })])), 9, 11, 10],
     ["canStart false", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { moveOk: false }), 5, 11, 10],
+    ["no native path", () => withMap(withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 } })]), { unreachable: [[11, 10]] }), 5, 11, 10],
   ]) {
     const g = mk(); const log = []; g._log = log;
     const r = runPerformArgs(g, "MOVE_UNIT", uid, x, y);

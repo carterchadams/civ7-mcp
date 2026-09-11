@@ -141,8 +141,9 @@ class ActionRegistry:
                 entry["to"] = {"x": o["x"], "y": o["y"]}
                 if isinstance(o.get("direction"), int):
                     entry["direction"] = o["direction"]
-                if "terrainKey" in o:
-                    entry["terrainKey"] = o["terrainKey"]
+                for k in ("terrainKey", "pathTurns"):
+                    if k in o:
+                        entry[k] = o[k]
             self._offers[action_id] = rec
             for k in ("typeKey", "displayName", "tree", "cost", "turns", "blockingType", "alreadySent", "unitTypeKey", "movesRemaining", "location"):
                 if k in o:

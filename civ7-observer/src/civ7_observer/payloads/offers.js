@@ -80,10 +80,16 @@
           if (!loc || !isInt(loc.x) || !isInt(loc.y) || loc.x < 0 || loc.y < 0) continue;
           const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, loc.x, loc.y);
           if (!isInt(state) || state === RevealedStates.HIDDEN) continue;   // never offer unknown land
+          // canStart(MOVE_TO) does not validate the destination (live: it accepted an impassable
+          // mountain that the engine then silently dropped). The shipped path preview does.
+          const path = Units.getPathTo(unitId, { x: loc.x, y: loc.y });
+          const plots = path && Array.isArray(path.plots) ? path.plots : [];
+          const turns = path && Array.isArray(path.turns) ? path.turns : [];
+          if (plots.length === 0 || turns.length === 0 || turns[turns.length - 1] !== 1) continue;   // unreachable this turn
           const moveArgs = { X: loc.x, Y: loc.y, Modifiers: 0 };
           const check = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
           offers.push({ kind: "MOVE_UNIT", arg: u.id.id, x: loc.x, y: loc.y, direction: d, unitTypeKey: lookupKey(GameInfo.Units, u.type, "UnitType"),
-            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"),
+            terrainKey: lookupKey(GameInfo.Terrains, GameplayMap.getTerrainType(loc.x, loc.y), "TerrainType"), pathTurns: turns[turns.length - 1],
             movesRemaining: u.Movement.movementMovesRemaining, canStart: !!(check && check.Success === true) });
         }
       }

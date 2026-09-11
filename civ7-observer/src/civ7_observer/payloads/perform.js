@@ -76,6 +76,10 @@
     const state = GameplayMap.getRevealedState(BOUND_PLAYER_ID, ARG2, ARG3);
     if (!isInt(state) || state === RevealedStates.HIDDEN) return refuse("ACTION_NOT_STARTABLE", "target plot is unknown to the bound player");
     const unitId = unit.id;
+    const path = Units.getPathTo(unitId, { x: ARG2, y: ARG3 });
+    const pplots = path && Array.isArray(path.plots) ? path.plots : [];
+    const pturns = path && Array.isArray(path.turns) ? path.turns : [];
+    if (pplots.length === 0 || pturns.length === 0 || pturns[pturns.length - 1] !== 1) return refuse("ACTION_NOT_STARTABLE", "no native one-turn path to the target plot");
     const moveArgs = { X: ARG2, Y: ARG3, Modifiers: 0 };
     const mcheck = Game.UnitOperations.canStart(unitId, UnitOperationTypes.MOVE_TO, moveArgs, false);
     if (!mcheck || mcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the move");

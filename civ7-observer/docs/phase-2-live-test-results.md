@@ -81,3 +81,13 @@ Gate stage 2 decision so far: concealment holds for research, skip, move and end
 unsupported-decision path degrades to a human takeover with no leak beyond the human's own
 choice to dismiss the curtain. Production selection is the next catalog item the declared
 scenario needs.
+
+## Game 2 (different save, player 0, turn 13, curtain up): unknown-outcome path exercised
+
+| step | result |
+|---|---|
+| `move_unit` to an adjacent **mountain** plot that `canStart` had accepted | `sendRequest` accepted; read-back poll never saw the unit move; outcome `unknown`; journal `pending → unknown` |
+| next `act perform` | refused `RECONCILIATION_REQUIRED` (nothing sent) |
+| verification | unit still at (19, 32), 2/2 moves, `hasPendingOperations false`, `operationQueueSize 0`; `Units.getPathTo` returns an empty path for the mountain and a 1-turn path for a coast neighbour |
+| `act reconcile --status rejected` | accepted with the note above; actions unblocked |
+| fix | move offers/performs now require a native one-turn path (tests added) |
