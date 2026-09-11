@@ -916,3 +916,17 @@ def test_pantheon_offer_and_confirmation(tmp_path):
         assert pa["displayName"] == "City Patron Goddess" and pa["description"].startswith("+2") and "arg" not in pa
         res = reg.perform(gs, action_id=pa["actionId"], request_id="pa-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"pantheonFounded": 3001}
+
+
+def test_government_offer_and_confirmation_by_hash_or_index(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "CHANGE_GOVERNMENT", "arg": 1, "arg2": -87192893, "pre": -1, "typeKey": "GOVERNMENT_DESPOTISM", "displayName": "Despotism", "description": "d", "celebration": "c", "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "CHANGE_GOVERNMENT", "arg": 1, "government": -87192893, "observed": -1, "matches": False}}
+    rb = {**RB, "governmentType": -87192893}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        go = next(o for o in out["offers"] if o["kind"] == "change_government")
+        assert go["celebration"] == "c" and "arg" not in go and "arg2" not in go
+        res = reg.perform(gs, action_id=go["actionId"], request_id="go-1", player=1, mode="singleplayer")
+    assert res["status"] == "confirmed" and res["confirmedBy"]["effect"] == {"governmentType": -87192893}

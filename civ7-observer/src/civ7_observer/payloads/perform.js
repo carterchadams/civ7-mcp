@@ -211,6 +211,22 @@
     result.readback = { kind: KIND, arg: 0, blocking: isInt(bt) ? bname(bt) : null, matches: isInt(bt) && bname(bt) !== "TRADITIONS" };
     return JSON.stringify(result);
   }
+  if (KIND === "CHANGE_GOVERNMENT") {
+    if (!isInt(ARG) || !isInt(ARG2)) return refuse("UNKNOWN_ACTION", "government arguments are not integers");
+    if (!isInt(PlayerOperationTypes[OP_KIND]) || typeof PlayerOperationParameters === "undefined" || !isInt(PlayerOperationParameters.Activate)) return refuse("API_CONTRACT_MISMATCH", "government operation contract unavailable");
+    const grow = GameInfo.Governments.lookup(ARG2);
+    if (!grow || grow.$index !== ARG) return refuse("UNKNOWN_ACTION", "government identity does not match the offer");
+    let gcur = null; try { gcur = player.Culture.getGovernmentType(); } catch (e) { gcur = null; }
+    if ((isInt(gcur) ? gcur : -1) !== PRE) return refuse("ACTION_EXPIRED", "the government changed since the offer was made");
+    const args = { GovernmentType: ARG, Action: PlayerOperationParameters.Activate };
+    const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args, false);
+    if (!check || check.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused that government");
+    Game.PlayerOperations.sendRequest(BOUND_PLAYER_ID, PlayerOperationTypes[OP_KIND], args);
+    result.outcome = "sent";
+    let gafter = null; try { gafter = player.Culture.getGovernmentType(); } catch (e) { gafter = null; }
+    result.readback = { kind: KIND, arg: ARG, government: ARG2, observed: isInt(gafter) ? gafter : null, matches: gafter === ARG2 || gafter === ARG };
+    return JSON.stringify(result);
+  }
   if (KIND === "FOUND_PANTHEON") {
     if (!isInt(ARG)) return refuse("UNKNOWN_ACTION", "belief argument is not an integer");
     if (!isInt(PlayerOperationTypes[OP_KIND]) || !player.Religion || typeof player.Religion.getNumPantheons !== "function") return refuse("API_CONTRACT_MISMATCH", "pantheon operation contract unavailable");

@@ -31,6 +31,7 @@ DECISION_SKILL = {
     # procedure: take the reward that serves the current commitments, never stall the turn on it.
     "narrative": "civ7-turn-management",
     "pantheon": "civ7-religion-and-great-works",
+    "government": "civ7-happiness-and-government",
     "end_turn": "civ7-turn-management",
 }
 ALWAYS = "civ7-turn-management"

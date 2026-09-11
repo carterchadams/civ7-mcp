@@ -34,7 +34,7 @@ def test_brief_reports_context_attachment_and_turn_readiness(tmp_path):
     b, _, _ = build(tmp_path, offers_with(RESEARCH))
     assert b["context"]["turn"] == 12 and b["context"]["seat"] == 1 and b["context"]["mode"] == "singleplayer"
     assert b["attachment"]["match"] == "ABCDEF0123456789" and b["attachment"]["generation"] >= 1
-    assert b["endTurn"] == {"canStart": True, "blocking": None, "supported": True, "actionId": b["endTurn"]["actionId"]}
+    assert b["endTurn"] == {"canStart": True, "blocking": None, "blockingNotifications": [], "supported": True, "actionId": b["endTurn"]["actionId"]}
     assert b["reconciliationRequired"] == []
 
 
@@ -179,3 +179,24 @@ def test_notification_named_blockers_map_to_the_same_decisions_as_the_enum(tmp_p
     b, _, _ = build(tmp_path, offers_with(RESEARCH + civic + UNITS + production, end_can_start=False, blocking=blocking))
     assert b["pause"] is None and b["endTurn"]["supported"] is True
     assert [d["kind"] for d in b["decisions"] if d["required"]] == [decision]
+
+
+def test_blocking_notifications_add_required_decisions_beyond_the_single_blocker_value(tmp_path):
+    """Live (turn 8): blocker CULTURE while CHOOSE_GOVERNMENT and TRADITIONS_AVAILABLE were what blocked."""
+    civic = [{"kind": "SET_CULTURE_TREE_NODE", "arg": 801, "pre": 1301158071, "typeKey": "NODE_CIVIC_AQ_MAIN_DISCIPLINE", "displayName": "Discipline", "tree": "TREE_CIVICS_AQ_MAIN", "cost": 125, "turns": 6, "canStart": True}]
+    gov = [{"kind": "CHANGE_GOVERNMENT", "arg": 1, "arg2": -87192893, "pre": -1, "typeKey": "GOVERNMENT_DESPOTISM", "displayName": "Despotism", "description": "d", "celebration": "c", "canStart": True}]
+    policies = [{"kind": "CONSIDER_ASSIGN_TRADITIONS", "arg": 0, "pre": 0, "canStart": True}]
+    payload = offers_with(civic + gov + policies + UNITS, end_can_start=False, blocking="CULTURE")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_GOVERNMENT", "NOTIFICATION_COMMAND_UNITS", "NOTIFICATION_TRADITIONS_AVAILABLE"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"] is None and b["endTurn"]["supported"] is True
+    assert b["endTurn"]["blockingNotifications"] == ["NOTIFICATION_CHOOSE_GOVERNMENT", "NOTIFICATION_COMMAND_UNITS", "NOTIFICATION_TRADITIONS_AVAILABLE"]
+    assert [d["kind"] for d in b["decisions"] if d["required"]] == ["civic", "government", "unit", "policies"]
+    assert b["decisions"][1]["options"][0]["celebration"] == "c"
+
+
+def test_an_unmapped_blocking_notification_pauses_even_when_the_blocker_value_is_supported(tmp_path):
+    payload = offers_with(RESEARCH, end_can_start=False, blocking="RESEARCH")
+    payload["context"] = {**payload["context"], "blockingNotifications": ["NOTIFICATION_CHOOSE_RELIGION"]}
+    b, _, _ = build(tmp_path, payload)
+    assert b["pause"]["reason"] == "UNSUPPORTED_DECISION" and "NOTIFICATION_CHOOSE_RELIGION" in b["pause"]["message"]

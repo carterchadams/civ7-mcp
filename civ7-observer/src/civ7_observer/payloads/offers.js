@@ -44,6 +44,11 @@
     const blockerName = (v) => { for (const k of Object.keys(EndTurnBlockingTypes)) if (EndTurnBlockingTypes[k] === v) return k; try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && name) return name; } } } catch (e) { /* fall through to the raw value */ } return String(v); };
     if (!isInt(blockingType) || !isInt(none)) throw new Error("end-turn blocking contract unavailable");
     const blocked = blockingType !== none;
+    // The single blocker value can be a category (live: CULTURE while government and traditions were
+    // what actually blocked), so the notifications that block the turn are reported alongside it.
+    const blockingNotifications = [];
+    try { for (const nid of Game.Notifications.getIdsForPlayer(BOUND_PLAYER_ID)) { const n = Game.Notifications.find(nid); if (n && n.BlocksTurnAdvancement === true) { const name = Game.Notifications.getTypeName(n.Type); if (typeof name === "string" && blockingNotifications.indexOf(name) === -1) blockingNotifications.push(name); } } } catch (e) { /* reported empty */ }
+    result.context.blockingNotifications = blockingNotifications;
     const kinds = [["SET_TECH_TREE_NODE", player.Techs], ["SET_CULTURE_TREE_NODE", player.Culture]];
     for (const [kind, comp] of kinds) {
       if (!comp || typeof comp.getAllAvailableNodeTypes !== "function") throw new Error(kind + " component unavailable");
@@ -226,9 +231,25 @@
             typeKey: typeof row.TraditionType === "string" ? row.TraditionType : null, displayName: compose(row.Name), description: compose(row.Description), canStart: !!(check && check.Success === true) });
         }
       }
-      if (blocked && blockerName(blockingType) === "TRADITIONS" && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
+      if (blocked && (blockerName(blockingType) === "TRADITIONS" || blockingNotifications.indexOf("NOTIFICATION_TRADITIONS_AVAILABLE") !== -1) && isInt(PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS)) {
         const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CONSIDER_ASSIGN_TRADITIONS, {}, false);
         offers.push({ kind: "CONSIDER_ASSIGN_TRADITIONS", arg: 0, pre: 0, canStart: !!(check && check.Success === true) });
+      }
+    }
+    if (isInt(PlayerOperationTypes.CHANGE_GOVERNMENT) && typeof PlayerOperationParameters !== "undefined" && isInt(PlayerOperationParameters.Activate) && GameInfo.Governments && typeof GameInfo.Governments[Symbol.iterator] === "function") {
+      // Government: the shipped chooser lists StartingGovernments while none is held and sends
+      // CHANGE_GOVERNMENT {GovernmentType: $index, Action: Activate} after canStart.
+      let current = null; try { current = player.Culture.getGovernmentType(); } catch (e) { current = null; }
+      const gpre = isInt(current) ? current : -1;
+      let candidates = null;
+      if (gpre === -1 && GameInfo.StartingGovernments && typeof GameInfo.StartingGovernments[Symbol.iterator] === "function") { candidates = []; for (const sg of GameInfo.StartingGovernments) { if (sg && typeof sg.GovernmentType === "string") candidates.push(sg.GovernmentType); } if (candidates.length === 0) candidates = null; }
+      for (const g of GameInfo.Governments) {
+        if (!g || !isInt(g.$index) || !isInt(g.$hash) || typeof g.GovernmentType !== "string") continue;
+        if (candidates !== null && candidates.indexOf(g.GovernmentType) === -1) continue;
+        const gargs = { GovernmentType: g.$index, Action: PlayerOperationParameters.Activate };
+        const check = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, PlayerOperationTypes.CHANGE_GOVERNMENT, gargs, false);
+        if (!check || check.Success !== true) continue;
+        offers.push({ kind: "CHANGE_GOVERNMENT", arg: g.$index, arg2: g.$hash, pre: gpre, typeKey: g.GovernmentType, displayName: compose(g.Name), description: compose(g.Description), celebration: compose(g.CelebrationName), canStart: true });
       }
     }
     if (isInt(PlayerOperationTypes.FOUND_PANTHEON) && player.Religion && typeof player.Religion.getNumPantheons === "function" && GameInfo.Beliefs && typeof GameInfo.Beliefs[Symbol.iterator] === "function") {

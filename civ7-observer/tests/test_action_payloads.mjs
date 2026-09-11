@@ -51,7 +51,7 @@ test("offers enumerate research/civic choices with native canStart and an end-tu
   const log = [];
   const r = runOffers(world({ log }));
   assert.equal(r.refused, null);
-  assert.deepEqual(r.context, { turn: 10, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789" });
+  assert.deepEqual(r.context, { turn: 10, age: 4242, ageType: "AGE_ANTIQUITY", playerId: 1, localPlayerId: 1, localObserverId: 1, mode: "singleplayer", isTurnActive: true, curtainDisplayed: false, gameGuid: "ABCDEF0123456789", blockingNotifications: [] });
   assert.ok(r.offers.every((o) => typeof o.pre === "number"));
   const research = r.offers.filter((o) => o.kind === "SET_TECH_TREE_NODE");
   assert.deepEqual(research.map((o) => [o.arg, o.typeKey, o.displayName, o.tree, o.cost, o.turns, o.canStart]), [[701, "NODE_TECH_AQ_POTTERY", "Pottery", "TREE_TECHS_AQ", 60, 4, true], [702, "NODE_TECH_AQ_WRITING", "Writing", "TREE_TECHS_AQ", 100, 7, true]]);
@@ -731,5 +731,61 @@ test("perform FOUND_PANTHEON checks the belief class, the pantheon count and can
     const rr = runPerform(h, "FOUND_PANTHEON", hash, { pre });
     assert.ok(rr.refused, `${label}: expected refusal`);
     assert.ok(!l.some((e) => e.startsWith("psendRequest")), `${label}: must not send`);
+  }
+});
+
+// ---- government
+function withGovernment(g, { current = -1, starting = ["GOVERNMENT_DESPOTISM", "GOVERNMENT_OLIGARCHY"], allowed = null, applied = "hash" } = {}) {
+  const cu = g.Players.get(1).Culture;
+  let gov = current;
+  const rows = [{ $index: 0, $hash: 809918684, GovernmentType: "GOVERNMENT_CLASSICAL_REPUBLIC", Name: "LOC_G0", Description: "LOC_G0_D", CelebrationName: "LOC_G0_C" }, { $index: 1, $hash: -87192893, GovernmentType: "GOVERNMENT_DESPOTISM", Name: "LOC_G1", Description: "LOC_G1_D", CelebrationName: "LOC_G1_C" }, { $index: 2, $hash: -1635089126, GovernmentType: "GOVERNMENT_OLIGARCHY", Name: "LOC_G2", Description: "LOC_G2_D", CelebrationName: "LOC_G2_C" }];
+  g.GameInfo.Governments = table(rows); g.GameInfo.Governments[Symbol.iterator] = function* () { yield* rows; };
+  g.GameInfo.StartingGovernments = starting.map((t) => ({ GovernmentType: t }));
+  g.PlayerOperationParameters = g.PlayerOperationParameters || { Activate: -1326475004, Deactivate: 1318334332 };
+  g.PlayerOperationTypes.CHANGE_GOVERNMENT = 1553605243;
+  cu.getGovernmentType = () => gov;
+  const inner = g.Game.PlayerOperations;
+  g.Game.PlayerOperations = {
+    canStart: (pid, op, args, show) => { if (op !== 1553605243) return inner.canStart(pid, op, args, show); g._log.push(`gcanStart(${pid},${JSON.stringify(args)},${show})`); return { Success: allowed === null || allowed.includes(args.GovernmentType) }; },
+    sendRequest: (pid, op, args) => { if (op !== 1553605243) return inner.sendRequest(pid, op, args); g._log.push(`gsendRequest(${pid},${JSON.stringify(args)})`); const row = rows.find((r) => r.$index === args.GovernmentType); gov = applied === "hash" ? row.$hash : row.$index; },
+  };
+  return g;
+}
+
+test("government offers list the starting governments while none is held, with text and the celebration name", () => {
+  const log = [];
+  const g = withGovernment(world({ log })); g._log = log;
+  const govs = runOffers(g).offers.filter((o) => o.kind === "CHANGE_GOVERNMENT");
+  assert.deepEqual(govs.map((o) => [o.arg, o.arg2, o.pre, o.typeKey, o.displayName, o.celebration, o.canStart]), [[1, -87192893, -1, "GOVERNMENT_DESPOTISM", "LOC_G1", "LOC_G1_C", true], [2, -1635089126, -1, "GOVERNMENT_OLIGARCHY", "LOC_G2", "LOC_G2_C", true]]);
+  assert.ok(log.filter((e) => e.startsWith("gcanStart(")).every((e) => e.includes('"Action":-1326475004') && e.endsWith(",false)")));
+  assert.ok(!log.some((e) => e.startsWith("gsendRequest")));
+});
+
+test("blocking notifications are reported in the offers context", () => {
+  const g = withStory(world({ log: [] })); g._log = [];
+  const r = runOffers(g);
+  assert.deepEqual(r.context.blockingNotifications, ["NOTIFICATION_CHOOSE_DISCOVERY_STORY_DIRECTION"]);
+  const h = world({ log: [] });
+  assert.deepEqual(runOffers(h).context.blockingNotifications, []);
+});
+
+test("perform CHANGE_GOVERNMENT checks identity, the current government and canStart, sends Activate by index, and reads back hash or index", () => {
+  for (const applied of ["hash", "index"]) {
+    const log = [];
+    const g = withGovernment(world({ log }), { applied }); g._log = log;
+    const r = runPerformArgs(g, "CHANGE_GOVERNMENT", 1, -87192893, 0, { pre: -1 });
+    assert.equal(r.refused, null, applied);
+    assert.equal(r.readback.matches, true, applied);
+    assert.ok(log.find((e) => e.startsWith("gsendRequest(1,") && e.includes('"GovernmentType":1,"Action":-1326475004')));
+  }
+  for (const [label, mk, idx, hash, pre] of [
+    ["identity mismatch", () => withGovernment(world({ log: [] })), 2, -87192893, -1],
+    ["government changed", () => withGovernment(world({ log: [] }), { current: 809918684 }), 1, -87192893, -1],
+    ["canStart false", () => withGovernment(world({ log: [] }), { allowed: [] }), 1, -87192893, -1],
+  ]) {
+    const h = mk(); const l = []; h._log = l;
+    const rr = runPerformArgs(h, "CHANGE_GOVERNMENT", idx, hash, 0, { pre });
+    assert.ok(rr.refused, `${label}: expected refusal`);
+    assert.ok(!l.some((e) => e.startsWith("gsendRequest")), `${label}: must not send`);
   }
 });

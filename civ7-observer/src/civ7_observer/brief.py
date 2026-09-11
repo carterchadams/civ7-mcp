@@ -27,6 +27,8 @@ BLOCKER_DECISION = {
     "NEW_POPULATION": "population",
     "TRADITIONS": "policies",
     "PANTHEON": "pantheon",
+    "CONSIDER_GOVERNMENT_CHANGE": "government",
+    "NOTIFICATION_CHOOSE_GOVERNMENT": "government",
     # Blockers whose value is missing from EndTurnBlockingTypes are named after the blocking
     # notification's type (live: the civic blocker on turn 8 came back as a raw value), so every
     # supported decision is reachable under its notification name too.
@@ -58,6 +60,7 @@ DECISION_OF_KIND = {
     "confirm_traditions": "policies",
     "narrative_choice": "narrative",
     "found_pantheon": "pantheon",
+    "change_government": "government",
     "end_turn": "end_turn",
 }
 
@@ -66,7 +69,8 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "cityId", "cityName", "improvementKey", "featureKey", "river", "yields",
                  "constructibleKey", "constructibleClass", "placement", "plotIndex", "queue", "queueLength",
                  "slot", "slotsTotal", "slotsFree", "description",
-                 "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable")
+                 "storyId", "title", "body", "answerKey", "option", "reward", "action", "costYield", "affordable",
+                 "celebration")
 
 PRODUCTION_NOTE = ("each production action APPENDS to the city's build queue (`queue` shows what is already queued, in "
                    "order); a city with a non-empty queue needs no production action this turn")
@@ -96,11 +100,21 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
 
     end_offer = next((o for o in offers if o["kind"] == "end_turn"), None)
     blocking = end_offer.get("blockingType") if end_offer else None
-    required_decision = BLOCKER_DECISION.get(blocking) if blocking else None
+    # The blocker value can be a category (live: CULTURE while government and traditions were what
+    # blocked), so the notifications that block the turn name required decisions too.
+    notifications = [n for n in (ctx.get("blockingNotifications") or []) if isinstance(n, str)]
+    required: list[str] = []
+    for name in ([blocking] if blocking else []) + notifications:
+        decision = BLOCKER_DECISION.get(name)
+        if decision and decision not in required:
+            required.append(decision)
+    unmapped = [n for n in notifications if n not in BLOCKER_DECISION]
+    required_decision = required[0] if required else None
     end_turn = {
         "canStart": bool(end_offer and end_offer["canStart"]),
         "blocking": blocking,
-        "supported": blocking is None or required_decision is not None,
+        "blockingNotifications": notifications,
+        "supported": blocking is None or (bool(required) and not unmapped),
         "actionId": end_offer["actionId"] if end_offer else None,
     }
 
@@ -115,15 +129,16 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
             "reason": "RECONCILIATION_REQUIRED", "blocking": blocking,
             "message": f"an earlier action has an unknown outcome ({', '.join(unresolved)}); a human must verify it in the game and reconcile before this seat acts again"}}
 
-    if blocking is not None and required_decision is None:
+    if blocking is not None and (not required or unmapped):
+        what = ", ".join(unmapped) if unmapped else blocking
         return {**base, "decisions": [], "pause": {
             "reason": "UNSUPPORTED_DECISION", "blocking": blocking,
-            "message": f"the game requires a {blocking} decision, which this catalog cannot make; a human must take the seat and resolve it"}}
+            "message": f"the game requires a {what} decision, which this catalog cannot make; a human must take the seat and resolve it"}}
 
     groups: dict[str, dict[str, Any]] = {}
 
     def group_for(decision: str) -> dict[str, Any]:
-        return groups.setdefault(decision, {"kind": decision, "required": decision == required_decision,
+        return groups.setdefault(decision, {"kind": decision, "required": decision in required,
                                             "optionCount": 0, "options": [], "entities": [], "_seen": set()})
 
     for offer in offers:
@@ -162,5 +177,5 @@ def build_brief(gs: GameSession, registry: ActionRegistry, *, player: int, mode:
         else:
             del group["entities"]
         decisions.append(group)
-    decisions.sort(key=lambda d: (not d["required"], d["kind"]))
+    decisions.sort(key=lambda d: (not d["required"], required.index(d["kind"]) if d["kind"] in required else 0, d["kind"]))
     return {**base, "decisions": decisions, "pause": None}
