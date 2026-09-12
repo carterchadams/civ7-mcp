@@ -462,3 +462,8 @@ resource had no legal settlement; the seat shuffled an ivory that was already pl
 towns for a whole turn, each move confirmed, because the confirm was withheld while any assignment
 was possible. Only an unplaced resource with a legal settlement counts now; moving a placed one is
 offered as a `reassignment`, which never answers the blocker.
+
+**Lesson (turn 99, live):** a settler under a nightly alert order was offered no move for twelve turns
+and was disbanded as "boxed in". A standing order (sleep, fortify, alert) also reads as a pending
+operation, so the turn-66 guard withheld its moves. The guard now applies only to a unit whose current
+activity is the move itself (`UnitActivityTypes.OPERATION`).

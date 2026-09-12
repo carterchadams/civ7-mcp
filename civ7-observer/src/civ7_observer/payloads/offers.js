@@ -158,9 +158,12 @@
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
         if (u.isOnMap !== true || !u.location || !isInt(u.location.x) || u.location.x < 0) continue;
-        // A unit already carrying a queued operation is travelling: a fresh move on top of it leaves no
-        // signal to confirm by (live, turn 66, three unknowns on one settler). It keeps its cancel.
-        if ((typeof u.hasPendingOperations === "function" ? u.hasPendingOperations() : u.hasPendingOperations) === true) continue;
+        // A unit mid-move is travelling: a fresh move on top of it leaves no signal to confirm by (live,
+        // turn 66, three unknowns on one settler). It keeps its cancel. Only a unit whose activity is
+        // the move itself counts: a sleeping, fortified or alert unit also "has pending operations",
+        // and a settler under a nightly alert order was offered no move for twelve turns and disbanded.
+        const pendingNow = (typeof u.hasPendingOperations === "function" ? u.hasPendingOperations() : u.hasPendingOperations) === true;
+        if (pendingNow && typeof UnitActivityTypes !== "undefined" && u.activityType === UnitActivityTypes.OPERATION) continue;
         if (!u.Movement || !isInt(u.Movement.movementMovesRemaining) || u.Movement.movementMovesRemaining <= 0) continue;
         const unitId = u.id;
         // Everywhere the unit can actually reach this turn, not just its six neighbours: a scout with
