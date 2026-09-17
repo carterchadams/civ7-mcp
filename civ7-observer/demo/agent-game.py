@@ -165,7 +165,8 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     # Live-test opportunities: at most two open cases whose kinds this seat is being offered right now.
     ledger = TestLedger(ctx["match"])
     offered = {o.get("kind") for d in brief.get("decisions", []) for o in d.get("options", []) if o.get("kind")}
-    cases = ledger.opportunities(seat, offered)
+    # the operator asked for a testing focus: more untested cases per turn than the default two
+    cases = ledger.opportunities(seat, offered, limit=4)
     summary["testing"] = [c["case_id"] for c in cases]
     system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir),
                                     directives=directives, testing=TestLedger.note(cases))

@@ -19,7 +19,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 178,
+          "confirmed": 191,
           "rejected": 0,
           "unknown": 0
         }
@@ -43,7 +43,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 161,
+          "confirmed": 172,
           "rejected": 0,
           "unknown": 0
         }
@@ -67,7 +67,7 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 0
         }
@@ -91,7 +91,7 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_TARGET_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -115,7 +115,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 568,
+          "confirmed": 664,
           "rejected": 4,
           "unknown": 0
         }
@@ -139,8 +139,8 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2355,
-          "rejected": 13,
+          "confirmed": 3437,
+          "rejected": 14,
           "unknown": 0
         }
       }
@@ -163,7 +163,7 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1984,
+          "confirmed": 2103,
           "rejected": 32,
           "unknown": 4
         }
@@ -187,7 +187,7 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 157,
+          "confirmed": 167,
           "rejected": 2,
           "unknown": 1
         }
@@ -211,7 +211,7 @@
       "expected_evidence": "a confirmed `PRODUCE_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 4,
+          "confirmed": 5,
           "rejected": 0,
           "unknown": 0
         }
@@ -235,7 +235,7 @@
       "expected_evidence": "a confirmed `FOUND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 38,
+          "confirmed": 41,
           "rejected": 5,
           "unknown": 5
         }
@@ -259,7 +259,7 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 250,
+          "confirmed": 319,
           "rejected": 0,
           "unknown": 0
         }
@@ -283,7 +283,7 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 108,
+          "confirmed": 160,
           "rejected": 0,
           "unknown": 0
         }
@@ -307,8 +307,8 @@
       "expected_evidence": "a confirmed `CHANGE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 99,
-          "rejected": 3,
+          "confirmed": 108,
+          "rejected": 4,
           "unknown": 0
         }
       }
@@ -331,7 +331,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 63,
+          "confirmed": 72,
           "rejected": 0,
           "unknown": 2
         }
@@ -355,7 +355,7 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 69,
+          "confirmed": 73,
           "rejected": 0,
           "unknown": 0
         }
@@ -427,7 +427,7 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 15,
+          "confirmed": 17,
           "rejected": 0,
           "unknown": 0
         }
@@ -475,7 +475,7 @@
       "expected_evidence": "a confirmed `CHOOSE_GOLDEN_AGE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 91,
+          "confirmed": 94,
           "rejected": 0,
           "unknown": 0
         }
@@ -499,7 +499,7 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 87,
+          "confirmed": 109,
           "rejected": 8,
           "unknown": 1
         }
@@ -523,7 +523,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 35,
+          "confirmed": 53,
           "rejected": 0,
           "unknown": 0
         }
@@ -547,7 +547,7 @@
       "expected_evidence": "a confirmed `PROMOTE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 29,
+          "confirmed": 32,
           "rejected": 0,
           "unknown": 2
         }
@@ -595,7 +595,7 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 25,
+          "confirmed": 32,
           "rejected": 0,
           "unknown": 1
         }
@@ -667,7 +667,7 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 6,
+          "confirmed": 8,
           "rejected": 2,
           "unknown": 0
         }
@@ -835,7 +835,7 @@
       "expected_evidence": "a confirmed `SEND_MERCHANT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 26,
+          "confirmed": 28,
           "rejected": 5,
           "unknown": 0
         }
@@ -931,7 +931,7 @@
       "expected_evidence": "a confirmed `SUPPORT_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -1208,7 +1208,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "deactivate_tradition"
@@ -1217,7 +1217,13 @@
       "consequence_class": "low",
       "procedure": "take a `deactivate_tradition` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `DEACTIVATE_TRADITION` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 1,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-unassign_resource",
@@ -1226,7 +1232,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "unassign_resource"
@@ -1235,7 +1241,13 @@
       "consequence_class": "low",
       "procedure": "take a `unassign_resource` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `UNASSIGN_RESOURCE` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 5,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-swap_resources",
@@ -1244,7 +1256,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "swap_resources"
@@ -1253,7 +1265,13 @@
       "consequence_class": "low",
       "procedure": "take a `swap_resources` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SWAP_RESOURCES` receipt in the seat journal",
-      "evidence_refs": {}
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2,
+          "rejected": 0,
+          "unknown": 0
+        }
+      }
     },
     {
       "case_id": "LT-wake_unit",
@@ -1273,7 +1291,7 @@
       "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 1
         }
@@ -1315,7 +1333,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 240,
+          "confirmed": 538,
           "rejected": 1,
           "unknown": 1
         }
@@ -1339,7 +1357,7 @@
       "expected_evidence": "a confirmed `DISBAND_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -1352,7 +1370,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "assign_specialist"
@@ -1363,7 +1381,7 @@
       "expected_evidence": "a confirmed `ASSIGN_WORKER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 0,
+          "confirmed": 2,
           "rejected": 1,
           "unknown": 1
         }
@@ -1531,7 +1549,7 @@
       "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 5,
           "rejected": 0,
           "unknown": 1
         }
@@ -1555,7 +1573,7 @@
       "expected_evidence": "a confirmed `FOUND_RELIGION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 2,
           "rejected": 0,
           "unknown": 0
         }
@@ -1579,7 +1597,7 @@
       "expected_evidence": "a confirmed `ADD_BELIEF` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 6,
           "rejected": 0,
           "unknown": 1
         }
@@ -1603,7 +1621,7 @@
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 5,
           "rejected": 0,
           "unknown": 0
         }
@@ -1861,7 +1879,7 @@
       "expected_evidence": "a confirmed `AUTOMATE_EXPLORE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 15,
+          "confirmed": 24,
           "rejected": 0,
           "unknown": 0
         }
@@ -1892,7 +1910,7 @@
       "variant": "default",
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": [
           "move_great_work"
@@ -1903,7 +1921,7 @@
       "expected_evidence": "a confirmed `MOVE_GREAT_WORK` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 0,
+          "confirmed": 1,
           "rejected": 1,
           "unknown": 1
         }
@@ -2745,7 +2763,7 @@
       "variant": "plan-item",
       "priority": 2,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
@@ -2764,7 +2782,7 @@
       "variant": "plan-item",
       "priority": 2,
       "implementation_status": "offline_verified",
-      "live_status": "not_seen",
+      "live_status": "passed",
       "eligibility": {
         "offered": []
       },
