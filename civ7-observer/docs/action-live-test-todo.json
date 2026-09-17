@@ -22,12 +22,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 194,
+          "confirmed": 197,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "techResearching": 102
+          "techResearching": 103
         }
       }
     },
@@ -52,12 +52,12 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 174,
+          "confirmed": 176,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "civicResearching": 74
+          "civicResearching": 75
         }
       }
     },
@@ -82,12 +82,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "treeGoal": 3
+          "treeGoal": 4
         }
       }
     },
@@ -142,7 +142,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 674,
+          "confirmed": 680,
           "rejected": 4,
           "unknown": 0
         },
@@ -170,12 +170,12 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3602,
+          "confirmed": 3743,
           "rejected": 15,
           "unknown": 0
         },
         "effects": {
-          "unitNoLongerReady": 3445
+          "unitNoLongerReady": 3583
         }
       }
     },
@@ -200,12 +200,12 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitLocation` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2107,
+          "confirmed": 2174,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
-          "unitLocation": 2083,
+          "unitLocation": 2150,
           "unitMoved": 22
         }
       }
@@ -231,12 +231,12 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitMoved` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2107,
+          "confirmed": 2174,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
-          "unitLocation": 2083,
+          "unitLocation": 2150,
           "unitMoved": 22
         }
       }
@@ -262,13 +262,13 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 174,
+          "confirmed": 182,
           "rejected": 2,
           "unknown": 1
         },
         "effects": {
           "cityProduction": 8,
-          "queued": 160
+          "queued": 168
         }
       }
     },
@@ -353,12 +353,12 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 325,
+          "confirmed": 329,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "populationPlaced": 325
+          "populationPlaced": 329
         }
       }
     },
@@ -774,12 +774,12 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 35,
+          "confirmed": 37,
           "rejected": 0,
           "unknown": 1
         },
         "effects": {
-          "townFocusKept": 17
+          "townFocusKept": 19
         }
       }
     },
@@ -1244,7 +1244,7 @@
       "expected_kind": "PROPOSE_PEACE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "c3fce76df4f3",
+      "contract_fingerprint": "5af7378fcc14",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2003,7 +2003,7 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "default",
       "expected_effect": "diplomaticActionStarted",
-      "contract_fingerprint": "098aa9222ea8",
+      "contract_fingerprint": "01826cac245e",
       "passed_fingerprint": "098aa9222ea8",
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2028,12 +2028,42 @@
       }
     },
     {
+      "case_id": "LT-start_diplomatic_action-free",
+      "action_family": "start_diplomatic_action",
+      "expected_kind": "START_DIPLOMATIC_ACTION",
+      "variant": "free",
+      "expected_effect": "diplomaticProjectStarted",
+      "contract_fingerprint": "01826cac245e",
+      "passed_fingerprint": null,
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "start_diplomatic_action"
+        ]
+      },
+      "consequence_class": "medium",
+      "procedure": "start a free diplomatic project (its own event is the proof)",
+      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `diplomaticProjectStarted` in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 5,
+          "rejected": 0,
+          "unknown": 0
+        },
+        "effects": {
+          "diplomaticActionStarted": 5
+        }
+      }
+    },
+    {
       "case_id": "LT-start_diplomatic_action-war",
       "action_family": "start_diplomatic_action",
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "war",
       "expected_effect": "warDeclared",
-      "contract_fingerprint": "098aa9222ea8",
+      "contract_fingerprint": "01826cac245e",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2063,7 +2093,7 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "alliance",
       "expected_effect": "allianceFormed",
-      "contract_fingerprint": "098aa9222ea8",
+      "contract_fingerprint": "01826cac245e",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3211,20 +3241,20 @@
           "live": "not_seen"
         },
         {
-          "variant": "answer an incoming proposal",
+          "variant": "inspect and answer an incoming proposal",
           "disposition": "implemented",
           "kinds": [
             "accept_peace",
             "reject_peace"
           ],
-          "evidence": "ACCEPT_PEACE / REJECT_PEACE; the incoming deal id shape is inferred and not yet verified live",
+          "evidence": "sendWorkingDeal(shape, ACCEPTED|REJECTED) on whichever working-deal shape holds the proposal (the shipped manager reads a switched OUTGOING deal); terms listed from getWorkingDealItem; the shape itself is unverified live until a war with a major occurs",
           "live": "not_seen"
         },
         {
-          "variant": "inspect and edit terms, counteroffer",
+          "variant": "terms and counteroffer",
           "disposition": "partial",
           "kinds": [],
-          "evidence": "not implemented; native term inspection/edit flow needs verification on a disposable war scenario (work package B1)",
+          "evidence": "the shipped panel adds CITIES (CEDE_OCCUPIED / OFFER), GOLD and INFLUENCE lump items and resends ADJUSTED; RESOURCES, UNITS, TECHNOLOGY, GREATWORK, CAPTIVE and per-turn gold have no UI call site. possibleTerms are read for inspection; sending terms awaits a disposable war scenario",
           "live": null
         }
       ]
@@ -3264,7 +3294,7 @@
     {
       "family": "A05",
       "title": "Support/oppose ongoing diplomatic actions",
-      "status": "partial",
+      "status": "implemented",
       "variants": [
         {
           "variant": "support a side with one token",
@@ -3276,10 +3306,19 @@
           "live": "passed"
         },
         {
-          "variant": "oppose, retract, larger amounts",
-          "disposition": "partial",
+          "variant": "oppose a side",
+          "disposition": "already_covered",
+          "kinds": [
+            "support_diplomatic_action"
+          ],
+          "evidence": "SubType picks the side backed (true initiator, false target); opposing the initiator is supporting the target, as the shipped details screen does",
+          "live": "passed"
+        },
+        {
+          "variant": "retract support, larger amounts",
+          "disposition": "native_dormant",
           "kinds": [],
-          "evidence": "not verified; whether native opposition/retraction exists is open (work package B2)",
+          "evidence": "no OPPOSE/RETRACT/WITHDRAW operation in any shipped .js.map; Amount is 1 at every call site; SUPPORT_/OPPOSE_LAND_CLAIMS rows are commented out of diplomacy-actions.xml",
           "live": null
         }
       ]
@@ -3299,11 +3338,13 @@
           "live": "passed"
         },
         {
-          "variant": "free projects with no relationship signal",
-          "disposition": "excluded",
-          "kinds": [],
-          "evidence": "withheld: no authoritative signal to confirm by; revisit when project/event identity gives one (work package B2)",
-          "live": null
+          "variant": "free projects",
+          "disposition": "implemented",
+          "kinds": [
+            "start_diplomatic_action"
+          ],
+          "evidence": "confirmed by the project's own event among the seat's actions against the target (Game.Diplomacy.getPlayerEvents, initialPlayer = seat), as the shipped panel reads it back",
+          "live": "passed"
         }
       ]
     },
