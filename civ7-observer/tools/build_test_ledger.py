@@ -55,6 +55,7 @@ VARIANTS = {
     "move_unit": [("default", "unitLocation", "move a unit to a plot it reaches this turn"),
                   ("standing", "unitMoved", "take a `multiTurn` move toward one of the seat's own settlements (confirmed as queued or under way, not arrival)")],
     "start_diplomatic_action": [("default", "diplomaticActionStarted", "start an influence-priced diplomatic project"),
+                                ("free", "diplomaticProjectStarted", "start a free diplomatic project (its own event is the proof)"),
                                 ("war", "warDeclared", "declare war through a diplomatic action (only in a war the seat would fight anyway)"),
                                 ("alliance", "allianceFormed", "form an alliance through a diplomatic action")],
 }
@@ -69,16 +70,17 @@ FAMILIES = {
         ("keep, raze, liberate", "implemented", ["keep_captured_city", "raze_captured_city", "liberate_captured_city"], "CityCommandTypes.DESTROY with Directive 2/3/0")]),
     "A02": ("Peace deals: inspect, propose, accept, reject", [
         ("plain proposal", "implemented", ["propose_peace"], "PROPOSE_PEACE with the engine's drafted terms"),
-        ("answer an incoming proposal", "implemented", ["accept_peace", "reject_peace"], "ACCEPT_PEACE / REJECT_PEACE; the incoming deal id shape is inferred and not yet verified live"),
-        ("inspect and edit terms, counteroffer", "partial", [], "not implemented; native term inspection/edit flow needs verification on a disposable war scenario (work package B1)")]),
+        ("inspect and answer an incoming proposal", "implemented", ["accept_peace", "reject_peace"], "sendWorkingDeal(shape, ACCEPTED|REJECTED) on whichever working-deal shape holds the proposal (the shipped manager reads a switched OUTGOING deal); terms listed from getWorkingDealItem; the shape itself is unverified live until a war with a major occurs"),
+        ("terms and counteroffer", "partial", [], "the shipped panel adds CITIES (CEDE_OCCUPIED / OFFER), GOLD and INFLUENCE lump items and resends ADJUSTED; RESOURCES, UNITS, TECHNOLOGY, GREATWORK, CAPTIVE and per-turn gold have no UI call site. possibleTerms are read for inspection; sending terms awaits a disposable war scenario")]),
     "A03": ("Ally at war / call to arms", [("join the ally's war", "implemented", ["join_ally_war"], "DECLARE_WAR via Game.Diplomacy.getNextCallToArms")]),
     "A04": ("Choose city-state bonus", [("choose bonus", "implemented", ["choose_city_state_bonus"], "CHOOSE_CITY_STATE_BONUS {OtherPlayer, CityStateBonusType}")]),
     "A05": ("Support/oppose ongoing diplomatic actions", [
         ("support a side with one token", "implemented", ["support_diplomatic_action"], "SUPPORT_DIPLOMATIC_ACTION {ID, Type: DIPLOMACY_TOKEN_GLOBAL, Amount: 1, SubType}"),
-        ("oppose, retract, larger amounts", "partial", [], "not verified; whether native opposition/retraction exists is open (work package B2)")]),
+        ("oppose a side", "already_covered", ["support_diplomatic_action"], "SubType picks the side backed (true initiator, false target); opposing the initiator is supporting the target, as the shipped details screen does"),
+        ("retract support, larger amounts", "native_dormant", [], "no OPPOSE/RETRACT/WITHDRAW operation in any shipped .js.map; Amount is 1 at every call site; SUPPORT_/OPPOSE_LAND_CLAIMS rows are commented out of diplomacy-actions.xml")]),
     "A06": ("Diplomatic projects with secondary targets", [
         ("influence-priced projects, secondary targets", "implemented", ["start_diplomatic_action"], "the engine's own getProjectDataForUI listing supplies operation, price and targetList2"),
-        ("free projects with no relationship signal", "excluded", [], "withheld: no authoritative signal to confirm by; revisit when project/event identity gives one (work package B2)")]),
+        ("free projects", "implemented", ["start_diplomatic_action"], "confirmed by the project's own event among the seat's actions against the target (Game.Diplomacy.getPlayerEvents, initialPlayer = seat), as the shipped panel reads it back")]),
     "A07": ("Advisor-warning acknowledgement", [("acknowledge", "implemented", ["acknowledge_advisor_warning"], "VIEWED_ADVISOR_WARNING")]),
     "A08": ("Pillage, coastal raid, route plunder", [("pillage, raid, plunder", "implemented", ["pillage", "coastal_raid", "pillage_route", "plunder_trade_route"], "plot-target operations from canStart(op, {}).Plots; PLUNDER_TRADE_ROUTE command")]),
     "A09": ("Religious spread and relics", [

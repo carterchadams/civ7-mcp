@@ -746,9 +746,11 @@
     let influenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceAfter = null; }
     let nowAtWar = null, nowAllied = null;
     try { nowAtWar = player.Diplomacy.isAtWarWith(ARG) === true; nowAllied = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { nowAtWar = null; nowAllied = null; }
+    // the action's own event among this seat's actions against them: the identity a free project leaves
+    let eventsNow = null; try { eventsNow = 0; for (const ev of Game.Diplomacy.getPlayerEvents(ARG)) { if (ev && ev.initialPlayer === BOUND_PLAYER_ID && ev.actionType === ARG2) eventsNow++; } } catch (e) { eventsNow = null; }
     result.readback = { kind: KIND, arg: ARG, actionType: ARG2, secondary: second ? { parameter: second.parameterName, id: ARG3 } : null, influenceBefore: PRE, influence: influenceAfter,
-      wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied,
-      matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) };
+      wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied, events: eventsNow,
+      matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) || (isInt(eventsNow) && eventsNow > 0) };
     return JSON.stringify(result);
   }
   if (KIND === "RESPOND_DIPLOMATIC_ACTION") {
@@ -818,9 +820,14 @@
       return JSON.stringify(result);
     }
     if (pendingNow !== true) return refuse("ACTION_EXPIRED", "no deal with them is on the table");
-    const incoming = { direction: DiplomacyDealDirection.INCOMING, player1: ARG, player2: BOUND_PLAYER_ID };
-    let onTable = null; try { const d = Game.DiplomacyDeals.getWorkingDeal(incoming); onTable = d && Array.isArray(d.itemIds) ? d.itemIds.length : null; } catch (e) { onTable = null; }
+    // the deal is answered on the working-deal shape that held it when offered (arg2: 0 incoming, 1 outgoing)
+    const incoming = ARG2 === 1 ? { direction: DiplomacyDealDirection.OUTGOING, player1: BOUND_PLAYER_ID, player2: ARG }
+                                : { direction: DiplomacyDealDirection.INCOMING, player1: ARG, player2: BOUND_PLAYER_ID };
+    let onTable = null, theirs = false;
+    try { const d = Game.DiplomacyDeals.getWorkingDeal(incoming); onTable = d && Array.isArray(d.itemIds) ? d.itemIds.length : null;
+      if (d && Array.isArray(d.itemIds)) for (const itemId of d.itemIds) { const it = Game.DiplomacyDeals.getWorkingDealItem(incoming, itemId); if (it && it.from === ARG) theirs = true; } } catch (e) { onTable = null; }
     if (!isInt(onTable) || onTable < 1) return refuse("ACTION_EXPIRED", "the incoming deal has no terms to answer");
+    if (!theirs) return refuse("ACTION_EXPIRED", "the deal on the table is this seat's own proposal, not theirs to answer");
     const answer = KIND === "ACCEPT_PEACE" ? DiplomacyDealProposalActions.ACCEPTED : DiplomacyDealProposalActions.REJECTED;
     Game.DiplomacyDeals.sendWorkingDeal(incoming, answer);
     result.outcome = "sent";

@@ -151,6 +151,10 @@ class TestLedger:
         for case in self.cases:
             if case.get("implementation_status") not in IMPLEMENTED or not case.get("expected_kind"):
                 continue
+            # a war, a razing, a strike or a disbanding is never suggested to fill a checklist; such a
+            # case passes only when play calls for the action anyway
+            if case.get("consequence_class") == "high":
+                continue
             if self.live_status(case) == PASSED:
                 continue
             need = set((case.get("eligibility") or {}).get("offered") or [])

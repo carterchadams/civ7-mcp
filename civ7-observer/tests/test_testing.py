@@ -30,8 +30,8 @@ def test_opportunities_are_open_implemented_cases_whose_kinds_are_offered_cheape
     L = ledger(tmp_path)
     got = [c["case_id"] for c in L.opportunities(1, {"attack", "send_merchant", "move_unit", "old_pass"}, limit=5)]
     # the seeded pass stays out; its standing variant is open; the pass under an old contract is open again
-    assert got == ["LT-old_pass", "LT-send_merchant", "LT-move_unit-standing", "LT-attack"]
-    assert [c["case_id"] for c in L.opportunities(1, {"attack"})] == ["LT-attack"]
+    assert got == ["LT-old_pass", "LT-send_merchant", "LT-move_unit-standing"], "a high-consequence case is never suggested"
+    assert L.opportunities(1, {"attack"}) == []
     assert L.opportunities(1, {"research"}) == []
     assert len(L.opportunities(1, {"attack", "send_merchant", "move_unit"}, limit=2)) == 2, "the bound holds"
 

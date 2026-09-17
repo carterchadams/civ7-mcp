@@ -1374,7 +1374,7 @@ test("perform DECLARE_WAR for a call to arms declares on the enemy and confirms 
 });
 
 // ---- peace: a plain proposal, and answering an incoming one
-function withPeace(g, { atWar = [0], canPeace = [0], pending = [], incomingItems = 1, drafted = 1, proposeApplies = true, answerApplies = true } = {}) {
+function withPeace(g, { atWar = [0], canPeace = [0], pending = [], incomingItems = 1, drafted = 1, proposeApplies = true, answerApplies = true, ownProposal = false } = {}) {
   g._log = g._log || [];
   withDiplomacy(g, { atWar, met: [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: true, name: "LOC_MEIJI" }] });
   const me = g.Players.get(1);
@@ -1382,12 +1382,15 @@ function withPeace(g, { atWar = [0], canPeace = [0], pending = [], incomingItems
   me.Diplomacy.canMakePeaceWith = (id) => ({ Success: canPeace.includes(id) });
   g.DiplomacyDealDirection = { OUTGOING: 0, INCOMING: 1 };
   g.DiplomacyDealProposalActions = { PROPOSED: 1, ADJUSTED: 2, INSPECT: 3, ACCEPTED: 4, REJECTED: 5 };
-  g.DiplomacyDealItemTypes = { AGREEMENTS: 9 };
+  g.DiplomacyDealItemTypes = { AGREEMENTS: 9, CITIES: 11, GOLD: 12, INFLUENCE: 13 };
   g.DiplomacyDealItemAgreementTypes = { MAKE_PEACE: 3 };
   const drafts = {};
   g.Game.DiplomacyDeals = {
     hasPendingDeal: (a, b) => pendingNow.has(b),
     getWorkingDeal: (id) => id.direction === 1 ? { itemIds: Array.from({ length: incomingItems }, (_, i) => i) } : { itemIds: drafts[id.player2] || [] },
+    // the deal's items say who proposed: the MAKE_PEACE agreement is from the other side unless it is this seat's own proposal
+    getWorkingDealItem: (id, itemId) => ({ id: itemId, type: 9, agreementType: 3, from: ownProposal ? 1 : 0, to: ownProposal ? 0 : 1, amount: 0, subType: 0 }),
+    getPossibleWorkingDealItems: (id, pid, type) => (type === 11 ? [{ cityId: 5 }, { cityId: 6 }] : type === 12 ? [{}] : []),
     clearWorkingDeal: (id) => { g._log.push(`clear(${JSON.stringify(id)})`); drafts[id.player2] = []; },
     addItemToWorkingDeal: (id, item) => { g._log.push(`add(${JSON.stringify(item)})`); drafts[id.player2] = Array.from({ length: drafted }, (_, i) => i); return 1; },
     sendWorkingDeal: (id, action) => { g._log.push(`send(${JSON.stringify(id)},${action})`); if (action === 1 && proposeApplies) pendingNow.add(id.player2); if ((action === 4 || action === 5) && answerApplies) { pendingNow.delete(id.player1); if (action === 4) me.Diplomacy.isAtWarWith = () => false; } },
@@ -1402,7 +1405,11 @@ test("peace is offered as a plain proposal while at war, and as accept or reject
   assert.deepEqual(offers.filter((o) => ["ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)), []);
   const table = withPeace(withUnits(world({ log: [] }), []), { pending: [0] }); table._log = [];
   const to = runOffers(table).offers;
-  assert.deepEqual(to.filter((o) => ["PROPOSE_PEACE", "ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)).map((o) => [o.kind, o.arg, o.dealItems]), [["ACCEPT_PEACE", 0, 1], ["REJECT_PEACE", 0, 1]]);
+  assert.deepEqual(to.filter((o) => ["PROPOSE_PEACE", "ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)).map((o) => [o.kind, o.arg, o.arg2, o.dealItems, o.dealShape]), [["ACCEPT_PEACE", 0, 0, 1, "incoming"], ["REJECT_PEACE", 0, 0, 1, "incoming"]]);
+  assert.deepEqual(to.find((o) => o.kind === "ACCEPT_PEACE").terms, [{ type: "AGREEMENTS", subType: 0, amount: 0, from: 0, to: 1, cityId: null, cityTransfer: null, agreement: "MAKE_PEACE" }], "the terms on the table are inspectable");
+  assert.deepEqual(offers.find((o) => o.kind === "PROPOSE_PEACE").possibleTerms, { cities: 2, gold: 1, influence: 0 }, "what could be added is counted, not offered");
+  const mine = withPeace(withUnits(world({ log: [] }), []), { pending: [0], ownProposal: true }); mine._log = [];
+  assert.deepEqual(runOffers(mine).offers.filter((o) => ["ACCEPT_PEACE", "REJECT_PEACE"].includes(o.kind)), [], "the seat's own pending proposal is theirs to answer, not ours");
   const notyet = withPeace(withUnits(world({ log: [] }), []), { canPeace: [] }); notyet._log = [];
   assert.deepEqual(runOffers(notyet).offers.filter((o) => o.kind === "PROPOSE_PEACE"), [], "the game decides when peace may be offered");
   const peace = withPeace(withUnits(world({ log: [] }), []), { atWar: [] }); peace._log = [];
@@ -1438,6 +1445,9 @@ test("perform ACCEPT_PEACE confirms on the war ending and REJECT_PEACE on the ta
   assert.ok(runPerformArgs(none, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 }).refused, "nothing on the table");
   const empty = withPeace(withUnits(world({ log: [] }), []), { pending: [0], incomingItems: 0 }); empty._log = [];
   assert.ok(runPerformArgs(empty, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 }).refused, "an incoming deal with no terms is not answered");
+  const own = withPeace(withUnits(world({ log: [] }), []), { pending: [0], ownProposal: true }); own._log = [];
+  assert.equal(runPerformArgs(own, "ACCEPT_PEACE", 0, 0, 0, { pre: 1 }).refused.code, "ACTION_EXPIRED", "a seat never answers its own proposal");
+  assert.ok(!own._log.some((e) => e.startsWith("send(")));
 });
 
 // ---- specialists (a PLAYER operation taking a plot INDEX, not a city one taking x/y)
@@ -2392,8 +2402,9 @@ test("a free action with no relationship to change, a blocked one and an unmet c
   const log = [];
   const free = [{ actionType: 9005, actionTypeName: "DIPLOMACY_ACTION_SOMETHING_FREE", actionDisplayName: "LOC_FREE", operationType: 559, actionGroup: 5, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 0 }] }];
   const g = withDiplomacy(withUnits(world({ log }), []), { projects: free }); g._log = log;
-  assert.deepEqual(runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION"), [],
-    "a free action that changes no relationship leaves no signal and is not offered");
+  const freeOffers = runOffers(g).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
+  assert.deepEqual(freeOffers.map((o) => [o.arg, o.arg2, o.expect, o.eventsBefore]), [[0, 9005, "event", 0]],
+    "a free action is offered, to be proven by its own event among the seat's actions against the target");
   const h = withDiplomacy(withUnits(world({ log: [] }), [])); h._log = [];
   const dips = runOffers(h).offers.filter((o) => o.kind === "START_DIPLOMATIC_ACTION");
   assert.ok(!dips.some((o) => o.arg2 === 9004), "a blocked project is not offered");
@@ -2418,8 +2429,9 @@ test("perform START_DIPLOMATIC_ACTION takes the operation from the engine's own 
   const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, secondary: null, influenceBefore: 500, influence: 467,
-    wasAtWar: false, atWar: false, wasAllied: false, allied: false, matches: true });
+  assert.deepEqual({ ...r.readback, events: undefined }, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, secondary: null, influenceBefore: 500, influence: 467,
+    wasAtWar: false, atWar: false, wasAllied: false, allied: false, matches: true, events: undefined });
+  assert.ok(r.readback.events === null || Number.isInteger(r.readback.events), "the action's own event count is read back");
   const send = log.find((e) => e.startsWith("dsendRequest("));
   assert.ok(send.includes(",555,"), "the operation must be the one the listing gave for that project");
   assert.ok(send.includes('"Type":9001') && send.includes('"Player2":0'));

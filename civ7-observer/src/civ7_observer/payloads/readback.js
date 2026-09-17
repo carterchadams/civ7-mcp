@@ -38,6 +38,9 @@
     unitCount: player ? t(() => player.Units.getUnits().length) : null,
     // BEGIN VETTED MET-PLAYER SCOPE
     diplomaticRelations: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; m[String(other.id)] = { atWar: player.Diplomacy.isAtWarWith(other.id) === true, allied: player.Diplomacy.hasAllied(other.id) === true, pendingDeal: (() => { try { return Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, other.id) === true; } catch (e) { return null; } })() }; } return m; }) : null,
+    // The seat's own diplomatic actions in progress, counted per (action type, target): the identity of
+    // a started project, as the shipped panel reads it back. Only events this seat initiated are counted.
+    diplomaticEvents: player ? t(() => { const m = {}; for (const other of Players.getEverAlive()) { if (!other || !Number.isInteger(other.id) || other.id === BOUND_PLAYER_ID) continue; if (player.Diplomacy.hasMet(other.id) !== true) continue; for (const ev of Game.Diplomacy.getPlayerEvents(other.id)) { if (ev && ev.initialPlayer === BOUND_PLAYER_ID && Number.isInteger(ev.actionType)) { const k = String(ev.actionType) + ":" + String(other.id); m[k] = (m[k] || 0) + 1; } } } return m; }) : null,
     // END VETTED MET-PLAYER SCOPE
     // The answer recorded on each proposal aimed at this seat (-1 while unanswered).
     proposalResponses: player ? t(() => { const m = {}; for (const ev of Game.Diplomacy.getPlayerEvents(BOUND_PLAYER_ID)) { if (ev && Number.isInteger(ev.uniqueID) && ev.targetPlayer === BOUND_PLAYER_ID && Number.isInteger(ev.responseType)) m[String(ev.uniqueID)] = ev.responseType; } return m; }) : null,

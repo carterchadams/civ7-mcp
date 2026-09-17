@@ -679,8 +679,9 @@ class ActionRegistry:
                 if isinstance(o.get("arg3"), int):
                     rec["arg3"] = o["arg3"]
                 rec["expect"] = o.get("expect")
+                rec["eventsBefore"] = o.get("eventsBefore") if isinstance(o.get("eventsBefore"), int) else 0
                 for k in ("typeKey", "displayName", "targetPlayerId", "targetName", "targetIsMajor", "secondary",
-                          "group", "cost", "costYield", "influenceBalance", "affordable", "expect",
+                          "group", "cost", "costYield", "influenceBalance", "affordable", "expect", "eventsBefore",
                           "destructive", "requiresConfirmation"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
@@ -703,7 +704,10 @@ class ActionRegistry:
                     if o.get(k) is not None:
                         entry[k] = o[k]
             if kind in ("PROPOSE_PEACE", "ACCEPT_PEACE", "REJECT_PEACE"):
-                for k in ("targetPlayerId", "targetName", "targetIsMajor", "dealItems"):
+                if kind != "PROPOSE_PEACE":
+                    # the working-deal shape that held the proposal (0 incoming, 1 outgoing) is answered on
+                    rec["arg2"] = o["arg2"] if isinstance(o.get("arg2"), int) else 0
+                for k in ("targetPlayerId", "targetName", "targetIsMajor", "dealItems", "terms", "dealShape", "possibleTerms"):
                     if o.get(k) is not None:
                         entry[k] = o[k]
             if kind == "DECLARE_WAR":
@@ -1130,14 +1134,21 @@ class ActionRegistry:
                     rel = rb.get("diplomaticRelations")
                     state = rel.get(str(offer["arg"])) if isinstance(rel, dict) else None
                     inf = rb.get("influenceBalance")
-                    if expect == "war":
+                    events = rb.get("diplomaticEvents")
+                    now_events = events.get(f"{offer['arg2']}:{offer['arg']}") if isinstance(events, dict) else None
+                    started = isinstance(now_events, int) and not isinstance(now_events, bool) and now_events > int(offer.get("eventsBefore") or 0)
+                    if expect == "event":
+                        # a free project: its own event among this seat's actions against them is the proof
+                        if started:
+                            effect = {"diplomaticProjectStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"], "identity": "event"}}
+                    elif expect == "war":
                         if isinstance(state, dict) and state.get("atWar") is True:
                             effect = {"warDeclared": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"]}}
                     elif expect == "alliance":
                         if isinstance(state, dict) and state.get("allied") is True:
                             effect = {"allianceFormed": {"targetPlayerId": offer["arg"]}}
                     elif isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
-                        effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"],
+                        effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"], "identity": "event" if started else "influence",
                                                              "influenceSpent": offer["pre"] - inf}}
                 elif kind in ("NAME_UNIT", "NAME_CITY"):
                     names = rb.get("unitNames" if kind == "NAME_UNIT" else "cityNames")
