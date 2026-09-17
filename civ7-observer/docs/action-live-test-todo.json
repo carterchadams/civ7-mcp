@@ -22,12 +22,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 197,
+          "confirmed": 199,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "techResearching": 103
+          "techResearching": 104
         }
       }
     },
@@ -82,12 +82,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_TARGET_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 4,
+          "confirmed": 5,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "treeGoal": 4
+          "treeGoal": 5
         }
       }
     },
@@ -142,7 +142,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 680,
+          "confirmed": 685,
           "rejected": 4,
           "unknown": 0
         },
@@ -170,12 +170,12 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3743,
-          "rejected": 15,
+          "confirmed": 3823,
+          "rejected": 16,
           "unknown": 0
         },
         "effects": {
-          "unitNoLongerReady": 3583
+          "unitNoLongerReady": 3663
         }
       }
     },
@@ -200,12 +200,12 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitLocation` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2174,
+          "confirmed": 2197,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
-          "unitLocation": 2150,
+          "unitLocation": 2173,
           "unitMoved": 22
         }
       }
@@ -231,12 +231,12 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitMoved` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2174,
+          "confirmed": 2197,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
-          "unitLocation": 2150,
+          "unitLocation": 2173,
           "unitMoved": 22
         }
       }
@@ -262,13 +262,13 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 182,
+          "confirmed": 184,
           "rejected": 2,
           "unknown": 1
         },
         "effects": {
           "cityProduction": 8,
-          "queued": 168
+          "queued": 170
         }
       }
     },
@@ -353,12 +353,12 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 329,
+          "confirmed": 333,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "populationPlaced": 329
+          "populationPlaced": 333
         }
       }
     },
@@ -383,12 +383,12 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 164,
+          "confirmed": 170,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "queued": 164
+          "queued": 170
         }
       }
     },
@@ -774,12 +774,12 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 37,
+          "confirmed": 38,
           "rejected": 0,
           "unknown": 1
         },
         "effects": {
-          "townFocusKept": 19
+          "townFocusKept": 20
         }
       }
     },
@@ -1619,12 +1619,12 @@
       "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 0,
           "unknown": 1
         },
         "effects": {
-          "unitCommand": 2
+          "unitCommand": 3
         }
       }
     },
@@ -1670,12 +1670,12 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 599,
+          "confirmed": 602,
           "rejected": 1,
           "unknown": 1
         },
         "effects": {
-          "unitNoLongerReady": 53
+          "unitNoLongerReady": 56
         }
       }
     },
@@ -1730,12 +1730,12 @@
       "expected_evidence": "a confirmed `ASSIGN_WORKER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 1,
           "unknown": 1
         },
         "effects": {
-          "specialistAssigned": 2
+          "specialistAssigned": 3
         }
       }
     },
@@ -2073,7 +2073,7 @@
           "start_diplomatic_action"
         ]
       },
-      "consequence_class": "medium",
+      "consequence_class": "high",
       "procedure": "declare war through a diplomatic action (only in a war the seat would fight anyway)",
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `warDeclared` in the seat journal",
       "evidence_refs": {
