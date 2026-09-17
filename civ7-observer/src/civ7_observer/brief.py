@@ -274,7 +274,7 @@ SYNCRETISM_NOTE = ("this civilization may take on a related civilization's inher
                    "(syncretism_units), its buildings and quarters (syncretism_infrastructure), or its own tradition and a culture "
                    "slot (syncretism_self); `unlocks` lists what each gives. The choice is permanent and does not block the turn")
 
-MOVE_HINT_NOTE = ("a `multiTurn` move heads for one of the seat's own settlements over `pathTurns` turns and is confirmed as queued, not arrived; a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
+MOVE_HINT_NOTE = ("skip_unit must be repeated every turn; a standing order (unit_order: fortify, sleep, alert, heal) or automate_explore for a scout persists until woken, so idle units should be given one rather than skipped each turn. A `multiTurn` move heads for one of the seat's own settlements over `pathTurns` turns and is confirmed as queued, not arrived; a move option's `yields` describe the destination plot itself; `tooCloseToSettle` appears only on units "
                   "that could found a settlement, and is the game's own minimum-distance rule for that plot. A unit_order is a "
                   "standing order that also ends the unit's turn: Heal rests a damaged unit until full, Fortify and Alert hold "
                   "ground, Sleep waits. A unit carrying `damage` is wounded. A move option's `steps` is how far away the "
