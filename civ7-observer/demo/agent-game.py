@@ -132,7 +132,7 @@ def tidy_curtains(*, raise_curtain: bool) -> dict:
 
 
 def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float, raise_curtain: bool = False,
-              effort: str | None = None, directives_path: Path | None = None) -> dict:
+              effort: str | None = None, directives_path: Path | None = None, opportunities: int = 2) -> dict:
     ctx = context()
     turn = ctx["turn"]
     tag = f"t{turn}-seat{seat}"
@@ -162,11 +162,11 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     else:
         directives = operator_directives(state_dir() / "sessions")
     summary["directives"] = bool(directives)
-    # Live-test opportunities: at most two open cases whose kinds this seat is being offered right now.
+    # Live-test opportunities: a bounded number of open cases whose kinds this seat is being offered
+    # right now (two by default; --test-opportunities raises it for a testing-focused run).
     ledger = TestLedger(ctx["match"])
     offered = {o.get("kind") for d in brief.get("decisions", []) for o in d.get("options", []) if o.get("kind")}
-    # the operator asked for a testing focus: more untested cases per turn than the default two
-    cases = ledger.opportunities(seat, offered, limit=4)
+    cases = ledger.opportunities(seat, offered, limit=opportunities)
     summary["testing"] = [c["case_id"] for c in cases]
     system = assemble_system_prompt(brief, session.plan_text(), instructions=INSTRUCTIONS, skills_location=str(session.skills_dir),
                                     directives=directives, testing=TestLedger.note(cases))
@@ -256,6 +256,7 @@ def main() -> int:
     # a turn cut off by the cap wastes everything it spent (live: $1.56 on turn 85, aborted mid-action)
     ap.add_argument("--budget-usd", type=float, default=2.0, help="per seat-turn spend cap passed to claude")
     ap.add_argument("--timeout", type=float, default=1200.0, help="per seat-turn wall clock cap in seconds")
+    ap.add_argument("--test-opportunities", type=int, default=2, help="open live-test cases offered per seat-turn (bounded; raise for a testing-focused run)")
     ap.add_argument("--effort", default="medium", choices=["low", "medium", "high", "xhigh", "max", "default"],
                     help="reasoning effort passed to claude for each seat turn; 'default' omits the flag and takes the client's own setting")
     ap.add_argument("--directives", type=Path, default=None,
@@ -279,14 +280,14 @@ def main() -> int:
         seat = live
         if True:
             res = play_seat(seat, mode=args.mode, model=args.model, budget=args.budget_usd, timeout=args.timeout,
-                            raise_curtain=args.raise_curtain, effort=args.effort, directives_path=args.directives)
+                            raise_curtain=args.raise_curtain, effort=args.effort, directives_path=args.directives, opportunities=args.test_opportunities)
             played[seat] = played.get(seat, 0) + 1
             with open(log, "a", encoding="utf-8") as fh:
                 fh.write(json.dumps(res, ensure_ascii=False) + "\n")
             cur = res.get("curtain") or {}
             line = (f"[{res['tag']}] {res['status']}" + (" [directives]" if res.get("directives") else "")
                     + (f" [test: {','.join(res['testing'])}]" if res.get("testing") else "")
-                    + (f" [test-result: {','.join(c['case_id'] + '=' + c['live_status'] for c in res['testingChanged'])}]" if res.get("testingChanged") else "")
+                    + (f" [test-result: {','.join(c['case_id'] + '=' + (c['live_status'] if c.get('result', 'confirmed') == 'confirmed' else c['result']) for c in res['testingChanged'])}]" if res.get("testingChanged") else "")
                     + (f" (curtains {cur.get('curtainsBefore')}->{cur.get('curtainsAfter')}" + (", advisor popup confirmed" if (cur.get('advisorPopup') or {}).get('confirmed') else "") + ")" if cur and "curtainsBefore" in cur else "")
                     + (f" in {res['elapsedS']}s, ${res.get('costUsd') or 0:.2f}, tools {res['toolCalls']}, receipts "
                        f"{[(r['kind'], r['status']) for r in res['receipts']]}, friction {len(res['friction'])}" if "elapsedS" in res else ""))

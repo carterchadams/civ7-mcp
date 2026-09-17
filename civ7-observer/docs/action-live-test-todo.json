@@ -1,11 +1,14 @@
 {
-  "version": 1,
+  "version": 2,
   "cases": [
     {
       "case_id": "LT-research",
       "action_family": "research",
       "expected_kind": "SET_TECH_TREE_NODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "0b81f33e9135",
+      "passed_fingerprint": "0b81f33e9135",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -19,9 +22,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 191,
+          "confirmed": 192,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "techResearching": 100
         }
       }
     },
@@ -30,6 +36,9 @@
       "action_family": "civic",
       "expected_kind": "SET_CULTURE_TREE_NODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "89a68e3c5023",
+      "passed_fingerprint": "89a68e3c5023",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -43,9 +52,12 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 172,
+          "confirmed": 173,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "civicResearching": 73
         }
       }
     },
@@ -54,6 +66,9 @@
       "action_family": "research_goal",
       "expected_kind": "SET_TECH_TREE_TARGET_NODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "649c49d51503",
+      "passed_fingerprint": "649c49d51503",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -70,6 +85,9 @@
           "confirmed": 3,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "treeGoal": 3
         }
       }
     },
@@ -78,6 +96,9 @@
       "action_family": "civic_goal",
       "expected_kind": "SET_CULTURE_TREE_TARGET_NODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ee1407458512",
+      "passed_fingerprint": "ee1407458512",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -94,6 +115,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "treeGoal": 2
         }
       }
     },
@@ -102,6 +126,9 @@
       "action_family": "end_turn",
       "expected_kind": "END_TURN",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "877c01bd9f63",
+      "passed_fingerprint": "877c01bd9f63",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -115,10 +142,11 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 664,
+          "confirmed": 669,
           "rejected": 4,
           "unknown": 0
-        }
+        },
+        "effects": {}
       }
     },
     {
@@ -126,6 +154,9 @@
       "action_family": "skip_unit",
       "expected_kind": "SKIP_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d9122040d3e5",
+      "passed_fingerprint": "d9122040d3e5",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -139,9 +170,12 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3437,
+          "confirmed": 3520,
           "rejected": 14,
           "unknown": 0
+        },
+        "effects": {
+          "unitNoLongerReady": 3364
         }
       }
     },
@@ -150,6 +184,9 @@
       "action_family": "move_unit",
       "expected_kind": "MOVE_UNIT",
       "variant": "default",
+      "expected_effect": "unitLocation",
+      "contract_fingerprint": "27d9e37ce83b",
+      "passed_fingerprint": "27d9e37ce83b",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -159,13 +196,48 @@
         ]
       },
       "consequence_class": "low",
-      "procedure": "take a `move_unit` offer when it is strategically sensible",
-      "expected_evidence": "a confirmed `MOVE_UNIT` receipt in the seat journal",
+      "procedure": "move a unit to a plot it reaches this turn",
+      "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitLocation` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2103,
+          "confirmed": 2106,
           "rejected": 32,
           "unknown": 4
+        },
+        "effects": {
+          "unitLocation": 2083,
+          "unitMoved": 21
+        }
+      }
+    },
+    {
+      "case_id": "LT-move_unit-standing",
+      "action_family": "move_unit",
+      "expected_kind": "MOVE_UNIT",
+      "variant": "standing",
+      "expected_effect": "unitMoved",
+      "contract_fingerprint": "27d9e37ce83b",
+      "passed_fingerprint": "27d9e37ce83b",
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "passed",
+      "eligibility": {
+        "offered": [
+          "move_unit"
+        ]
+      },
+      "consequence_class": "low",
+      "procedure": "take a `multiTurn` move toward one of the seat's own settlements (confirmed as queued or under way, not arrival)",
+      "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitMoved` in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 2106,
+          "rejected": 32,
+          "unknown": 4
+        },
+        "effects": {
+          "unitLocation": 2083,
+          "unitMoved": 21
         }
       }
     },
@@ -174,6 +246,9 @@
       "action_family": "produce_unit",
       "expected_kind": "PRODUCE_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "cfde858eb73b",
+      "passed_fingerprint": "cfde858eb73b",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -187,9 +262,13 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 167,
+          "confirmed": 170,
           "rejected": 2,
           "unknown": 1
+        },
+        "effects": {
+          "cityProduction": 8,
+          "queued": 156
         }
       }
     },
@@ -198,6 +277,9 @@
       "action_family": "produce_project",
       "expected_kind": "PRODUCE_PROJECT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "68f19d7e9e10",
+      "passed_fingerprint": "68f19d7e9e10",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -214,6 +296,9 @@
           "confirmed": 5,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "projectQueued": 5
         }
       }
     },
@@ -222,6 +307,9 @@
       "action_family": "found_city",
       "expected_kind": "FOUND_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ffc05225df51",
+      "passed_fingerprint": "ffc05225df51",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -230,7 +318,7 @@
           "found_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `found_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOUND_CITY` receipt in the seat journal",
       "evidence_refs": {
@@ -238,6 +326,9 @@
           "confirmed": 41,
           "rejected": 5,
           "unknown": 5
+        },
+        "effects": {
+          "settlementFounded": 41
         }
       }
     },
@@ -246,6 +337,9 @@
       "action_family": "expand_city",
       "expected_kind": "EXPAND_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "bf55d206e453",
+      "passed_fingerprint": "bf55d206e453",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -259,9 +353,12 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 319,
+          "confirmed": 323,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "populationPlaced": 323
         }
       }
     },
@@ -270,6 +367,9 @@
       "action_family": "produce_constructible",
       "expected_kind": "PRODUCE_CONSTRUCTIBLE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "95b523fd4088",
+      "passed_fingerprint": "95b523fd4088",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -283,9 +383,12 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 160,
+          "confirmed": 163,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "queued": 163
         }
       }
     },
@@ -294,6 +397,9 @@
       "action_family": "activate_tradition",
       "expected_kind": "CHANGE_TRADITION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2781ce2f32ce",
+      "passed_fingerprint": "2781ce2f32ce",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -307,9 +413,12 @@
       "expected_evidence": "a confirmed `CHANGE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 108,
-          "rejected": 4,
+          "confirmed": 111,
+          "rejected": 5,
           "unknown": 0
+        },
+        "effects": {
+          "traditionActive": 111
         }
       }
     },
@@ -318,6 +427,9 @@
       "action_family": "confirm_traditions",
       "expected_kind": "CONSIDER_ASSIGN_TRADITIONS",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "27236f5f0d9e",
+      "passed_fingerprint": "27236f5f0d9e",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -331,9 +443,13 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 72,
+          "confirmed": 73,
           "rejected": 0,
           "unknown": 2
+        },
+        "effects": {
+          "endTurnBlocking": 57,
+          "traditionsNotificationCleared": 57
         }
       }
     },
@@ -342,6 +458,9 @@
       "action_family": "narrative_choice",
       "expected_kind": "CHOOSE_NARRATIVE_STORY_DIRECTION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "70b209979bdd",
+      "passed_fingerprint": "70b209979bdd",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -358,6 +477,9 @@
           "confirmed": 73,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "storyResolved": 73
         }
       }
     },
@@ -366,6 +488,9 @@
       "action_family": "found_pantheon",
       "expected_kind": "FOUND_PANTHEON",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "b855cdf19bf2",
+      "passed_fingerprint": "b855cdf19bf2",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -374,7 +499,7 @@
           "found_pantheon"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `found_pantheon` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOUND_PANTHEON` receipt in the seat journal",
       "evidence_refs": {
@@ -382,6 +507,9 @@
           "confirmed": 4,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "pantheonFounded": 4
         }
       }
     },
@@ -390,6 +518,9 @@
       "action_family": "change_government",
       "expected_kind": "CHANGE_GOVERNMENT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "c593bc7a81c2",
+      "passed_fingerprint": "c593bc7a81c2",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -398,7 +529,7 @@
           "change_government"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `change_government` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CHANGE_GOVERNMENT` receipt in the seat journal",
       "evidence_refs": {
@@ -406,6 +537,9 @@
           "confirmed": 10,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "governmentType": 8
         }
       }
     },
@@ -414,6 +548,9 @@
       "action_family": "buy_attribute",
       "expected_kind": "BUY_ATTRIBUTE_TREE_NODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "8f7757edf6e7",
+      "passed_fingerprint": "8f7757edf6e7",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -422,7 +559,7 @@
           "buy_attribute"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `buy_attribute` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
@@ -430,6 +567,9 @@
           "confirmed": 17,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "attributeNodeState": 17
         }
       }
     },
@@ -438,6 +578,9 @@
       "action_family": "consider_attributes",
       "expected_kind": "CONSIDER_ASSIGN_ATTRIBUTE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "edcc05f98005",
+      "passed_fingerprint": "edcc05f98005",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -454,6 +597,9 @@
           "confirmed": 5,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "attributeNotificationCleared": 5
         }
       }
     },
@@ -462,6 +608,9 @@
       "action_family": "choose_celebration",
       "expected_kind": "CHOOSE_GOLDEN_AGE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "f3b8e0e6a105",
+      "passed_fingerprint": "f3b8e0e6a105",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -478,6 +627,9 @@
           "confirmed": 94,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "celebrationChosen": 94
         }
       }
     },
@@ -486,6 +638,9 @@
       "action_family": "assign_resource",
       "expected_kind": "ASSIGN_RESOURCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2caf1d3276a3",
+      "passed_fingerprint": "2caf1d3276a3",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -499,9 +654,12 @@
       "expected_evidence": "a confirmed `ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 109,
+          "confirmed": 110,
           "rejected": 8,
           "unknown": 1
+        },
+        "effects": {
+          "resourceAssigned": 109
         }
       }
     },
@@ -510,6 +668,9 @@
       "action_family": "consider_resources",
       "expected_kind": "CONSIDER_ASSIGN_RESOURCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "99b2f0b28ba0",
+      "passed_fingerprint": "99b2f0b28ba0",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -523,9 +684,12 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 53,
+          "confirmed": 54,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "resourceNotificationCleared": 54
         }
       }
     },
@@ -534,6 +698,9 @@
       "action_family": "promote_unit",
       "expected_kind": "PROMOTE_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "95ef57ed2fc7",
+      "passed_fingerprint": "95ef57ed2fc7",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -542,7 +709,7 @@
           "promote_unit"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `promote_unit` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PROMOTE_UNIT` receipt in the seat journal",
       "evidence_refs": {
@@ -550,6 +717,9 @@
           "confirmed": 32,
           "rejected": 0,
           "unknown": 2
+        },
+        "effects": {
+          "unitPromoted": 30
         }
       }
     },
@@ -558,6 +728,9 @@
       "action_family": "town_project",
       "expected_kind": "CHOOSE_TOWN_PROJECT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "34d6022aaf95",
+      "passed_fingerprint": "34d6022aaf95",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -574,6 +747,9 @@
           "confirmed": 10,
           "rejected": 4,
           "unknown": 4
+        },
+        "effects": {
+          "townProject": 10
         }
       }
     },
@@ -582,6 +758,9 @@
       "action_family": "keep_town_focus",
       "expected_kind": "CONSIDER_TOWN_PROJECT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "47446dc00d72",
+      "passed_fingerprint": "47446dc00d72",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -595,9 +774,12 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 32,
+          "confirmed": 34,
           "rejected": 0,
           "unknown": 1
+        },
+        "effects": {
+          "townFocusKept": 16
         }
       }
     },
@@ -606,6 +788,9 @@
       "action_family": "purchase_unit",
       "expected_kind": "PURCHASE_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "0a9ebfa816d8",
+      "passed_fingerprint": "0a9ebfa816d8",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -614,7 +799,7 @@
           "purchase_unit"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `purchase_unit` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PURCHASE_UNIT` receipt in the seat journal",
       "evidence_refs": {
@@ -622,6 +807,9 @@
           "confirmed": 4,
           "rejected": 1,
           "unknown": 0
+        },
+        "effects": {
+          "unitPurchased": 4
         }
       }
     },
@@ -630,6 +818,9 @@
       "action_family": "purchase_constructible",
       "expected_kind": "PURCHASE_CONSTRUCTIBLE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "7454a277d0d1",
+      "passed_fingerprint": "7454a277d0d1",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -638,7 +829,7 @@
           "purchase_constructible"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `purchase_constructible` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PURCHASE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
@@ -646,6 +837,9 @@
           "confirmed": 1,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "constructiblePurchased": 1
         }
       }
     },
@@ -654,6 +848,9 @@
       "action_family": "promote_town_to_city",
       "expected_kind": "UPGRADE_TOWN",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d65c315d85cb",
+      "passed_fingerprint": "d65c315d85cb",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -662,7 +859,7 @@
           "promote_town_to_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `promote_town_to_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
@@ -670,6 +867,9 @@
           "confirmed": 8,
           "rejected": 2,
           "unknown": 0
+        },
+        "effects": {
+          "townUpgraded": 8
         }
       }
     },
@@ -678,6 +878,9 @@
       "action_family": "choose_age_civilization",
       "expected_kind": "CHOOSE_AGE_CIVILIZATION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "3d935e461a84",
+      "passed_fingerprint": "3d935e461a84",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -686,7 +889,7 @@
           "choose_age_civilization"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `choose_age_civilization` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CHOOSE_AGE_CIVILIZATION` receipt in the seat journal",
       "evidence_refs": {
@@ -694,7 +897,8 @@
           "confirmed": 3,
           "rejected": 0,
           "unknown": 0
-        }
+        },
+        "effects": {}
       }
     },
     {
@@ -702,6 +906,9 @@
       "action_family": "finish_age_transition",
       "expected_kind": "SET_AGE_TRANSITION_DATA",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "4c201f5e7dd1",
+      "passed_fingerprint": "4c201f5e7dd1",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -710,7 +917,7 @@
           "finish_age_transition"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `finish_age_transition` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SET_AGE_TRANSITION_DATA` receipt in the seat journal",
       "evidence_refs": {
@@ -718,6 +925,10 @@
           "confirmed": 3,
           "rejected": 0,
           "unknown": 2
+        },
+        "effects": {
+          "civilizationChoiceClosed": 1,
+          "endTurnBlocking": 1
         }
       }
     },
@@ -726,6 +937,9 @@
       "action_family": "pick_legacy_card",
       "expected_kind": "ADVANCED_START_MODIFY_DECK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "06c5b0b1f92e",
+      "passed_fingerprint": "06c5b0b1f92e",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -742,6 +956,9 @@
           "confirmed": 12,
           "rejected": 6,
           "unknown": 1
+        },
+        "effects": {
+          "legacyCardAdded": 11
         }
       }
     },
@@ -750,6 +967,9 @@
       "action_family": "finish_legacy_deck",
       "expected_kind": "ADVANCED_START_MARK_COMPLETED",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d35ef7541d57",
+      "passed_fingerprint": "d35ef7541d57",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -758,7 +978,7 @@
           "finish_legacy_deck"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `finish_legacy_deck` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `ADVANCED_START_MARK_COMPLETED` receipt in the seat journal",
       "evidence_refs": {
@@ -766,6 +986,9 @@
           "confirmed": 4,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "legacyDeckCompleted": 4
         }
       }
     },
@@ -774,6 +997,9 @@
       "action_family": "greet_new_civilization",
       "expected_kind": "RESPOND_DIPLOMATIC_FIRST_MEET",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a7748c625f7f",
+      "passed_fingerprint": "a7748c625f7f",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -782,7 +1008,7 @@
           "greet_new_civilization"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `greet_new_civilization` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_FIRST_MEET` receipt in the seat journal",
       "evidence_refs": {
@@ -790,6 +1016,9 @@
           "confirmed": 3,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "firstMeetAnswered": 3
         }
       }
     },
@@ -798,6 +1027,9 @@
       "action_family": "make_trade_route",
       "expected_kind": "MAKE_TRADE_ROUTE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "3104f762d42b",
+      "passed_fingerprint": "3104f762d42b",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -806,7 +1038,7 @@
           "make_trade_route"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `make_trade_route` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `MAKE_TRADE_ROUTE` receipt in the seat journal",
       "evidence_refs": {
@@ -814,6 +1046,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "tradeRouteStarted": 2
         }
       }
     },
@@ -822,6 +1057,9 @@
       "action_family": "send_merchant",
       "expected_kind": "SEND_MERCHANT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "87e473ddfdf9",
+      "passed_fingerprint": "87e473ddfdf9",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -838,6 +1076,9 @@
           "confirmed": 28,
           "rejected": 5,
           "unknown": 0
+        },
+        "effects": {
+          "merchantSent": 28
         }
       }
     },
@@ -846,6 +1087,9 @@
       "action_family": "keep_captured_city",
       "expected_kind": "KEEP_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "485a6f85b238",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -854,7 +1098,7 @@
           "keep_captured_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `keep_captured_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `KEEP_CITY` receipt in the seat journal",
       "evidence_refs": {}
@@ -864,6 +1108,9 @@
       "action_family": "raze_captured_city",
       "expected_kind": "RAZE_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d93f29f438d9",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -872,7 +1119,7 @@
           "raze_captured_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `raze_captured_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `RAZE_CITY` receipt in the seat journal",
       "evidence_refs": {}
@@ -882,6 +1129,9 @@
       "action_family": "liberate_captured_city",
       "expected_kind": "LIBERATE_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a992ad63ca2e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -890,7 +1140,7 @@
           "liberate_captured_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `liberate_captured_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `LIBERATE_CITY` receipt in the seat journal",
       "evidence_refs": {}
@@ -900,6 +1150,9 @@
       "action_family": "choose_city_state_bonus",
       "expected_kind": "CHOOSE_CITY_STATE_BONUS",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2bcfa7969071",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -918,6 +1171,9 @@
       "action_family": "support_diplomatic_action",
       "expected_kind": "SUPPORT_DIPLOMATIC_ACTION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ad36749d0bd7",
+      "passed_fingerprint": "ad36749d0bd7",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -926,7 +1182,7 @@
           "support_diplomatic_action"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `support_diplomatic_action` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SUPPORT_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
@@ -934,6 +1190,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "diplomaticActionSupported": 2
         }
       }
     },
@@ -942,6 +1201,9 @@
       "action_family": "acknowledge_advisor_warning",
       "expected_kind": "VIEWED_ADVISOR_WARNING",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "22b147d8d175",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -960,6 +1222,9 @@
       "action_family": "join_ally_war",
       "expected_kind": "DECLARE_WAR",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "92da7c34ee59",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -968,7 +1233,7 @@
           "join_ally_war"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `join_ally_war` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `DECLARE_WAR` receipt in the seat journal",
       "evidence_refs": {}
@@ -978,6 +1243,9 @@
       "action_family": "propose_peace",
       "expected_kind": "PROPOSE_PEACE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "c3fce76df4f3",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -986,7 +1254,7 @@
           "propose_peace"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `propose_peace` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PROPOSE_PEACE` receipt in the seat journal",
       "evidence_refs": {}
@@ -996,6 +1264,9 @@
       "action_family": "accept_peace",
       "expected_kind": "ACCEPT_PEACE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "054ecc31fb7b",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1004,7 +1275,7 @@
           "accept_peace"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `accept_peace` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `ACCEPT_PEACE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1014,6 +1285,9 @@
       "action_family": "reject_peace",
       "expected_kind": "REJECT_PEACE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "6f44d89d7b09",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1022,7 +1296,7 @@
           "reject_peace"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `reject_peace` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `REJECT_PEACE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1032,6 +1306,9 @@
       "action_family": "pillage",
       "expected_kind": "PILLAGE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2567aa181ab8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1040,7 +1317,7 @@
           "pillage"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `pillage` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PILLAGE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1050,6 +1327,9 @@
       "action_family": "coastal_raid",
       "expected_kind": "COASTAL_RAID",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2567aa181ab8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1058,7 +1338,7 @@
           "coastal_raid"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `coastal_raid` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `COASTAL_RAID` receipt in the seat journal",
       "evidence_refs": {}
@@ -1068,6 +1348,9 @@
       "action_family": "pillage_route",
       "expected_kind": "PILLAGE_ROUTE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2567aa181ab8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1076,7 +1359,7 @@
           "pillage_route"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `pillage_route` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PILLAGE_ROUTE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1086,6 +1369,9 @@
       "action_family": "plunder_trade_route",
       "expected_kind": "PLUNDER_TRADE_ROUTE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "77d75dc26a7c",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1094,7 +1380,7 @@
           "plunder_trade_route"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `plunder_trade_route` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `PLUNDER_TRADE_ROUTE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1104,6 +1390,9 @@
       "action_family": "spread_religion",
       "expected_kind": "SPREAD_RELIGION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ea6ab0a531d0",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1122,6 +1411,9 @@
       "action_family": "town_growth_mode",
       "expected_kind": "TOWN_GROWTH_MODE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "95698a6f5a90",
+      "passed_fingerprint": "95698a6f5a90",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1138,6 +1430,9 @@
           "confirmed": 1,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "townGrowing": 1
         }
       }
     },
@@ -1146,6 +1441,9 @@
       "action_family": "queue_remove",
       "expected_kind": "QUEUE_REMOVE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ef9ba3cd781c",
+      "passed_fingerprint": "ef9ba3cd781c",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1162,6 +1460,9 @@
           "confirmed": 1,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "queueEdited": 1
         }
       }
     },
@@ -1170,6 +1471,9 @@
       "action_family": "queue_move_up",
       "expected_kind": "QUEUE_MOVE_UP",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "7009dbbc0678",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1188,6 +1492,9 @@
       "action_family": "queue_move_down",
       "expected_kind": "QUEUE_MOVE_DOWN",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2bc40c421ed4",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1206,6 +1513,9 @@
       "action_family": "deactivate_tradition",
       "expected_kind": "DEACTIVATE_TRADITION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "b08b19819419",
+      "passed_fingerprint": "b08b19819419",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1219,9 +1529,12 @@
       "expected_evidence": "a confirmed `DEACTIVATE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 3,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "traditionDeactivated": 3
         }
       }
     },
@@ -1230,6 +1543,9 @@
       "action_family": "unassign_resource",
       "expected_kind": "UNASSIGN_RESOURCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "9be7a0b9b006",
+      "passed_fingerprint": "9be7a0b9b006",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1246,6 +1562,9 @@
           "confirmed": 5,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "resourceUnassigned": 5
         }
       }
     },
@@ -1254,6 +1573,9 @@
       "action_family": "swap_resources",
       "expected_kind": "SWAP_RESOURCES",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a286dc276e92",
+      "passed_fingerprint": "a286dc276e92",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1270,6 +1592,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "resourcesSwapped": 2
         }
       }
     },
@@ -1278,6 +1603,9 @@
       "action_family": "wake_unit",
       "expected_kind": "WAKE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ad5ce9ef0c42",
+      "passed_fingerprint": "ad5ce9ef0c42",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1294,6 +1622,9 @@
           "confirmed": 3,
           "rejected": 0,
           "unknown": 1
+        },
+        "effects": {
+          "unitCommand": 2
         }
       }
     },
@@ -1302,6 +1633,9 @@
       "action_family": "cancel_order",
       "expected_kind": "CANCEL",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "cad8c2bebc11",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1320,6 +1654,9 @@
       "action_family": "unit_order",
       "expected_kind": "UNIT_ORDER",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "f96cfd0878c6",
+      "passed_fingerprint": "f96cfd0878c6",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1333,9 +1670,12 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 538,
+          "confirmed": 558,
           "rejected": 1,
           "unknown": 1
+        },
+        "effects": {
+          "unitNoLongerReady": 53
         }
       }
     },
@@ -1344,6 +1684,9 @@
       "action_family": "disband_unit",
       "expected_kind": "DISBAND_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5f022602a69f",
+      "passed_fingerprint": "5f022602a69f",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1360,6 +1703,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "unitDisbanded": 2
         }
       }
     },
@@ -1368,6 +1714,9 @@
       "action_family": "assign_specialist",
       "expected_kind": "ASSIGN_WORKER",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5501fdd5970f",
+      "passed_fingerprint": "5501fdd5970f",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1384,6 +1733,9 @@
           "confirmed": 2,
           "rejected": 1,
           "unknown": 1
+        },
+        "effects": {
+          "specialistAssigned": 2
         }
       }
     },
@@ -1392,6 +1744,9 @@
       "action_family": "cancel_alliance",
       "expected_kind": "CANCEL_ALLIANCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "4f30b3a1ae4d",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1410,6 +1765,9 @@
       "action_family": "attack",
       "expected_kind": "ATTACK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "195e637e88f2",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1428,6 +1786,9 @@
       "action_family": "upgrade_unit",
       "expected_kind": "UPGRADE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a370c092d783",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1436,7 +1797,7 @@
           "upgrade_unit"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `upgrade_unit` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `UPGRADE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1446,6 +1807,9 @@
       "action_family": "pack_army",
       "expected_kind": "PACK_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "23103031d7c0",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1464,6 +1828,9 @@
       "action_family": "join_army",
       "expected_kind": "ADD_TO_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d8d6f68f776c",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1482,6 +1849,9 @@
       "action_family": "leave_army",
       "expected_kind": "REMOVE_FROM_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "bde4a6c2933d",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1500,6 +1870,9 @@
       "action_family": "unpack_army",
       "expected_kind": "UNPACK_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "95b174013607",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1518,6 +1891,9 @@
       "action_family": "activate_great_person",
       "expected_kind": "ACTIVATE_GREAT_PERSON",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "03b3ab47d4af",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1536,6 +1912,9 @@
       "action_family": "respond_to_proposal",
       "expected_kind": "RESPOND_DIPLOMATIC_ACTION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "9f2de6e0ab8b",
+      "passed_fingerprint": "9f2de6e0ab8b",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1552,6 +1931,9 @@
           "confirmed": 5,
           "rejected": 0,
           "unknown": 1
+        },
+        "effects": {
+          "proposalAnswered": 4
         }
       }
     },
@@ -1560,6 +1942,9 @@
       "action_family": "found_religion",
       "expected_kind": "FOUND_RELIGION",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2c30dcdfc49c",
+      "passed_fingerprint": "2c30dcdfc49c",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1568,7 +1953,7 @@
           "found_religion"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `found_religion` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOUND_RELIGION` receipt in the seat journal",
       "evidence_refs": {
@@ -1576,6 +1961,9 @@
           "confirmed": 2,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "religionFounded": 2
         }
       }
     },
@@ -1584,6 +1972,9 @@
       "action_family": "add_belief",
       "expected_kind": "ADD_BELIEF",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5314b1adb446",
+      "passed_fingerprint": "5314b1adb446",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1592,7 +1983,7 @@
           "add_belief"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `add_belief` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `ADD_BELIEF` receipt in the seat journal",
       "evidence_refs": {
@@ -1600,6 +1991,9 @@
           "confirmed": 6,
           "rejected": 0,
           "unknown": 1
+        },
+        "effects": {
+          "beliefAdded": 5
         }
       }
     },
@@ -1608,6 +2002,9 @@
       "action_family": "start_diplomatic_action",
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "default",
+      "expected_effect": "diplomaticActionStarted",
+      "contract_fingerprint": "098aa9222ea8",
+      "passed_fingerprint": "098aa9222ea8",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1616,14 +2013,77 @@
           "start_diplomatic_action"
         ]
       },
-      "consequence_class": "low",
-      "procedure": "take a `start_diplomatic_action` offer when it is strategically sensible",
-      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt in the seat journal",
+      "consequence_class": "medium",
+      "procedure": "start an influence-priced diplomatic project",
+      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `diplomaticActionStarted` in the seat journal",
       "evidence_refs": {
         "journal": {
           "confirmed": 5,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "diplomaticActionStarted": 5
+        }
+      }
+    },
+    {
+      "case_id": "LT-start_diplomatic_action-war",
+      "action_family": "start_diplomatic_action",
+      "expected_kind": "START_DIPLOMATIC_ACTION",
+      "variant": "war",
+      "expected_effect": "warDeclared",
+      "contract_fingerprint": "098aa9222ea8",
+      "passed_fingerprint": null,
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "start_diplomatic_action"
+        ]
+      },
+      "consequence_class": "medium",
+      "procedure": "declare war through a diplomatic action (only in a war the seat would fight anyway)",
+      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `warDeclared` in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 5,
+          "rejected": 0,
+          "unknown": 0
+        },
+        "effects": {
+          "diplomaticActionStarted": 5
+        }
+      }
+    },
+    {
+      "case_id": "LT-start_diplomatic_action-alliance",
+      "action_family": "start_diplomatic_action",
+      "expected_kind": "START_DIPLOMATIC_ACTION",
+      "variant": "alliance",
+      "expected_effect": "allianceFormed",
+      "contract_fingerprint": "098aa9222ea8",
+      "passed_fingerprint": null,
+      "priority": 3,
+      "implementation_status": "offline_verified",
+      "live_status": "not_seen",
+      "eligibility": {
+        "offered": [
+          "start_diplomatic_action"
+        ]
+      },
+      "consequence_class": "medium",
+      "procedure": "form an alliance through a diplomatic action",
+      "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `allianceFormed` in the seat journal",
+      "evidence_refs": {
+        "journal": {
+          "confirmed": 5,
+          "rejected": 0,
+          "unknown": 0
+        },
+        "effects": {
+          "diplomaticActionStarted": 5
         }
       }
     },
@@ -1632,6 +2092,9 @@
       "action_family": "select_capital",
       "expected_kind": "SELECT_CAPITAL",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "7eb109fb9d5d",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1640,7 +2103,7 @@
           "select_capital"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `select_capital` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SELECT_CAPITAL` receipt in the seat journal",
       "evidence_refs": {}
@@ -1650,6 +2113,9 @@
       "action_family": "syncretism_units",
       "expected_kind": "CHOOSE_SYNCRETISM_UNITS",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d62058e3f8fd",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1658,7 +2124,7 @@
           "syncretism_units"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `syncretism_units` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_UNITS` receipt in the seat journal",
       "evidence_refs": {}
@@ -1668,6 +2134,9 @@
       "action_family": "syncretism_infrastructure",
       "expected_kind": "CHOOSE_SYNCRETISM_INFRASTRUCTURE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d958b12b5456",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1676,7 +2145,7 @@
           "syncretism_infrastructure"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `syncretism_infrastructure` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_INFRASTRUCTURE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1686,6 +2155,9 @@
       "action_family": "syncretism_self",
       "expected_kind": "CHOOSE_SYNCRETISM_SELF",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "05631b570b4c",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1694,7 +2166,7 @@
           "syncretism_self"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `syncretism_self` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CHOOSE_SYNCRETISM_SELF` receipt in the seat journal",
       "evidence_refs": {}
@@ -1704,6 +2176,9 @@
       "action_family": "drop_legacy_card",
       "expected_kind": "ADVANCED_START_REMOVE_CARD",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d63ffd9840c7",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1722,6 +2197,9 @@
       "action_family": "place_legacy_settlement",
       "expected_kind": "ADVANCED_START_PLACE_SETTLEMENT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "feb9826661b9",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1730,7 +2208,7 @@
           "place_legacy_settlement"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `place_legacy_settlement` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `ADVANCED_START_PLACE_SETTLEMENT` receipt in the seat journal",
       "evidence_refs": {}
@@ -1740,6 +2218,9 @@
       "action_family": "resettle",
       "expected_kind": "RESETTLE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "24bde9f61268",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1748,7 +2229,7 @@
           "resettle"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `resettle` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `RESETTLE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1758,6 +2239,9 @@
       "action_family": "excavate",
       "expected_kind": "EXCAVATE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "24474f58cb89",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1776,6 +2260,9 @@
       "action_family": "research_artifacts",
       "expected_kind": "RESEARCH_ARTIFACTS",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2531d80d05da",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1794,6 +2281,9 @@
       "action_family": "air_attack",
       "expected_kind": "AIR_ATTACK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "7f78792cd4f8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1802,7 +2292,7 @@
           "air_attack"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `air_attack` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `AIR_ATTACK` receipt in the seat journal",
       "evidence_refs": {}
@@ -1812,6 +2302,9 @@
       "action_family": "naval_attack",
       "expected_kind": "NAVAL_ATTACK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "19e34fd877bb",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1820,7 +2313,7 @@
           "naval_attack"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `naval_attack` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `NAVAL_ATTACK` receipt in the seat journal",
       "evidence_refs": {}
@@ -1830,6 +2323,9 @@
       "action_family": "cargo_drop",
       "expected_kind": "CARGO_DROP",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "83f158040620",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1848,6 +2344,9 @@
       "action_family": "unit_air_drop",
       "expected_kind": "UNIT_AIR_DROP",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ee5a1ce56f34",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1866,6 +2365,9 @@
       "action_family": "automate_explore",
       "expected_kind": "AUTOMATE_EXPLORE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "66e61d07ba38",
+      "passed_fingerprint": "66e61d07ba38",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1882,6 +2384,9 @@
           "confirmed": 24,
           "rejected": 0,
           "unknown": 0
+        },
+        "effects": {
+          "unitAutomated": 24
         }
       }
     },
@@ -1890,6 +2395,9 @@
       "action_family": "wmd_strike",
       "expected_kind": "WMD_STRIKE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "f7c92f97a40f",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1898,7 +2406,7 @@
           "wmd_strike"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `wmd_strike` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `WMD_STRIKE` receipt in the seat journal",
       "evidence_refs": {}
@@ -1908,6 +2416,9 @@
       "action_family": "move_great_work",
       "expected_kind": "MOVE_GREAT_WORK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "804bdd87f07e",
+      "passed_fingerprint": "804bdd87f07e",
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "passed",
@@ -1924,6 +2435,9 @@
           "confirmed": 1,
           "rejected": 1,
           "unknown": 1
+        },
+        "effects": {
+          "greatWorkMoved": 1
         }
       }
     },
@@ -1932,6 +2446,9 @@
       "action_family": "rename_unit",
       "expected_kind": "NAME_UNIT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "08d12dd39436",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1940,7 +2457,7 @@
           "rename_unit"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `rename_unit` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `NAME_UNIT` receipt in the seat journal",
       "evidence_refs": {}
@@ -1950,6 +2467,9 @@
       "action_family": "rename_city",
       "expected_kind": "NAME_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "0fc26a04cb44",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1958,7 +2478,7 @@
           "rename_city"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `rename_city` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `NAME_CITY` receipt in the seat journal",
       "evidence_refs": {}
@@ -1968,6 +2488,9 @@
       "action_family": "reinforce_army",
       "expected_kind": "REINFORCE_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "f7cd46218d9e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -1976,7 +2499,7 @@
           "reinforce_army"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `reinforce_army` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `REINFORCE_ARMY` receipt in the seat journal",
       "evidence_refs": {}
@@ -1986,6 +2509,9 @@
       "action_family": "rebase",
       "expected_kind": "REBASE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "b4509152e779",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2004,6 +2530,9 @@
       "action_family": "teleport_to_city",
       "expected_kind": "TELEPORT_TO_CITY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "f97389d7433a",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2022,6 +2551,9 @@
       "action_family": "establish_base",
       "expected_kind": "ESTABLISH_BASE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "6ccc4c0cf170",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2040,6 +2572,9 @@
       "action_family": "disperse_independent",
       "expected_kind": "DISPERSE_INDEPENDENT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "e76df9ba2380",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2048,7 +2583,7 @@
           "disperse_independent"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `disperse_independent` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `DISPERSE_INDEPENDENT` receipt in the seat journal",
       "evidence_refs": {}
@@ -2058,6 +2593,9 @@
       "action_family": "convert_independent_to_city_state",
       "expected_kind": "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "8296d1d64468",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2066,7 +2604,7 @@
           "convert_independent_to_city_state"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `convert_independent_to_city_state` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE` receipt in the seat journal",
       "evidence_refs": {}
@@ -2076,6 +2614,9 @@
       "action_family": "repair",
       "expected_kind": "REPAIR",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "eab940a280e4",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2094,6 +2635,9 @@
       "action_family": "remove_feature",
       "expected_kind": "REMOVE_FEATURE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5364fa7bb655",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2102,7 +2646,7 @@
           "remove_feature"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `remove_feature` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `REMOVE_FEATURE` receipt in the seat journal",
       "evidence_refs": {}
@@ -2112,6 +2656,9 @@
       "action_family": "remove_improvement",
       "expected_kind": "REMOVE_IMPROVEMENT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a885a5d2baec",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2120,7 +2667,7 @@
           "remove_improvement"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `remove_improvement` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `REMOVE_IMPROVEMENT` receipt in the seat journal",
       "evidence_refs": {}
@@ -2130,6 +2677,9 @@
       "action_family": "plant_forest",
       "expected_kind": "PLANT_FOREST",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5a947661b445",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2148,6 +2698,9 @@
       "action_family": "harvest_resource",
       "expected_kind": "HARVEST_RESOURCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "20e3d28fa1dd",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2156,7 +2709,7 @@
           "harvest_resource"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `harvest_resource` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `HARVEST_RESOURCE` receipt in the seat journal",
       "evidence_refs": {}
@@ -2166,6 +2719,9 @@
       "action_family": "build_improvement",
       "expected_kind": "BUILD_IMPROVEMENT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "467be9062620",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2184,6 +2740,9 @@
       "action_family": "embed_lookout",
       "expected_kind": "EMBED_LOOKOUT",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "340170a37443",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2202,6 +2761,9 @@
       "action_family": "search",
       "expected_kind": "SEARCH",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "bec638875a2a",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2220,6 +2782,9 @@
       "action_family": "aerial_recon",
       "expected_kind": "AERIAL_RECON",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "eae11f4e3c5c",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2238,6 +2803,9 @@
       "action_family": "call_reinforcements",
       "expected_kind": "CALL_REINFORCEMENTS",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ea6b69beedb7",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2256,6 +2824,9 @@
       "action_family": "connect_with_road",
       "expected_kind": "CONNECT_WITH_ROAD",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "ce46387d3bcf",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2274,6 +2845,9 @@
       "action_family": "move_by_rail",
       "expected_kind": "MOVE_BY_RAIL",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "09da75cb91bc",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2292,6 +2866,9 @@
       "action_family": "upgrade_army",
       "expected_kind": "UPGRADE_ARMY",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2be9cc636b44",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2300,7 +2877,7 @@
           "upgrade_army"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "medium",
       "procedure": "take a `upgrade_army` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `UPGRADE_ARMY` receipt in the seat journal",
       "evidence_refs": {}
@@ -2310,6 +2887,9 @@
       "action_family": "focused_attack_land_melee",
       "expected_kind": "FOCUSED_ATTACK_LAND_MELEE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "4762aeccc6e8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2318,7 +2898,7 @@
           "focused_attack_land_melee"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_land_melee` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_LAND_MELEE` receipt in the seat journal",
       "evidence_refs": {}
@@ -2328,6 +2908,9 @@
       "action_family": "focused_attack_land_ranged",
       "expected_kind": "FOCUSED_ATTACK_LAND_RANGED",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "a98ca13c2143",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2336,7 +2919,7 @@
           "focused_attack_land_ranged"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_land_ranged` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_LAND_RANGED` receipt in the seat journal",
       "evidence_refs": {}
@@ -2346,6 +2929,9 @@
       "action_family": "focused_attack_sea_melee",
       "expected_kind": "FOCUSED_ATTACK_SEA_MELEE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "980170bc00e8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2354,7 +2940,7 @@
           "focused_attack_sea_melee"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_sea_melee` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_SEA_MELEE` receipt in the seat journal",
       "evidence_refs": {}
@@ -2364,6 +2950,9 @@
       "action_family": "focused_attack_sea_ranged",
       "expected_kind": "FOCUSED_ATTACK_SEA_RANGED",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "d55b8a6f96d1",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2372,7 +2961,7 @@
           "focused_attack_sea_ranged"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_sea_ranged` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_SEA_RANGED` receipt in the seat journal",
       "evidence_refs": {}
@@ -2382,6 +2971,9 @@
       "action_family": "focused_attack_air_to_air",
       "expected_kind": "FOCUSED_ATTACK_AIR_TO_AIR",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "9683333e4450",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2390,7 +2982,7 @@
           "focused_attack_air_to_air"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_air_to_air` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_TO_AIR` receipt in the seat journal",
       "evidence_refs": {}
@@ -2400,6 +2992,9 @@
       "action_family": "focused_attack_air_to_land",
       "expected_kind": "FOCUSED_ATTACK_AIR_TO_LAND",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "e262451761a4",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2408,7 +3003,7 @@
           "focused_attack_air_to_land"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_air_to_land` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_TO_LAND` receipt in the seat journal",
       "evidence_refs": {}
@@ -2418,6 +3013,9 @@
       "action_family": "focused_attack_air_bomb",
       "expected_kind": "FOCUSED_ATTACK_AIR_BOMB",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "78ab20eeb023",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2426,7 +3024,7 @@
           "focused_attack_air_bomb"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `focused_attack_air_bomb` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `FOCUSED_ATTACK_AIR_BOMB` receipt in the seat journal",
       "evidence_refs": {}
@@ -2436,6 +3034,9 @@
       "action_family": "army_overrun",
       "expected_kind": "ARMY_OVERRUN",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "754a24632b3f",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2444,7 +3045,7 @@
           "army_overrun"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `army_overrun` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `ARMY_OVERRUN` receipt in the seat journal",
       "evidence_refs": {}
@@ -2454,6 +3055,9 @@
       "action_family": "commander_attack",
       "expected_kind": "COMMANDER_ATTACK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "22b39162d6e2",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2462,7 +3066,7 @@
           "commander_attack"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `commander_attack` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `COMMANDER_ATTACK` receipt in the seat journal",
       "evidence_refs": {}
@@ -2472,6 +3076,9 @@
       "action_family": "stone_trap",
       "expected_kind": "STONE_TRAP",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "eabc8daca1c7",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2490,6 +3097,9 @@
       "action_family": "treat_sick",
       "expected_kind": "TREAT_SICK",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "16e0cdee785a",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2508,6 +3118,9 @@
       "action_family": "claim_resource",
       "expected_kind": "CLAIM_RESOURCE",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "2d3acc83e5e9",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2526,6 +3139,9 @@
       "action_family": "scorched_earth",
       "expected_kind": "SCORCHED_EARTH",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "bb42f5ae4e2c",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2534,7 +3150,7 @@
           "scorched_earth"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `scorched_earth` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `SCORCHED_EARTH` receipt in the seat journal",
       "evidence_refs": {}
@@ -2544,6 +3160,9 @@
       "action_family": "disperse_clan",
       "expected_kind": "DISPERSE_CLAN",
       "variant": "default",
+      "expected_effect": null,
+      "contract_fingerprint": "5042aa34ea84",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
       "live_status": "not_seen",
@@ -2552,593 +3171,662 @@
           "disperse_clan"
         ]
       },
-      "consequence_class": "low",
+      "consequence_class": "high",
       "procedure": "take a `disperse_clan` offer when it is strategically sensible",
       "expected_evidence": "a confirmed `DISPERSE_CLAN` receipt in the seat journal",
       "evidence_refs": {}
+    }
+  ],
+  "families": [
+    {
+      "family": "A01",
+      "title": "Captured settlement keep/raze/liberate",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "keep, raze, liberate",
+          "disposition": "implemented",
+          "kinds": [
+            "keep_captured_city",
+            "raze_captured_city",
+            "liberate_captured_city"
+          ],
+          "evidence": "CityCommandTypes.DESTROY with Directive 2/3/0",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A01",
-      "action_family": "Captured settlement keep/raze/liberate",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "keep_captured_city",
-        "raze_captured_city",
-        "liberate_captured_city"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Captured settlement keep/raze/liberate",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A02",
+      "title": "Peace deals: inspect, propose, accept, reject",
+      "status": "partial",
+      "variants": [
+        {
+          "variant": "plain proposal",
+          "disposition": "implemented",
+          "kinds": [
+            "propose_peace"
+          ],
+          "evidence": "PROPOSE_PEACE with the engine's drafted terms",
+          "live": "not_seen"
+        },
+        {
+          "variant": "answer an incoming proposal",
+          "disposition": "implemented",
+          "kinds": [
+            "accept_peace",
+            "reject_peace"
+          ],
+          "evidence": "ACCEPT_PEACE / REJECT_PEACE; the incoming deal id shape is inferred and not yet verified live",
+          "live": "not_seen"
+        },
+        {
+          "variant": "inspect and edit terms, counteroffer",
+          "disposition": "partial",
+          "kinds": [],
+          "evidence": "not implemented; native term inspection/edit flow needs verification on a disposable war scenario (work package B1)",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A02",
-      "action_family": "Peace deals: inspect, propose, accept, reject",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "propose_peace",
-        "accept_peace",
-        "reject_peace"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Peace deals: inspect, propose, accept, reject",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A03",
+      "title": "Ally at war / call to arms",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "join the ally's war",
+          "disposition": "implemented",
+          "kinds": [
+            "join_ally_war"
+          ],
+          "evidence": "DECLARE_WAR via Game.Diplomacy.getNextCallToArms",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A03",
-      "action_family": "Ally at war / call to arms",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "join_ally_war"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Ally at war / call to arms",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A04",
+      "title": "Choose city-state bonus",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "choose bonus",
+          "disposition": "implemented",
+          "kinds": [
+            "choose_city_state_bonus"
+          ],
+          "evidence": "CHOOSE_CITY_STATE_BONUS {OtherPlayer, CityStateBonusType}",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A04",
-      "action_family": "Choose city-state bonus",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "choose_city_state_bonus"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Choose city-state bonus",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A05",
+      "title": "Support/oppose ongoing diplomatic actions",
+      "status": "partial",
+      "variants": [
+        {
+          "variant": "support a side with one token",
+          "disposition": "implemented",
+          "kinds": [
+            "support_diplomatic_action"
+          ],
+          "evidence": "SUPPORT_DIPLOMATIC_ACTION {ID, Type: DIPLOMACY_TOKEN_GLOBAL, Amount: 1, SubType}",
+          "live": "passed"
+        },
+        {
+          "variant": "oppose, retract, larger amounts",
+          "disposition": "partial",
+          "kinds": [],
+          "evidence": "not verified; whether native opposition/retraction exists is open (work package B2)",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A05",
-      "action_family": "Support/oppose ongoing diplomatic actions",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "support_diplomatic_action"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Support/oppose ongoing diplomatic actions",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A06",
+      "title": "Diplomatic projects with secondary targets",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "influence-priced projects, secondary targets",
+          "disposition": "implemented",
+          "kinds": [
+            "start_diplomatic_action"
+          ],
+          "evidence": "the engine's own getProjectDataForUI listing supplies operation, price and targetList2",
+          "live": "passed"
+        },
+        {
+          "variant": "free projects with no relationship signal",
+          "disposition": "excluded",
+          "kinds": [],
+          "evidence": "withheld: no authoritative signal to confirm by; revisit when project/event identity gives one (work package B2)",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A06",
-      "action_family": "Diplomatic projects with secondary targets",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 1,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "start_diplomatic_action"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Diplomatic projects with secondary targets",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A07",
+      "title": "Advisor-warning acknowledgement",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "acknowledge",
+          "disposition": "implemented",
+          "kinds": [
+            "acknowledge_advisor_warning"
+          ],
+          "evidence": "VIEWED_ADVISOR_WARNING",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A07",
-      "action_family": "Advisor-warning acknowledgement",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "acknowledge_advisor_warning"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Advisor-warning acknowledgement",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A08",
+      "title": "Pillage, coastal raid, route plunder",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "pillage, raid, plunder",
+          "disposition": "implemented",
+          "kinds": [
+            "pillage",
+            "coastal_raid",
+            "pillage_route",
+            "plunder_trade_route"
+          ],
+          "evidence": "plot-target operations from canStart(op, {}).Plots; PLUNDER_TRADE_ROUTE command",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A08",
-      "action_family": "Pillage, coastal raid, route plunder",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "pillage",
-        "coastal_raid",
-        "pillage_route",
-        "plunder_trade_route"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Pillage, coastal raid, route plunder",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A09",
+      "title": "Religious spread and relics",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "spread religion",
+          "disposition": "implemented",
+          "kinds": [
+            "spread_religion"
+          ],
+          "evidence": "SPREAD_RELIGION on the unit's activation plots",
+          "live": "not_seen"
+        },
+        {
+          "variant": "relics",
+          "disposition": "already_covered",
+          "kinds": [
+            "move_great_work"
+          ],
+          "evidence": "a relic is a great work; it is placed with move_great_work (shipped UI has no separate relic action)",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A09",
-      "action_family": "Religious spread and relics",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "spread_religion"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Religious spread and relics",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A10",
+      "title": "Production queue remove/reorder/move",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "remove, move up, move down",
+          "disposition": "implemented",
+          "kinds": [
+            "queue_remove",
+            "queue_move_up",
+            "queue_move_down"
+          ],
+          "evidence": "BUILD with InsertMode RemoveAt/Swap",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A10",
-      "action_family": "Production queue remove/reorder/move",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "queue_remove",
-        "queue_move_up",
-        "queue_move_down"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Production queue remove/reorder/move",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A11",
+      "title": "Policy deactivation and replacement",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "deactivate",
+          "disposition": "implemented",
+          "kinds": [
+            "deactivate_tradition"
+          ],
+          "evidence": "CHANGE_TRADITION into an empty slot",
+          "live": "passed"
+        },
+        {
+          "variant": "replace",
+          "disposition": "already_covered",
+          "kinds": [
+            "deactivate_tradition",
+            "activate_tradition"
+          ],
+          "evidence": "a replacement is a deactivation then an activation",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A11",
-      "action_family": "Policy deactivation and replacement",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "deactivate_tradition"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Policy deactivation and replacement",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A12",
+      "title": "Resource unassign/clear/swap",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "unassign, swap",
+          "disposition": "implemented",
+          "kinds": [
+            "unassign_resource",
+            "swap_resources"
+          ],
+          "evidence": "ASSIGN_RESOURCE with no city / two sends",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A12",
-      "action_family": "Resource unassign/clear/swap",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "unassign_resource",
-        "swap_resources"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Resource unassign/clear/swap",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A13",
+      "title": "Town return to growth mode",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "growth mode",
+          "disposition": "implemented",
+          "kinds": [
+            "town_growth_mode"
+          ],
+          "evidence": "CHANGE_GROWTH_MODE {Type: EXPAND, ProjectType: NO_PROJECT}",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A13",
-      "action_family": "Town return to growth mode",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 2,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "town_growth_mode"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Town return to growth mode",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A14",
+      "title": "Wake/cancel orders and unit swap",
+      "status": "partial",
+      "variants": [
+        {
+          "variant": "wake, cancel",
+          "disposition": "implemented",
+          "kinds": [
+            "wake_unit",
+            "cancel_order"
+          ],
+          "evidence": "UnitCommandTypes.WAKE / CANCEL",
+          "live": "not_seen"
+        },
+        {
+          "variant": "unit swap",
+          "disposition": "partial",
+          "kinds": [],
+          "evidence": "UNITOPERATION_SWAP_UNITS exists in the shipped click-to-move dispatcher (world-input.ts); not implemented, revisit as a plot-target operation",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A14",
-      "action_family": "Wake/cancel orders and unit swap",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "wake_unit",
-        "cancel_order"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Wake/cancel orders and unit swap",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A15",
+      "title": "Capital selection",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "select capital",
+          "disposition": "implemented",
+          "kinds": [
+            "select_capital"
+          ],
+          "evidence": "SELECT_CAPITAL {Player1, City, Swap} during the legacies decision",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A15",
-      "action_family": "Capital selection",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "select_capital"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Capital selection",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A16",
+      "title": "Syncretism choices",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "units, infrastructure, self",
+          "disposition": "implemented",
+          "kinds": [
+            "syncretism_units",
+            "syncretism_infrastructure",
+            "syncretism_self"
+          ],
+          "evidence": "CHOOSE_SYNCRETISM_* {CivilizationType}",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A16",
-      "action_family": "Syncretism choices",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "syncretism_units",
-        "syncretism_infrastructure",
-        "syncretism_self"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Syncretism choices",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A17",
+      "title": "Legacy deck revise and placement effects",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "put a card back, place a settlement",
+          "disposition": "implemented",
+          "kinds": [
+            "drop_legacy_card",
+            "place_legacy_settlement"
+          ],
+          "evidence": "ADVANCED_START_MODIFY_DECK REMOVE; ADVANCED_START_PLACE_SETTLEMENT {ID, X, Y}",
+          "live": "not_seen"
+        },
+        {
+          "variant": "rewards applied once, at the finish",
+          "disposition": "implemented",
+          "kinds": [
+            "finish_legacy_deck"
+          ],
+          "evidence": "ADVANCED_START_USE_EFFECT per effect at MARK_COMPLETED, as the shipped confirm does",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A17",
-      "action_family": "Legacy deck revise and placement effects",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "drop_legacy_card",
-        "place_legacy_settlement"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Legacy deck revise and placement effects",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A18",
+      "title": "Resettle/migrant and alternate founding",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "resettle a migrant",
+          "disposition": "implemented",
+          "kinds": [
+            "resettle"
+          ],
+          "evidence": "UnitCommandTypes.RESETTLE with the engine's Plots",
+          "live": "not_seen"
+        },
+        {
+          "variant": "alternate founding placement",
+          "disposition": "already_covered",
+          "kinds": [
+            "found_city",
+            "place_legacy_settlement"
+          ],
+          "evidence": "founding is where the settler stands; the legacies placement covers the age-start settlement",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A18",
-      "action_family": "Resettle/migrant and alternate founding",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "resettle"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Resettle/migrant and alternate founding",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A19",
+      "title": "Army reinforcement, focused attacks, overrun",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "reinforce, upgrade army, overrun, commander and focused attacks",
+          "disposition": "implemented",
+          "kinds": [
+            "reinforce_army",
+            "upgrade_army",
+            "army_overrun",
+            "commander_attack",
+            "focused_attack_land_melee",
+            "focused_attack_land_ranged",
+            "focused_attack_sea_melee",
+            "focused_attack_sea_ranged",
+            "focused_attack_air_to_air",
+            "focused_attack_air_to_land",
+            "focused_attack_air_bomb"
+          ],
+          "evidence": "table-driven operations/commands with the shipped interface modes' shapes",
+          "live": "not_seen"
+        },
+        {
+          "variant": "commander promotions",
+          "disposition": "already_covered",
+          "kinds": [
+            "promote_unit"
+          ],
+          "evidence": "the shipped panel reuses UNITCOMMAND_PROMOTE with commander disciplines",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A19",
-      "action_family": "Army reinforcement, focused attacks, overrun",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "reinforce_army",
-        "upgrade_army",
-        "army_overrun",
-        "commander_attack",
-        "focused_attack_land_melee",
-        "focused_attack_land_ranged",
-        "focused_attack_sea_melee",
-        "focused_attack_sea_ranged",
-        "focused_attack_air_to_air",
-        "focused_attack_air_to_land",
-        "focused_attack_air_bomb"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Army reinforcement, focused attacks, overrun",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A20",
+      "title": "Roads, rail, bases, rebase, cargo",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "road, rail move, rebase, teleport, base",
+          "disposition": "implemented",
+          "kinds": [
+            "connect_with_road",
+            "move_by_rail",
+            "rebase",
+            "teleport_to_city",
+            "establish_base"
+          ],
+          "evidence": "UNITCOMMAND_CONNECT_WITH_ROAD, MOVE_BY_RAIL; UNITOPERATION_REBASE, TELEPORT_TO_CITY, ESTABLISH_BASE",
+          "live": "not_seen"
+        },
+        {
+          "variant": "cargo delivery / treasure fleet",
+          "disposition": "already_covered",
+          "kinds": [
+            "disband_unit"
+          ],
+          "evidence": "the shipped UI unloads a treasure fleet with UNITCOMMAND_DISBAND (getDisbandBaseAmount is the payout)",
+          "live": "passed"
+        },
+        {
+          "variant": "build road operation, embark/disembark",
+          "disposition": "native_dormant",
+          "kinds": [],
+          "evidence": "UNITOPERATION_BUILD_ROUTE is commented out of unit-operations.xml; EMBARK/DISEMBARK are VisibleInUI=false with no handler",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A20",
-      "action_family": "Roads, rail, bases, rebase, cargo",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 3,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "connect_with_road",
-        "move_by_rail",
-        "rebase",
-        "teleport_to_city",
-        "establish_base"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Roads, rail, bases, rebase, cargo",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A21",
+      "title": "Civilization/unit-specific abilities",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "stone trap, treat sick, claim resource, lookout, search, aerial recon",
+          "disposition": "implemented",
+          "kinds": [
+            "stone_trap",
+            "treat_sick",
+            "claim_resource",
+            "embed_lookout",
+            "search",
+            "aerial_recon"
+          ],
+          "evidence": "gated natively via ChargedUnitAbilities/RequiresAbility; sent with UnitAbilityType -1 as the shipped loop does",
+          "live": "not_seen"
+        },
+        {
+          "variant": "passive abilities",
+          "disposition": "native_dormant",
+          "kinds": [],
+          "evidence": "most UnitAbilities rows are Inactive stat modifiers with no command or operation",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A21",
-      "action_family": "Civilization/unit-specific abilities",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "stone_trap",
-        "treat_sick",
-        "claim_resource",
-        "embed_lookout",
-        "search",
-        "aerial_recon"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Civilization/unit-specific abilities",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A22",
+      "title": "Tile actions: repair, remove, plant, disperse",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "repair, remove, plant, harvest, build, disperse, convert, scorch, disperse clan, call reinforcements",
+          "disposition": "implemented",
+          "kinds": [
+            "repair",
+            "remove_feature",
+            "remove_improvement",
+            "plant_forest",
+            "harvest_resource",
+            "build_improvement",
+            "disperse_independent",
+            "convert_independent_to_city_state",
+            "scorched_earth",
+            "disperse_clan",
+            "call_reinforcements"
+          ],
+          "evidence": "generic no-target/plot-target operation path; canStart decides which",
+          "live": "not_seen"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A22",
-      "action_family": "Tile actions: repair, remove, plant, disperse",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "repair",
-        "remove_feature",
-        "remove_improvement",
-        "plant_forest",
-        "harvest_resource",
-        "build_improvement",
-        "disperse_independent",
-        "convert_independent_to_city_state",
-        "scorched_earth",
-        "disperse_clan",
-        "call_reinforcements"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Tile actions: repair, remove, plant, disperse",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A23",
+      "title": "Artifacts and great-work relocation",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "excavate, research artifacts, move a great work",
+          "disposition": "implemented",
+          "kinds": [
+            "excavate",
+            "research_artifacts",
+            "move_great_work"
+          ],
+          "evidence": "UNITOPERATION_EXCAVATE / RESEARCH_ARTIFACTS; MOVE_GREAT_WORK with DestinationBuilding as the building type",
+          "live": "not_seen"
+        },
+        {
+          "variant": "display/claim artifact",
+          "disposition": "native_dormant",
+          "kinds": [],
+          "evidence": "no such operation in the shipped UI; placing an artifact is move_great_work",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A23",
-      "action_family": "Artifacts and great-work relocation",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "excavate",
-        "research_artifacts",
-        "move_great_work"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Artifacts and great-work relocation",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A24",
+      "title": "Air and specialized naval attacks",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "air attack, naval attack, cargo drop, air drop",
+          "disposition": "implemented",
+          "kinds": [
+            "air_attack",
+            "naval_attack",
+            "cargo_drop",
+            "unit_air_drop"
+          ],
+          "evidence": "dedicated interface modes with the plot-target shape",
+          "live": "not_seen"
+        },
+        {
+          "variant": "intercept, patrol, naval bombardment",
+          "disposition": "native_dormant",
+          "kinds": [],
+          "evidence": "no call site anywhere in the shipped modules (grep of every .js.map)",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A24",
-      "action_family": "Air and specialized naval attacks",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "air_attack",
-        "naval_attack",
-        "cargo_drop",
-        "unit_air_drop"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Air and specialized naval attacks",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A25",
+      "title": "WMD and contamination cleanup",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "nuclear strike",
+          "disposition": "implemented",
+          "kinds": [
+            "wmd_strike"
+          ],
+          "evidence": "UNITOPERATION_WMD_STRIKE with Type WMD_NUCLEAR_DEVICE hard-coded as the shipped mode does; confirmation added here",
+          "live": "not_seen"
+        },
+        {
+          "variant": "contamination cleanup",
+          "disposition": "native_dormant",
+          "kinds": [],
+          "evidence": "no player operation; fallout is a plot effect that decays",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A25",
-      "action_family": "WMD and contamination cleanup",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "wmd_strike"
-      ],
-      "consequence_class": "medium",
-      "procedure": "WMD and contamination cleanup",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A26",
+      "title": "City/district attacks and espionage units if player-facing",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "city or district attack",
+          "disposition": "already_covered",
+          "kinds": [
+            "attack"
+          ],
+          "evidence": "ranged or melee into the city's plot; no separate operation",
+          "live": "not_seen"
+        },
+        {
+          "variant": "espionage",
+          "disposition": "already_covered",
+          "kinds": [
+            "start_diplomatic_action"
+          ],
+          "evidence": "the four espionage projects are diplomatic actions the engine lists like any other",
+          "live": "passed"
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A26",
-      "action_family": "City/district attacks and espionage units if player-facing",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "start_diplomatic_action"
-      ],
-      "consequence_class": "medium",
-      "procedure": "City/district attacks and espionage units if player-facing",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A27",
+      "title": "Standing multi-turn movement and automate-explore",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "standing move to an own settlement",
+          "disposition": "implemented",
+          "kinds": [
+            "move_unit"
+          ],
+          "evidence": "MOVE_TO with a multi-turn path, accepted only toward the seat's own settlements",
+          "live": "passed"
+        },
+        {
+          "variant": "automate explore",
+          "disposition": "implemented",
+          "kinds": [
+            "automate_explore"
+          ],
+          "evidence": "UNITOPERATION_AUTOMATE_EXPLORE; cancelled with cancel_order",
+          "live": "passed"
+        },
+        {
+          "variant": "fog / frontier destinations",
+          "disposition": "excluded",
+          "kinds": [],
+          "evidence": "moves are offered to visible plots only, so no hidden terrain leaks through path previews; revisit with a knowledge contract that validates without revealing",
+          "live": null
+        }
+      ]
     },
     {
-      "case_id": "PLAN-A27",
-      "action_family": "Standing multi-turn movement and automate-explore",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 4,
-      "implementation_status": "offline_verified",
-      "live_status": "passed",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "automate_explore",
-        "move_unit"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Standing multi-turn movement and automate-explore",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
-    },
-    {
-      "case_id": "PLAN-A28",
-      "action_family": "Custom religion name and renaming",
-      "expected_kind": null,
-      "variant": "plan-item",
-      "priority": 5,
-      "implementation_status": "offline_verified",
-      "live_status": "not_seen",
-      "eligibility": {
-        "offered": []
-      },
-      "kinds": [
-        "rename_unit",
-        "rename_city",
-        "found_religion"
-      ],
-      "consequence_class": "medium",
-      "procedure": "Custom religion name and renaming",
-      "expected_evidence": "a confirmed receipt of each listed kind",
-      "evidence_refs": {}
+      "family": "A28",
+      "title": "Custom religion name and renaming",
+      "status": "implemented",
+      "variants": [
+        {
+          "variant": "religion name, unit and city renaming",
+          "disposition": "implemented",
+          "kinds": [
+            "found_religion",
+            "rename_unit",
+            "rename_city"
+          ],
+          "evidence": "ReligionCustomName on FOUND_RELIGION; NAME_UNIT / NAME_CITY {Name}, text validated host-side",
+          "live": "not_seen"
+        }
+      ]
     }
   ]
 }
