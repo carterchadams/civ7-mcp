@@ -22,12 +22,12 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 192,
+          "confirmed": 194,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "techResearching": 100
+          "techResearching": 102
         }
       }
     },
@@ -52,12 +52,12 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 173,
+          "confirmed": 174,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "civicResearching": 73
+          "civicResearching": 74
         }
       }
     },
@@ -142,7 +142,7 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 669,
+          "confirmed": 674,
           "rejected": 4,
           "unknown": 0
         },
@@ -170,12 +170,12 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3520,
-          "rejected": 14,
+          "confirmed": 3602,
+          "rejected": 15,
           "unknown": 0
         },
         "effects": {
-          "unitNoLongerReady": 3364
+          "unitNoLongerReady": 3445
         }
       }
     },
@@ -200,13 +200,13 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitLocation` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2106,
+          "confirmed": 2107,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
           "unitLocation": 2083,
-          "unitMoved": 21
+          "unitMoved": 22
         }
       }
     },
@@ -231,13 +231,13 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitMoved` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2106,
+          "confirmed": 2107,
           "rejected": 32,
           "unknown": 4
         },
         "effects": {
           "unitLocation": 2083,
-          "unitMoved": 21
+          "unitMoved": 22
         }
       }
     },
@@ -262,13 +262,13 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 170,
+          "confirmed": 174,
           "rejected": 2,
           "unknown": 1
         },
         "effects": {
           "cityProduction": 8,
-          "queued": 156
+          "queued": 160
         }
       }
     },
@@ -353,12 +353,12 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 323,
+          "confirmed": 325,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "populationPlaced": 323
+          "populationPlaced": 325
         }
       }
     },
@@ -383,12 +383,12 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 163,
+          "confirmed": 164,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "queued": 163
+          "queued": 164
         }
       }
     },
@@ -443,7 +443,7 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 73,
+          "confirmed": 74,
           "rejected": 0,
           "unknown": 2
         },
@@ -474,12 +474,12 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 73,
+          "confirmed": 75,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "storyResolved": 73
+          "storyResolved": 75
         }
       }
     },
@@ -564,12 +564,12 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 17,
+          "confirmed": 18,
           "rejected": 0,
           "unknown": 0
         },
         "effects": {
-          "attributeNodeState": 17
+          "attributeNodeState": 18
         }
       }
     },
@@ -774,12 +774,12 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 34,
+          "confirmed": 35,
           "rejected": 0,
           "unknown": 1
         },
         "effects": {
-          "townFocusKept": 16
+          "townFocusKept": 17
         }
       }
     },
@@ -789,7 +789,7 @@
       "expected_kind": "PURCHASE_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "0a9ebfa816d8",
+      "contract_fingerprint": "9572037b0a98",
       "passed_fingerprint": "0a9ebfa816d8",
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1670,7 +1670,7 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 558,
+          "confirmed": 599,
           "rejected": 1,
           "unknown": 1
         },
