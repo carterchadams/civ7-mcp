@@ -1050,9 +1050,9 @@ def test_town_project_offer_and_confirmation(tmp_path):
 
 
 def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
-    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_UNIT", "arg": 65536, "arg2": 777513683, "pre": 1, "cityId": 65536, "cityName": "Pārsa", "unitTypeKey": "UNIT_SPEARMAN", "displayName": "Spearman", "cost": 240, "goldBalance": 2792, "canStart": True}]}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_UNIT", "arg": 65536, "arg2": 777513683, "pre": 1, "unitTypeCount": 0, "cityId": 65536, "cityName": "Pārsa", "unitTypeKey": "UNIT_SPEARMAN", "displayName": "Spearman", "cost": 240, "goldBalance": 2792, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_UNIT", "arg": 65536, "unitType": 777513683, "unitsBefore": 1, "units": 1, "matches": False}}
-    rb = {**RB, "unitCount": 2, "goldBalance": 2552}
+    rb = {**RB, "unitCount": 2, "unitTypeCounts": {"777513683": 1, "99": 1}, "goldBalance": 2552}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
     with gs:
@@ -1061,7 +1061,21 @@ def test_purchase_offer_and_confirmation_on_the_roster_growing(tmp_path):
         assert pu["cost"] == 240 and pu["goldBalance"] == 2792 and pu["unitTypeKey"] == "UNIT_SPEARMAN" and "arg" not in pu
         res = reg.perform(gs, action_id=pu["actionId"], request_id="buy-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
-    assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "units": 2}}
+    assert res["confirmedBy"]["effect"] == {"unitPurchased": {"cityId": 65536, "unitType": 777513683, "ofType": 1, "identity": "unitType"}}
+
+
+def test_a_longer_roster_without_one_more_of_the_bought_type_does_not_prove_a_unit_purchase(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_UNIT", "arg": 65536, "arg2": 777513683, "pre": 1, "unitTypeCount": 0, "cityId": 65536, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_UNIT", "arg": 65536, "unitType": 777513683, "unitsBefore": 1, "units": 2, "ofType": 0, "matches": False}}
+    rb = {**RB, "unitCount": 2, "unitTypeCounts": {"99": 2}, "goldBalance": 2552}   # a unit finished from production, not the spearman
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pu = next(o for o in out["offers"] if o["kind"] == "purchase_unit")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=pu["actionId"], request_id="buy-x", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
 
 
 def test_a_unit_upgrade_confirms_on_the_type_changing(tmp_path):
@@ -1741,7 +1755,7 @@ def test_a_diplomatic_action_that_spends_no_influence_stays_unknown(tmp_path):
 def test_building_purchase_confirms_on_a_lighter_treasury(tmp_path):
     offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "cityId": 65536, "cityName": "Pārsa", "constructibleKey": "BUILDING_GRANARY", "constructibleClass": "BUILDING", "displayName": "Granary", "cost": 144, "goldBalance": 2792, "affordable": True, "plotIndex": 403, "placement": "urban", "x": 3, "y": 4, "canStart": True}]}
     performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2792, "matches": False}}
-    rb = {**RB, "goldBalance": 2648}
+    rb = {**RB, "goldBalance": 2648, "cityConstructibles": {"65536": [373747371, 501]}}
     reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
     gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
     with gs:
@@ -1751,7 +1765,34 @@ def test_building_purchase_confirms_on_a_lighter_treasury(tmp_path):
         assert "arg" not in pc and "arg2" not in pc and "arg3" not in pc
         res = reg.perform(gs, action_id=pc["actionId"], request_id="bb-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
-    assert res["confirmedBy"]["effect"] == {"constructiblePurchased": {"cityId": 65536, "constructibleType": 501, "plotIndex": 403, "goldSpent": 144}}
+    assert res["confirmedBy"]["effect"] == {"constructiblePurchased": {"cityId": 65536, "constructibleType": 501, "plotIndex": 403, "goldSpent": 144, "identity": "constructible"}}
+
+
+def test_a_lighter_treasury_without_the_building_in_the_settlement_does_not_prove_a_purchase(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2648, "placed": False, "matches": False}}
+    rb = {**RB, "goldBalance": 2648, "cityConstructibles": {"65536": [373747371]}}   # gold moved, granary absent
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pc = next(o for o in out["offers"] if o["kind"] == "purchase_constructible")
+        with pytest.raises(service.ObserverError) as info:
+            reg.perform(gs, action_id=pc["actionId"], request_id="bb-3", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
+
+
+def test_without_a_constructible_list_the_treasury_stands_alone_and_the_receipt_says_so(tmp_path):
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [{"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "arg2": 501, "arg3": 403, "pre": 2792, "canStart": True}]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "PURCHASE_CONSTRUCTIBLE", "arg": 65536, "constructibleType": 501, "plotIndex": 403, "goldBefore": 2792, "gold": 2648, "placed": None, "matches": False}}
+    rb = {**RB, "goldBalance": 2648}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        pc = next(o for o in out["offers"] if o["kind"] == "purchase_constructible")
+        res = reg.perform(gs, action_id=pc["actionId"], request_id="bb-4", player=1, mode="singleplayer")
+    assert res["confirmedBy"]["effect"]["constructiblePurchased"]["identity"] == "treasuryOnly"
     sent = json.loads(f.all_sockets[1].sent[3])["params"]["expression"]
     assert "const ARG2 = 501;" in sent and "const ARG3 = 403;" in sent
 

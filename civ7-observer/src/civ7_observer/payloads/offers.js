@@ -138,6 +138,11 @@
       const orderArgs = { X: -9999, Y: -9999, UnitAbilityType: -1 };
       for (const u of player.Units.getUnits()) {
         if (!u || !u.id || !isInt(u.id.id) || u.id.owner !== BOUND_PLAYER_ID) continue;
+        // Only a unit awaiting orders needs one. The engine accepts an order for a unit already under
+        // one, so six sentried units were re-ordered three times in a turn while the two units the
+        // turn was actually waiting on sat past the option cap (live, turn 109). A unit under an
+        // order is changed through wake_unit or cancel_order, then ordered again.
+        if (u.isReadyToMove !== true) continue;
         const unitId = u.id;
         const moves = u.Movement && isInt(u.Movement.movementMovesRemaining) ? u.Movement.movementMovesRemaining : -1;
         const damage = u.Health && isInt(u.Health.damage) ? u.Health.damage : null;
@@ -1194,12 +1199,14 @@
         // Purchasing spends the treasury instead of production and delivers the unit at once. The
         // native check returns the gold cost in its own result, which is what the shipped chooser shows.
         if (typeof CityCommandTypes !== "undefined" && isInt(CityCommandTypes.PURCHASE)) {
+          // how many of each type the seat has now: the proof of a purchase is one more of the type bought
+          const typeCounts = {}; try { for (const u of player.Units.getUnits()) { if (u && isInt(u.type)) typeCounts[u.type] = (typeCounts[u.type] || 0) + 1; } } catch (e) { /* counts stay empty */ }
           for (const row of GameInfo.Units) {
             if (!row || !isInt(row.$hash) || typeof row.UnitType !== "string") continue;
             const buyArgs = { UnitType: row.$hash };
             const check = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false);
             if (!check || check.Success !== true) continue;
-            offers.push({ kind: "PURCHASE_UNIT", arg: c.id.id, arg2: row.$hash, pre: unitCount, cityId: c.id.id, cityName: compose(c.name),
+            offers.push({ kind: "PURCHASE_UNIT", arg: c.id.id, arg2: row.$hash, pre: unitCount, unitTypeCount: typeCounts[row.$hash] || 0, cityId: c.id.id, cityName: compose(c.name),
               unitTypeKey: row.UnitType, displayName: typeof row.Name === "string" ? compose(row.Name) : null,
               cost: isInt(check.Cost) ? check.Cost : null, goldBalance: goldBalance, canStart: true });
           }

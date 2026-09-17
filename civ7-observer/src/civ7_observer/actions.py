@@ -740,6 +740,7 @@ class ActionRegistry:
                     if k in o:
                         entry[k] = o[k]
             if kind == "PURCHASE_UNIT":
+                rec["unitTypeCount"] = o.get("unitTypeCount") if isinstance(o.get("unitTypeCount"), int) else 0
                 if not isinstance(o.get("arg2"), int):
                     raise ObserverError("API_CONTRACT_MISMATCH", "purchase offer without a unit type")
                 rec["arg2"] = o["arg2"]
@@ -1188,20 +1189,31 @@ class ActionRegistry:
                     if isinstance(q, list) and len(q) > offer["pre"] and q[offer["pre"]] == offer["arg2"]:
                         effect = {"projectQueued": {"cityId": offer["arg"], "projectType": offer["arg2"], "position": offer["pre"]}}
                 elif kind == "PURCHASE_CONSTRUCTIBLE":
-                    # Only a mutation moves the treasury within a turn, so a lighter balance is the
-                    # specific effect; the building itself lands on the plot the offer named.
+                    # A lighter treasury says something was bought; the building standing in the settlement
+                    # says it was this. Both are required when the settlement's list is readable; when the
+                    # engine gives no list the treasury stands alone, and the receipt says so.
                     gold = rb.get("goldBalance")
-                    if isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]:
+                    built = rb.get("cityConstructibles")
+                    have = built.get(str(offer["arg"])) if isinstance(built, dict) else None
+                    paid = isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]
+                    if paid and (have is None or offer["arg2"] in have):
                         effect = {"constructiblePurchased": {"cityId": offer["arg"], "constructibleType": offer["arg2"],
-                                                            "plotIndex": offer["arg3"], "goldSpent": offer["pre"] - gold}}
+                                                            "plotIndex": offer["arg3"], "goldSpent": offer["pre"] - gold,
+                                                            "identity": "constructible" if have is not None else "treasuryOnly"}}
                 elif kind == "UPGRADE_TOWN":
                     flags = rb.get("townFlags")
                     if isinstance(flags, dict) and flags.get(str(offer["arg"])) is False:
                         effect = {"townUpgraded": {"cityId": offer["arg"]}}
                 elif kind == "PURCHASE_UNIT":
+                    # one more unit of the type bought, not merely a longer roster
+                    counts = rb.get("unitTypeCounts")
+                    now = counts.get(str(offer["arg2"])) if isinstance(counts, dict) else None
+                    before = offer.get("unitTypeCount")
                     count = rb.get("unitCount")
-                    if isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:
-                        effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "units": count}}
+                    if isinstance(now, int) and not isinstance(now, bool) and isinstance(before, int) and now > before:
+                        effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "ofType": now, "identity": "unitType"}}
+                    elif counts is None and isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:
+                        effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "units": count, "identity": "rosterOnly"}}
                 elif kind == "CONSIDER_TOWN_PROJECT":
                     # this town's own notification gone, not every town's (live: six pending at once)
                     pending = rb.get("townFocusPending")

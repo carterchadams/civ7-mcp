@@ -1246,7 +1246,7 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   const g = withPurchase(withUnits(world({ log }), [])); g._log = log;
   const r = runPerformArgs(g, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
   assert.equal(r.refused, null);
-  assert.deepEqual(r.readback, { kind: "PURCHASE_UNIT", arg: 65536, unitType: 99, unitsBefore: 0, units: 1, matches: true });
+  assert.deepEqual(r.readback, { kind: "PURCHASE_UNIT", arg: 65536, unitType: 99, unitsBefore: 0, units: 1, ofType: 1, matches: true }, "one more unit of the bought type is the proof");
   assert.ok(log.find((e) => e.startsWith("qsendRequest(") && e.includes('"UnitType":99')));
   for (const [label, mk, cid, ut, pre] of [
     ["unknown city", () => withPurchase(withUnits(world({ log: [] }), [])), 7, 99, 0],
@@ -2481,6 +2481,13 @@ function withGoldPurchases(g, { gold = 900, upgradeOk = true, isTown = true, upg
       me.Treasury = { goldBalance: gold - spend };
     },
   };
+  // the settlement's own constructible list: what a purchase must show up in
+  const built = [];
+  const gcity = g.Players.get(1).Cities.getCities()[0];
+  gcity.Constructibles = { ...(gcity.Constructibles || {}), getIds: () => built.map((t, i) => ({ owner: 1, id: 7000 + i, type: 2 })) };
+  g.Constructibles = { get: (cid) => ({ type: built[cid.id - 7000] }) };
+  const prevSend = g.Game.CityCommands.sendRequest;
+  g.Game.CityCommands.sendRequest = (cid, cmd, args) => { prevSend(cid, cmd, args); if (args && args.ConstructibleType !== undefined) built.push(args.ConstructibleType); };
   return g;
 }
 
@@ -2509,7 +2516,7 @@ test("perform PURCHASE_CONSTRUCTIBLE re-checks gold and canStart with the plot, 
   const r = runPerformArgs(g, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "PURCHASE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plotIndex: 403, goldBefore: 900, gold: 756, matches: true });
+  assert.deepEqual(r.readback, { kind: "PURCHASE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plotIndex: 403, goldBefore: 900, gold: 756, placed: true, matches: true }, "the building standing in the settlement, not the treasury alone");
   assert.ok(log.find((e) => e.startsWith("psendRequest(") && e.includes('"ConstructibleType":501') && e.includes('"X":3') && e.includes('"Y":4')));
   assert.ok(!log.some((e) => e.startsWith("bsendRequest")), "buying must never touch the build queue");
 });
@@ -3249,6 +3256,9 @@ test("standing orders are offered only where the engine accepts them, and carry 
   const log = [];
   const g = withOrders(world({ log })); g._log = log;
   const orders = runOffers(g).offers.filter((o) => o.kind === "UNIT_ORDER");
+  const sentried = withUnits(world({ log: [] }), [unit(5, { location: { x: 10, y: 10 }, isReadyToMove: false, activityType: -793848223 })]); sentried._log = [];
+  sentried.GameInfo.UnitOperations = g.GameInfo.UnitOperations; sentried.Game.UnitOperations = g.Game.UnitOperations; sentried.UnitOperationTypes = g.UnitOperationTypes;
+  assert.equal(runOffers(sentried).offers.filter((o) => o.kind === "UNIT_ORDER").length, 0, "a unit already under an order is not offered another");
   assert.deepEqual(orders.map((o) => [o.arg, o.arg2, o.pre, o.orderKey, o.displayName, o.description, o.damage, o.maxDamage, o.canStart]),
     [[5, -41338758, 2, "UNITOPERATION_SLEEP", "LOC_SLEEP", "LOC_SLEEP_D", 84, 100, true],
      [5, 1576905647, 2, "UNITOPERATION_REST_UNTIL_HEALED", "LOC_HEAL", "LOC_HEAL_D", 84, 100, true]]);

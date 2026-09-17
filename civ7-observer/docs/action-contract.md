@@ -467,3 +467,21 @@ offered as a `reassignment`, which never answers the blocker.
 and was disbanded as "boxed in". A standing order (sleep, fortify, alert) also reads as a pending
 operation, so the turn-66 guard withheld its moves. The guard now applies only to a unit whose current
 activity is the move itself (`UnitActivityTypes.OPERATION`).
+
+**Lesson (turn 109, live, revision 21fbacb+):** six units already under sentry or hold orders were
+re-ordered three times in one turn while the two units the turn was actually waiting on sat past the
+option cap, and the seat gave up. The engine accepts a standing order for a unit that already has one,
+so `unit_order` is now offered only to units that are ready to move; a unit under an order is changed
+through `wake_unit` or `cancel_order` first.
+
+**Purchase proofs (work package B3).** A lighter treasury says something was bought; it does not say
+what. `purchase_constructible` now also requires the building to stand in the settlement's own
+constructible list (`cityConstructibles`), and `purchase_unit` one more unit of the bought type
+(`unitTypeCounts`), with the receipt naming which identity confirmed it. When the engine offers no
+constructible list the treasury stands alone and the receipt says `treasuryOnly`.
+
+**Bounded tools continue (work package C).** `get_unit_options`, `get_city_options` and
+`list_actions(kind=...)` page over the catalog captured on the first call (40 per page, every option
+once); a `cursor` is bound to seat, match, turn, age, attachment generation, entity and kind filter and
+returns `REFRESH_REQUIRED` when any of them changed. Counts describe the captured catalog, which is what
+the game's own legality check offered the seat; nothing is claimed about native completeness beyond it.

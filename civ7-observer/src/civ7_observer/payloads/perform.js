@@ -869,7 +869,9 @@
     Game.CityCommands.sendRequest(bCityId, CityCommandTypes.PURCHASE, cbuyArgs);
     result.outcome = "sent";
     let goldAfter = null; try { const g = player.Treasury.goldBalance; goldAfter = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldAfter = null; }
-    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plotIndex: ARG3, goldBefore: PRE, gold: goldAfter, matches: isInt(goldAfter) && goldAfter < PRE };
+    // the building standing in the settlement is the identity proof; the treasury alone is not
+    let placed = null; try { if (bcity.Constructibles && typeof bcity.Constructibles.getIds === "function") { placed = false; for (const cid of bcity.Constructibles.getIds()) { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); if (inst && inst.type === ARG2) placed = true; } } } catch (e) { placed = null; }
+    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plotIndex: ARG3, goldBefore: PRE, gold: goldAfter, placed: placed, matches: isInt(goldAfter) && goldAfter < PRE && placed === true };
     return JSON.stringify(result);
   }
   if (KIND === "UPGRADE_TOWN") {
@@ -908,8 +910,9 @@
     if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the purchase");
     Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs);
     result.outcome = "sent";
-    let after = null; try { after = player.Units.getUnits().length; } catch (e) { after = null; }
-    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, matches: isInt(after) && after > PRE };
+    let after = null, ofType = null; try { const all = player.Units.getUnits(); after = all.length; ofType = all.filter((u) => u && u.type === ARG2).length; } catch (e) { after = null; ofType = null; }
+    // the roster growing is not proof of this purchase; one more unit of the bought type is
+    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, ofType: ofType, matches: isInt(after) && after > PRE && isInt(ofType) && ofType > 0 };
     return JSON.stringify(result);
   }
   if (KIND === "PRODUCE_PROJECT") {

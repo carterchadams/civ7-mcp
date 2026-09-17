@@ -317,3 +317,79 @@ def test_list_actions_is_a_capped_survey_that_says_what_it_left_out():
     assert out["context"] == {"turn": 1}
     small = compact_listing({"offers": offers[:2]})
     assert "omittedByKind" not in small and small["offers"] == offers[:2]
+
+
+def _city_offers(n, city=65536):
+    return [{"kind": "PRODUCE_CONSTRUCTIBLE", "arg": city, "arg2": 500 + i, "arg3": 400 + (i % 7), "pre": 0, "cityId": city, "cityName": "Tokyo",
+             "constructibleKey": f"BUILDING_{i % 9}", "plotIndex": 400 + (i % 7), "x": i % 7, "y": 4, "placement": "urban", "canStart": True} for i in range(n)]
+
+
+def test_city_options_page_through_a_captured_set_exactly_once(tmp_path):
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    payload = json.dumps(offers_with(_city_offers(93), end_can_start=False, blocking="PRODUCTION"))
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)] + [reply(1, ctx), reply(1, ctx)] * 4}, journal=tmp_path / "j.jsonl")
+    first = tool(s, "get_city_options").fn(city_id=65536)
+    assert first["count"] == 93 and first["shown"] == 40 and first["omitted"] == 53 and first["page"] == 0 and first["cursor"]
+    assert len(json.dumps(first)) < 60_000
+    seen = [o["actionId"] for o in first["options"]]
+    cursor, pages = first["cursor"], 1
+    while cursor:
+        page = tool(s, "get_city_options").fn(city_id=65536, cursor=cursor)
+        assert "error" not in page, page
+        seen += [o["actionId"] for o in page["options"]]
+        assert page["count"] == 93 and page["page"] == pages and page["attachment"] is None, "a continuation re-enumerates nothing"
+        cursor, pages = page["cursor"], pages + 1
+    assert pages == 3 and len(seen) == 93 and len(set(seen)) == 93, "every captured option exactly once"
+    # the first page shows every distinct building before any repeats
+    assert len({o["constructibleKey"] for o in first["options"][:9]}) == 9
+
+
+def test_cursors_fail_safely_when_stale_foreign_or_malformed(tmp_path):
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    later = json.dumps({**GAME, "turn": GAME["turn"] + 1})
+    payload = json.dumps(offers_with(_city_offers(45), end_can_start=False, blocking="PRODUCTION"))
+    # every call after the first sees the next turn: the captured page is stale for all of them
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx)] + [reply(1, later), reply(1, later)] * 6}, journal=tmp_path / "j.jsonl")
+    first = tool(s, "get_city_options").fn(city_id=65536)
+    cursor = first["cursor"]
+    # the turn moved on: the captured options are no longer this game's
+    stale = tool(s, "get_city_options").fn(city_id=65536, cursor=cursor)
+    assert stale["error"]["code"] == "REFRESH_REQUIRED" and stale["error"]["captured"]["turn"] == GAME["turn"]
+    # the same cursor asked for another settlement or another kind is refused
+    assert tool(s, "get_city_options").fn(city_id=131073, cursor=cursor)["error"]["code"] == "REFRESH_REQUIRED"
+    assert tool(s, "get_city_options").fn(city_id=65536, kind="produce_unit", cursor=cursor)["error"]["code"] == "REFRESH_REQUIRED"
+    assert tool(s, "get_city_options").fn(city_id=65536, cursor="nonsense")["error"]["code"] == "INVALID_ARGUMENT"
+    assert tool(s, "get_city_options").fn(city_id=65536, cursor="abcdefghijklmnop.40")["error"]["code"] == "REFRESH_REQUIRED", "a cursor never issued here"
+    assert tool(s, "get_city_options").fn(city_id=65536, kind="no_such_kind")["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_list_actions_with_a_kind_lists_every_option_of_that_kind_seat_wide_in_pages(tmp_path):
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    diplo = [{"kind": "START_DIPLOMATIC_ACTION", "arg": 2, "arg2": 1000 + i, "arg3": 0, "pre": 300, "expect": "influence", "typeKey": f"DIPLOMACY_ACTION_{i}", "targetPlayerId": 2, "targetName": "Rome", "targetIsMajor": True, "cost": 20, "canStart": True} for i in range(43)]
+    payload = json.dumps(offers_with(diplo + _city_offers(3), end_can_start=False, blocking="PRODUCTION"))
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx), reply(1, ctx), reply(1, ctx)]}, journal=tmp_path / "j.jsonl")
+    first = tool(s, "list_actions").fn(kind="start_diplomatic_action")
+    assert first["kind"] == "start_diplomatic_action" and first["count"] == 43 and first["shown"] == 40 and first["cursor"]
+    assert all(o["kind"] == "start_diplomatic_action" for o in first["options"])
+    rest = tool(s, "list_actions").fn(kind="start_diplomatic_action", cursor=first["cursor"])
+    assert rest["shown"] == 3 and rest["cursor"] is None
+    assert len({o["actionId"] for o in first["options"] + rest["options"]}) == 43
+    assert tool(s, "list_actions").fn(kind="bogus")["error"]["code"] == "INVALID_ARGUMENT"
+
+
+def test_page_store_is_bounded_in_time_count_and_bytes():
+    from civ7_observer.server import PAGE_STORE_MAX, PageStore, _page
+    clock = [0.0]
+    store = PageStore(ttl=100, capacity=3, clock=lambda: clock[0])
+    tokens = [store.put({"n": i}, [{"actionId": str(i)}]) for i in range(5)]
+    assert all(tokens) and len(store.pages) == 3, "the oldest pages make room"
+    clock[0] = 101
+    assert store.get(tokens[-1]) is None, "pages expire"
+    assert store.put({"n": 9}, [{"blob": "x" * (600 * 1024)}]) is None, "an oversized set is not retained"
+    scope = {"seat": 1, "turn": 1}
+    out = _page(PageStore(), scope, [{"actionId": str(i)} for i in range(5)], None, size=2)
+    assert [o["actionId"] for o in out["options"]] == ["0", "1"] and out["cursor"].endswith(".2")
+    assert PAGE_STORE_MAX >= 8
