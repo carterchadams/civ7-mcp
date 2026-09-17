@@ -5,7 +5,10 @@ starts a model, opens a game session or touches live state: it inspects the comm
 run and the instructions that would be sent.
 """
 import importlib.util
+import json
+import os
 import sys
+import time
 from pathlib import Path
 
 import pytest
@@ -99,3 +102,77 @@ def test_the_driver_injects_testing_opportunities_and_grades_them_by_receipts(dr
     assert "ledger.opportunities(seat, offered, limit=opportunities)" in source and '"--test-opportunities"' in source
     assert "testing=TestLedger.note(cases)" in source
     assert "ledger.record_receipts(seat, rows, turn=turn)" in source, "passes come from receipts, not from the report"
+
+
+# ---- recovery and controller acceptance (work package E): the driver's own guarantees, with stubs
+
+def test_only_one_controller_owns_the_seats_and_a_dead_holder_is_taken_over(driver, tmp_path):
+    lock = tmp_path / "driver.lock"
+    first = driver.acquire_controller(lock, pid=os.getpid(), seats=[0, 1])
+    assert first["pid"] == os.getpid() and json.loads(lock.read_text())["seats"] == [0, 1]
+    # a second driver while the first is alive is refused, naming the holder
+    with pytest.raises(RuntimeError) as info:
+        driver.acquire_controller(lock, pid=os.getpid() + 100000, seats=[0, 1])
+    assert str(os.getpid()) in str(info.value)
+    # the holder's own re-acquire is fine (a restart in the same process); a dead holder is stale
+    driver.acquire_controller(lock, pid=os.getpid(), seats=[0])
+    lock.write_text(json.dumps({"pid": 2**22 + 12345, "startedAt": "x", "seats": []}))
+    assert driver.acquire_controller(lock, pid=os.getpid(), seats=[3])["seats"] == [3]
+    # an unreadable lock is never cleared silently
+    lock.write_text("{not json")
+    with pytest.raises(RuntimeError):
+        driver.acquire_controller(lock, pid=os.getpid())
+    lock.write_text(json.dumps({"pid": os.getpid()}))
+    driver.release_controller(lock, pid=os.getpid())
+    assert not lock.exists()
+    driver.release_controller(lock, pid=os.getpid())   # releasing twice is harmless
+
+
+def test_a_stop_file_is_honoured_once_at_a_boundary(driver, tmp_path):
+    stop = tmp_path / "driver.stop"
+    assert driver.stop_requested(stop) is False
+    stop.write_text("")
+    assert driver.stop_requested(stop) is True and not stop.exists()
+    assert driver.stop_requested(stop) is False
+
+
+def test_outcomes_are_named_and_an_unknown_receipt_outranks_everything(driver):
+    c = driver.classify_outcome
+    assert c(exit_code=0, timed_out=False, ended=True, unknown=[], result_msg={"subtype": "success"}) == ("turn_ended", None)
+    assert c(exit_code=0, timed_out=False, ended=True, unknown=["r-1"], result_msg=None)[0] == "unknown_outcome"
+    assert c(exit_code=-1, timed_out=True, ended=False, unknown=[], result_msg=None)[0] == "timeout"
+    assert c(exit_code=1, timed_out=False, ended=False, unknown=[], result_msg={"subtype": "error_max_budget_usd"})[0] == "budget_exhausted"
+    assert c(exit_code=1, timed_out=False, ended=False, unknown=[], result_msg={"subtype": "error_max_turns"})[0] == "turn_cap"
+    assert c(exit_code=3, timed_out=False, ended=False, unknown=[], result_msg=None) == ("error", "the client exited with 3")
+    assert c(exit_code=0, timed_out=False, ended=False, unknown=[], result_msg={"subtype": "success"})[0] == "not_ended"
+
+
+def _stub(tmp_path, body: str) -> Path:
+    p = tmp_path / "stub-claude"
+    p.write_text("#!/bin/sh\n" + body)
+    p.chmod(0o755)
+    return p
+
+
+def test_the_child_runner_reports_exit_codes_and_kills_a_hung_client(driver, tmp_path):
+    ok = _stub(tmp_path, 'echo \'{"type":"result","subtype":"success","result":"done"}\'\nexit 0\n')
+    code, err, timed_out = driver.run_child([str(ok)], transcript=tmp_path / "t1.jsonl", timeout=5, env=dict(os.environ), cwd=tmp_path)
+    assert (code, timed_out) == (0, False) and json.loads((tmp_path / "t1.jsonl").read_text())["result"] == "done"
+    bad = _stub(tmp_path, 'echo "boom" 1>&2\nexit 7\n')
+    code, err, timed_out = driver.run_child([str(bad)], transcript=tmp_path / "t2.jsonl", timeout=5, env=dict(os.environ), cwd=tmp_path)
+    assert (code, timed_out) == (7, False) and "boom" in err
+    hung = _stub(tmp_path, 'echo \'{"type":"assistant"}\'\nsleep 30\n')
+    t0 = time.monotonic()
+    code, err, timed_out = driver.run_child([str(hung)], transcript=tmp_path / "t3.jsonl", timeout=1, env=dict(os.environ), cwd=tmp_path)
+    assert (code, timed_out) == (-1, True) and "timeout after 1" in err and time.monotonic() - t0 < 10
+    # what the client managed to write before it was killed stays on disk for the record
+    assert '"assistant"' in (tmp_path / "t3.jsonl").read_text()
+
+
+def test_the_main_loop_stops_cleanly_when_the_game_is_gone_or_a_stop_is_requested(driver, tmp_path, monkeypatch):
+    monkeypatch.setattr(driver, "context", lambda: (_ for _ in ()).throw(RuntimeError("nothing answering at 9444")))
+    monkeypatch.setattr(driver, "RUNS", tmp_path)
+    args = type("A", (), {"rounds": 1, "mode": "local-hotseat", "model": "sonnet", "budget_usd": 1.0, "timeout": 5.0, "raise_curtain": False, "effort": None, "directives": None, "test_opportunities": 2})()
+    assert driver._run(args, [0, 1], tmp_path / "log.jsonl", tmp_path / "driver.stop") == 2, "a game that went away is a named stop, not a traceback"
+    (tmp_path / "driver.stop").write_text("")
+    assert driver._run(args, [0, 1], tmp_path / "log.jsonl", tmp_path / "driver.stop") == 0 and not (tmp_path / "driver.stop").exists()

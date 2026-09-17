@@ -38,6 +38,9 @@ PLAN_FILE = "PLAN.md"
 FRICTION_FILE = "FRICTION.md"
 SKILLS_DIR = "skills"
 README_FILE = "README.md"
+# The plan is injected into every prompt wholesale, so it is bounded: the head is kept and the seat is
+# told how much it overran. A plan that grew without limit would crowd out the brief it steers.
+PLAN_MAX_BYTES = 16_000
 
 EMPTY_PLAN = "(no plan yet: write PLAN.md in your session directory and it will be here next turn)"
 FRICTION_KINDS = ("missing_action", "missing_information", "unclear_option", "blocked")
@@ -96,7 +99,13 @@ class SeatSession:
         if not self.plan_path.exists():
             return EMPTY_PLAN
         text = self.plan_path.read_text(encoding="utf-8").strip()
-        return text or EMPTY_PLAN
+        if not text:
+            return EMPTY_PLAN
+        raw = text.encode("utf-8")
+        if len(raw) > PLAN_MAX_BYTES:
+            head = raw[:PLAN_MAX_BYTES].decode("utf-8", errors="ignore")
+            return head + f"\n\n[PLAN.md is {len(raw) - PLAN_MAX_BYTES} bytes over the {PLAN_MAX_BYTES}-byte cap; only its head is shown. Trim it: keep the commitments you are pursuing, what each needs next, and what would make you drop them.]"
+        return text
 
     def friction_entries(self) -> list[dict[str, str]]:
         """Every entry in FRICTION.md, in order, as {kind, goal, needed, note}."""

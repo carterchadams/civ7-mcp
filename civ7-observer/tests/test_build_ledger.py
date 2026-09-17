@@ -59,6 +59,7 @@ def test_build_seeds_variants_from_effects_keeps_prior_pass_fingerprints_and_fla
     assert by["LT-send_merchant"]["passed_fingerprint"] == "stale00" and by["LT-send_merchant"]["priority"] == 1, "prior evidence and metadata are kept"
     assert by["LT-attack"]["live_status"] == "not_seen" and by["LT-attack"]["consequence_class"] == "high"
     assert by["LT-wmd_strike"]["consequence_class"] == "high" and by["LT-purchase_unit"]["consequence_class"] == "medium"
+    assert by["LT-start_diplomatic_action-war"]["consequence_class"] == "high" and by["LT-start_diplomatic_action"]["consequence_class"] == "medium", "a variant carries its own consequence"
     fams = {f["family"]: f for f in data["families"]}
     assert fams["A02"]["status"] == "partial" and fams["A28"]["status"] == "implemented"
     assert {v["disposition"] for v in fams["A20"]["variants"]} == {"implemented", "already_covered", "native_dormant"}

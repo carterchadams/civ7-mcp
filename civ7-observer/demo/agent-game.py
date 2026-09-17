@@ -118,6 +118,95 @@ def clean_env() -> dict[str, str]:
     return {k: v for k, v in os.environ.items() if not (k == "CLAUDECODE" or k.startswith("CLAUDE_CODE_") or k == "CLAUDE_PID")}
 
 
+# ---- controller ownership and stops. One driver at a time owns the seats it plays: two drivers would
+# each pass per-action checks and still race over whose turn it is. The lock is the driver's own, held
+# for its whole run, and separate from the short-lived game-action lock the registry takes per write.
+CONTROLLER_LOCK = "driver.lock"
+STOP_FILE = "driver.stop"
+
+
+def _pid_alive(pid: int) -> bool:
+    try:
+        os.kill(pid, 0)
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+    return True
+
+
+def acquire_controller(path: Path, *, pid: int | None = None, seats: list[int] | None = None) -> dict:
+    """Take the controller lock or raise RuntimeError naming the live holder. A lock whose holder is
+    dead is stale and is taken over; a lock that cannot be read is treated as held (never cleared)."""
+    pid = os.getpid() if pid is None else pid
+    if path.exists():
+        try:
+            held = json.loads(path.read_text(encoding="utf-8"))
+        except ValueError:
+            raise RuntimeError(f"controller lock {path} is unreadable; inspect it before starting another driver")
+        holder = held.get("pid")
+        if isinstance(holder, int) and holder != pid and _pid_alive(holder):
+            raise RuntimeError(f"another driver (pid {holder}, started {held.get('startedAt')}) owns the seats; stop it at a boundary first")
+    rec = {"pid": pid, "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "seats": list(seats or [])}
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(rec), encoding="utf-8")
+    return rec
+
+
+def release_controller(path: Path, *, pid: int | None = None) -> None:
+    pid = os.getpid() if pid is None else pid
+    try:
+        if json.loads(path.read_text(encoding="utf-8")).get("pid") == pid:
+            path.unlink()
+    except (FileNotFoundError, ValueError):
+        pass
+
+
+def stop_requested(path: Path) -> bool:
+    """An operator asks for a stop at the next seat boundary by creating the stop file; it is consumed."""
+    if path.exists():
+        path.unlink()
+        return True
+    return False
+
+
+def run_child(cmd: list[str], *, transcript: Path, timeout: float, env: dict[str, str], cwd: Path) -> tuple[int, str, bool]:
+    """Run one seat's client process. Returns (exit code, stderr tail, timed out). A timeout kills the
+    child; -1 is its exit code here."""
+    with open(transcript, "w", encoding="utf-8") as out:
+        try:
+            proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=env, timeout=timeout, cwd=cwd)
+            return proc.returncode, proc.stderr[-2000:], False
+        except subprocess.TimeoutExpired as exc:
+            return -1, f"timeout after {timeout}s: {str(exc.stderr or '')[-1000:]}", True
+
+
+def classify_outcome(*, exit_code: int, timed_out: bool, ended: bool, unknown: list, result_msg: dict | None) -> tuple[str, str | None]:
+    """The named outcome of a seat turn and why it stopped. An unknown receipt outranks everything:
+    the barrier must be reconciled before any seat acts again."""
+    subtype = (result_msg or {}).get("subtype")
+    if unknown:
+        return "unknown_outcome", "an action's outcome is unknown; reconcile before continuing"
+    if ended:
+        return "turn_ended", None
+    if timed_out:
+        return "timeout", "the client did not finish within the wall-clock cap"
+    if isinstance(subtype, str) and "budget" in subtype:
+        return "budget_exhausted", f"the client stopped at the spend cap ({subtype})"
+    if isinstance(subtype, str) and "max_turns" in subtype:
+        return "turn_cap", f"the client stopped at its turn cap ({subtype})"
+    if exit_code != 0:
+        return "error", f"the client exited with {exit_code}"
+    return "not_ended", "the client returned without ending the turn"
+
+
+def _revision() -> str | None:
+    try:
+        return subprocess.run(["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"], capture_output=True, text=True, timeout=5).stdout.strip() or None
+    except (OSError, subprocess.SubprocessError):
+        return None
+
+
 def journal_rows(seat: int) -> list[dict]:
     path = default_journal(seat)
     if not path.exists():
@@ -188,12 +277,7 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
            *(("--effort", effort) if effort else ()),
            "--output-format", "stream-json", "--verbose"]
     t0 = time.monotonic()
-    with open(transcript, "w", encoding="utf-8") as out:
-        try:
-            proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=clean_env(), timeout=timeout, cwd=session.dir)
-            exit_code, stderr = proc.returncode, proc.stderr[-2000:]
-        except subprocess.TimeoutExpired as exc:
-            exit_code, stderr = -1, f"timeout after {timeout}s: {str(exc.stderr or '')[-1000:]}"
+    exit_code, stderr, timed_out = run_child(cmd, transcript=transcript, timeout=timeout, env=clean_env(), cwd=session.dir)
     elapsed = round(time.monotonic() - t0, 1)
 
     result_msg, tool_calls, init = None, [], None
@@ -225,10 +309,11 @@ def play_seat(seat: int, *, mode: str, model: str, budget: float, timeout: float
     counts: dict[str, int] = {}
     for name in tool_calls:
         counts[name] = counts.get(name, 0) + 1
-    status = "turn_ended" if ended else ("error" if exit_code != 0 else "not_ended")
-    if unknown:
-        status = "unknown_outcome"
-    return {**summary, "status": status, "exitCode": exit_code, "elapsedS": elapsed, "toolCalls": counts,
+    status, stop_reason = classify_outcome(exit_code=exit_code, timed_out=timed_out, ended=ended, unknown=unknown, result_msg=result_msg)
+    # the settings this turn ran under, so a later comparison never has to guess them (work package F)
+    run = {"model": model, "effort": effort, "budgetUsd": budget, "timeoutS": timeout, "raiseCurtain": raise_curtain, "opportunities": opportunities,
+           "promptBytes": len(system.encode("utf-8")), "revision": _revision()}
+    return {**summary, "status": status, "stopReason": stop_reason, "run": run, "exitCode": exit_code, "elapsedS": elapsed, "toolCalls": counts,
             "receipts": receipts, "friction": friction, "unknown": unknown, "report": report,
             "costUsd": (result_msg or {}).get("total_cost_usd"), "numTurns": (result_msg or {}).get("num_turns"),
             "isError": (result_msg or {}).get("is_error"), "stderr": stderr if exit_code != 0 else "",
@@ -268,12 +353,34 @@ def main() -> int:
     RUNS.mkdir(parents=True, exist_ok=True)
     log = RUNS / "log.jsonl"
     seats = list(args.seats)
+    lock_path, stop_path = state_dir() / CONTROLLER_LOCK, state_dir() / STOP_FILE
+    try:
+        acquire_controller(lock_path, seats=seats)
+    except RuntimeError as exc:
+        print(str(exc), flush=True)
+        return 3
+    try:
+        return _run(args, seats, log, stop_path)
+    finally:
+        release_controller(lock_path)
+
+
+def _run(args, seats: list[int], log: Path, stop_path: Path) -> int:
     # Follow whoever the game has seated rather than a fixed rotation: a civilization can be
     # eliminated mid-game (live: the Russian Empire on turn 69) and the game then skips its seat.
     planned = args.rounds * len(seats)
     played: dict[int, int] = {}
     for _ in range(planned):
-        live = context()["localPlayerId"]
+        # a seat boundary: the only place a stop is honoured, and the only place a game that has gone
+        # away is reported as such rather than as a crash
+        if stop_requested(stop_path):
+            print("stop requested; stopping at the seat boundary", flush=True)
+            return 0
+        try:
+            live = context()["localPlayerId"]
+        except Exception as exc:  # noqa: BLE001 - the game closed or the debugger went away
+            print(json.dumps({"status": "game_unavailable", "error": str(exc)[:400]}), flush=True)
+            return 2
         if live not in seats:
             print(f"the live seat is {live}, which is not in {seats}; stopping", flush=True)
             return 1

@@ -56,7 +56,7 @@ VARIANTS = {
                   ("standing", "unitMoved", "take a `multiTurn` move toward one of the seat's own settlements (confirmed as queued or under way, not arrival)")],
     "start_diplomatic_action": [("default", "diplomaticActionStarted", "start an influence-priced diplomatic project"),
                                 ("free", "diplomaticProjectStarted", "start a free diplomatic project (its own event is the proof)"),
-                                ("war", "warDeclared", "declare war through a diplomatic action (only in a war the seat would fight anyway)"),
+                                ("war", "warDeclared", "declare war through a diplomatic action (only in a war the seat would fight anyway)", "high"),
                                 ("alliance", "allianceFormed", "form an alliance through a diplomatic action")],
 }
 
@@ -196,7 +196,8 @@ def build(journals: Path | None) -> dict:
         seen = evidence.get(internal, {})
         fp = fingerprint(internal)
         variants = VARIANTS.get(public, [("default", None, None)])
-        for name, effect, procedure in variants:
+        for name, effect, procedure, *rest in variants:
+            klass = rest[0] if rest else consequence(public)
             cid = f"LT-{public}" if name == "default" else f"LT-{public}-{name}"
             old = prior.get(cid, {})
             confirmed = seen.get("confirmed", 0) if not effect else (seen.get("effects") or {}).get(effect, 0)
@@ -210,7 +211,7 @@ def build(journals: Path | None) -> dict:
                 "expected_effect": effect, "contract_fingerprint": fp, "passed_fingerprint": passed_fp if live == "passed" else None,
                 "priority": old.get("priority", 3), "implementation_status": old.get("implementation_status", "offline_verified"),
                 "live_status": live, "eligibility": {"offered": [public]},
-                "consequence_class": consequence(public),
+                "consequence_class": klass,
                 "procedure": procedure or old.get("procedure", f"take a `{public}` offer when it is strategically sensible"),
                 "expected_evidence": f"a confirmed `{internal}` receipt" + (f" whose effect is `{effect}`" if effect else "") + " in the seat journal",
                 "evidence_refs": {"journal": {k: v for k, v in seen.items() if k != "effects"}, "effects": seen.get("effects", {})} if seen else old.get("evidence_refs", {}),

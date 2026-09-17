@@ -78,3 +78,15 @@ def test_operator_directives_live_above_every_seat_and_are_none_when_absent_or_e
     s = SeatSession(root=tmp_path, seat=1); s.prepare()
     assert not (s.dir / "DIRECTIVES.md").exists()
     assert not str((tmp_path / "DIRECTIVES.md").resolve()).startswith(str(s.dir))
+
+
+def test_the_plan_injection_is_bounded_and_says_how_far_it_overran(tmp_path):
+    from civ7_observer.session import PLAN_MAX_BYTES, SeatSession
+    s = SeatSession(root=tmp_path / "sessions", seat=2)
+    s.prepare()
+    s.plan_path.write_text("# plan\n" + ("commitment line\n" * 2000), encoding="utf-8")
+    text = s.plan_text()
+    assert len(text.encode("utf-8")) < PLAN_MAX_BYTES + 400
+    assert text.startswith("# plan") and "over the 16000-byte cap" in text and "Trim it" in text
+    s.plan_path.write_text("# plan\nshort\n", encoding="utf-8")
+    assert s.plan_text() == "# plan\nshort"
