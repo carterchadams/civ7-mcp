@@ -239,7 +239,7 @@ OPTION_FIELDS = ("actionId", "kind", "typeKey", "displayName", "tree", "cost", "
                  "secondary", "callToArms", "allyPlayerId", "allyName", "dealItems",
                  "movesLeft", "charges", "currentProject", "currentProjectKey", "position", "toPosition", "itemKey", "otherResourceKey", "otherCityName", "otherCityId",
                  "fullName", "historical", "selected", "invalidReason", "selectedCivilization",
-                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "reassignment", "currentName", "needsText", "acceptsText", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
+                 "cardId", "pointsAvailable", "needsPlacement", "effectCount", "deck", "terms", "dealShape", "possibleTerms", "eventsBefore", "reassignment", "currentName", "needsText", "acceptsText", "multiTurn", "fromCityId", "slotsFree", "pendingPlacements", "effectId", "remaining", "swap", "currentCapitalName", "civKey", "choice", "unlocks", "constructibleKey",
                  "greeting", "otherPlayer", "influenceCost", "influenceBalance", "note", "activeRoutes",
                  "orderKey", "damage", "maxDamage", "discipline", "disciplineName", "commendation", "promotionsEarned", "promotionPoints", "commendationPoints", "unitLevel", "resourceKey", "resourceClass", "assignedCityId", "originCityName", "cityIsTown", "cityCap", "cityAssigned", "toAssign", "assignable", "attribute", "attributeName", "availablePoints", "wildcardPoints")
 

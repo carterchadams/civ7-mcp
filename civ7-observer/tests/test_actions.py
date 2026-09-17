@@ -1735,7 +1735,32 @@ def test_diplomatic_action_confirms_on_influence_spent_and_names_its_target(tmp_
         assert "arg" not in d and "arg2" not in d
         res = reg.perform(gs, action_id=d["actionId"], request_id="dip-1", player=1, mode="singleplayer")
     assert res["status"] == "confirmed"
-    assert res["confirmedBy"]["effect"] == {"diplomaticActionStarted": {"targetPlayerId": 0, "actionType": 9001, "influenceSpent": 33}}
+    assert res["confirmedBy"]["effect"] == {"diplomaticActionStarted": {"targetPlayerId": 0, "actionType": 9001, "influenceSpent": 33, "identity": "influence"}}
+
+
+def test_a_free_diplomatic_project_confirms_on_its_own_event_and_not_on_influence(tmp_path):
+    free = {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "arg2": 9005, "pre": 500, "expect": "event", "eventsBefore": 0, "typeKey": "DIPLOMACY_ACTION_SOMETHING_FREE", "targetPlayerId": 0, "targetName": "Abbasid", "targetIsMajor": True, "cost": 0, "canStart": True}
+    offers = {**OFFERS, "offers": OFFERS["offers"] + [free]}
+    performed = {"payloadVersion": 1, "refused": None, "context": CTX, "outcome": "sent", "readback": {"kind": "START_DIPLOMATIC_ACTION", "arg": 0, "actionType": 9005, "secondary": None, "influenceBefore": 500, "influence": 500, "wasAtWar": False, "atWar": False, "wasAllied": False, "allied": False, "events": 0, "matches": False}}
+    rb_started = {**RB, "influenceBalance": 500, "diplomaticRelations": {"0": {"atWar": False, "allied": False, "pendingDeal": False}}, "diplomaticEvents": {"9005:0": 1}}
+    reg = actions.ActionRegistry(journal_path=tmp_path / "journal.jsonl")
+    gs, f = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed)), reply(5, json.dumps(rb_started))]})
+    with gs:
+        out = reg.list_offers(gs, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "start_diplomatic_action")
+        assert d["expect"] == "event" and d["eventsBefore"] == 0
+        res = reg.perform(gs, action_id=d["actionId"], request_id="free-1", player=1, mode="singleplayer")
+    assert res["confirmedBy"]["effect"] == {"diplomaticProjectStarted": {"targetPlayerId": 0, "actionType": 9005, "identity": "event"}}
+    # influence moving for some other reason does not prove a free project
+    rb_spent = {**RB, "influenceBalance": 480, "diplomaticRelations": {"0": {"atWar": False, "allied": False, "pendingDeal": False}}, "diplomaticEvents": {}}
+    reg2 = actions.ActionRegistry(journal_path=tmp_path / "j2.jsonl")
+    gs2, _ = open_session({"a": [ctx_reply(1), ctx_reply(1), reply(2, json.dumps(offers)), ctx_reply(3), reply(4, json.dumps(performed))] + [reply(5 + i, json.dumps(rb_spent)) for i in range(actions.READBACK_ATTEMPTS)]})
+    with gs2:
+        out = reg2.list_offers(gs2, player=1, mode="singleplayer")
+        d = next(o for o in out["offers"] if o["kind"] == "start_diplomatic_action")
+        with pytest.raises(service.ObserverError) as info:
+            reg2.perform(gs2, action_id=d["actionId"], request_id="free-2", player=1, mode="singleplayer")
+    assert info.value.code == "ACTION_OUTCOME_UNKNOWN"
 
 
 def test_a_diplomatic_action_that_spends_no_influence_stays_unknown(tmp_path):

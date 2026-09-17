@@ -5,6 +5,7 @@
   const result = { payloadVersion: 1, refused: null, context: null, offers: null };
   const refuse = (code, message) => { result.refused = { code: code, message: message }; return JSON.stringify(result); };
   const isInt = (v) => typeof v === "number" && Number.isInteger(v);
+  const enumName = (table, v) => { try { for (const k of Object.keys(table)) if (table[k] === v) return k; } catch (e) { /* no name */ } return String(v); };
   const MOVE_RADIUS_CAP = 4;     // how far out to look for this turn's destinations
   const MOVE_OFFER_CAP = 18;     // per unit, so one fast unit cannot fill the listing
   const isBool = (v) => typeof v === "boolean";
@@ -1033,10 +1034,12 @@
             // moving; the free ones are confirmed by the relationship itself changing. An action that
             // is free and changes no relationship has no signal at all, so it is withheld.
             const name = typeof d.actionTypeName === "string" ? d.actionTypeName : "";
+            // A free project proves itself by its own event appearing among the seat's actions against
+            // that player (the shipped panel's read-back), so it is offered too, with that expectation.
+            let eventsBefore = 0; try { for (const ev of Game.Diplomacy.getPlayerEvents(other.id)) { if (ev && ev.initialPlayer === BOUND_PLAYER_ID && ev.actionType === d.actionType) eventsBefore++; } } catch (e) { eventsBefore = 0; }
             const expect = (name === "DIPLOMACY_ACTION_DECLARE_WAR" || name === "DIPLOMACY_ACTION_DECLARE_FORMAL_WAR") ? "war"
                          : (name === "DIPLOMACY_ACTION_FORM_ALLIANCE") ? "alliance"
-                         : (t1.costYieldD > 0) ? "influence" : null;
-            if (expect === null) continue;
+                         : (t1.costYieldD > 0) ? "influence" : "event";
             // The engine's own listing supplies the operation; the seat only ever names the pair.
             const diploArgs = { Amount: 1, Player1: BOUND_PLAYER_ID, Type: d.actionType };
             if (other.major) diploArgs.Player2 = other.id; else diploArgs.ID = other.id;
@@ -1058,7 +1061,7 @@
                 if (!c2 || c2.Success !== true) continue;
                 const cost2 = typeof t2.costYieldD === "number" ? Math.floor(t2.costYieldD) : cost;
                 const plot = isInt(t2.targetPlot) && t2.targetPlot >= 0 ? GameplayMap.getLocationFromIndex(t2.targetPlot) : null;
-                offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, arg3: t2.targetID, pre: influence, expect: expect,
+                offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, arg3: t2.targetID, pre: influence, expect: expect, eventsBefore: eventsBefore,
                   destructive: expect === "war" || undefined, requiresConfirmation: expect === "war" || undefined,
                   typeKey: typeof d.actionTypeName === "string" ? d.actionTypeName : null,
                   displayName: typeof d.actionDisplayName === "string" ? compose(d.actionDisplayName) : null,
@@ -1071,7 +1074,7 @@
               }
               continue;
             }
-            offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence, expect: expect,
+            offers.push({ kind: "START_DIPLOMATIC_ACTION", arg: other.id, arg2: d.actionType, pre: influence, expect: expect, eventsBefore: eventsBefore,
               // War is not undone. The shipped map puts a confirmation in front of it too.
               destructive: expect === "war" || undefined, requiresConfirmation: expect === "war" || undefined,
               typeKey: typeof d.actionTypeName === "string" ? d.actionTypeName : null,
@@ -1142,19 +1145,47 @@
         if (atWar !== true) continue;
         let pending = null; try { pending = Game.DiplomacyDeals.hasPendingDeal(BOUND_PLAYER_ID, other.id) === true; } catch (e) { pending = null; }
         if (pending === true) {
-          // Something is on the table already: the incoming deal can be answered.
-          const incoming = { direction: DiplomacyDealDirection.INCOMING, player1: other.id, player2: BOUND_PLAYER_ID };
-          let items = null; try { const d = Game.DiplomacyDeals.getWorkingDeal(incoming); items = d && Array.isArray(d.itemIds) ? d.itemIds.length : null; } catch (e) { items = null; }
-          if (isInt(items) && items > 0) {
-            for (const kind of ["ACCEPT_PEACE", "REJECT_PEACE"]) {
-              offers.push({ kind: kind, arg: other.id, pre: 1, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major, dealItems: items, canStart: true });
+          // Something is on the table. The shipped manager reads a proposal aimed at this seat through
+          // the OUTGOING working deal (the engine switches an incoming deal over for the answer); the
+          // INCOMING shape is read too, and whichever holds items is the one answered. The deal's own
+          // items say who proposed: a MAKE_PEACE agreement from the other side is theirs to answer.
+          const shapes = [{ direction: DiplomacyDealDirection.INCOMING, player1: other.id, player2: BOUND_PLAYER_ID },
+                          { direction: DiplomacyDealDirection.OUTGOING, player1: BOUND_PLAYER_ID, player2: other.id }];
+          let held = null, shapeIndex = -1, terms = [];
+          for (let k = 0; k < shapes.length && held === null; k++) {
+            let d = null; try { d = Game.DiplomacyDeals.getWorkingDeal(shapes[k]); } catch (e) { d = null; }
+            if (!d || !Array.isArray(d.itemIds) || d.itemIds.length === 0) continue;
+            held = d; shapeIndex = k;
+            for (const itemId of d.itemIds) {
+              let it = null; try { it = Game.DiplomacyDeals.getWorkingDealItem(shapes[k], itemId); } catch (e) { it = null; }
+              if (!it) continue;
+              terms.push({ type: enumName(DiplomacyDealItemTypes, it.type), subType: isInt(it.subType) ? it.subType : null, amount: isInt(it.amount) ? it.amount : null,
+                from: isInt(it.from) ? it.from : null, to: isInt(it.to) ? it.to : null, cityId: it.cityId && isInt(it.cityId.id) ? it.cityId.id : (isInt(it.cityId) ? it.cityId : null),
+                cityTransfer: typeof DiplomacyDealItemCityTransferTypes !== "undefined" && isInt(it.cityTransferType) ? enumName(DiplomacyDealItemCityTransferTypes, it.cityTransferType) : null,
+                agreement: typeof DiplomacyDealItemAgreementTypes !== "undefined" && isInt(it.agreementType) ? enumName(DiplomacyDealItemAgreementTypes, it.agreementType) : null });
             }
+          }
+          if (held === null) continue;
+          const peaceTerm = terms.find((t) => t.agreement === "MAKE_PEACE") || null;
+          const theirs = peaceTerm ? peaceTerm.from === other.id : terms.some((t) => t.from === other.id);
+          if (!theirs) continue;   // the seat's own proposal awaits their answer; nothing to do here
+          for (const kind of ["ACCEPT_PEACE", "REJECT_PEACE"]) {
+            offers.push({ kind: kind, arg: other.id, arg2: shapeIndex, pre: 1, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major,
+              dealItems: terms.length, terms: terms, dealShape: shapeIndex === 0 ? "incoming" : "outgoing", canStart: true });
           }
           continue;
         }
         let can = null; try { const r = player.Diplomacy.canMakePeaceWith(other.id); can = r && typeof r === "object" ? r.Success === true : r === true; } catch (e) { can = null; }
         if (can !== true) continue;
-        offers.push({ kind: "PROPOSE_PEACE", arg: other.id, pre: 0, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major, canStart: true });
+        // What the engine would let this seat put on the table besides the agreement itself, counted
+        // by type; only the plain peace is sent (the terms are read for inspection, not offered).
+        const outgoingId = { direction: DiplomacyDealDirection.OUTGOING, player1: BOUND_PLAYER_ID, player2: other.id };
+        const possible = {};
+        if (typeof DiplomacyDealItemTypes !== "undefined") for (const tname of ["CITIES", "GOLD", "INFLUENCE"]) {
+          if (!isInt(DiplomacyDealItemTypes[tname])) continue;
+          try { const v = Game.DiplomacyDeals.getPossibleWorkingDealItems(outgoingId, BOUND_PLAYER_ID, DiplomacyDealItemTypes[tname]); possible[tname.toLowerCase()] = Array.isArray(v) ? v.length : null; } catch (e) { possible[tname.toLowerCase()] = null; }
+        }
+        offers.push({ kind: "PROPOSE_PEACE", arg: other.id, pre: 0, targetPlayerId: other.id, targetName: other.name, targetIsMajor: other.major, possibleTerms: possible, canStart: true });
       }
     }
     // Ending an alliance has no project row of its own: the shipped diplomacy panel sends the cancel
