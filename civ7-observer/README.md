@@ -115,13 +115,17 @@ loading another save. `omittedFeatures` lists what is deliberately not exported.
 .venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
 ```
 
-`--player` and `--mode` are required and fixed for the server's lifetime. The server
-exposes exactly two tools, both annotated read-only and taking no arguments:
+`--player` and `--mode` are required and fixed for the server's lifetime. Without
+`--allow-actions` the server exposes exactly two tools, both annotated read-only:
 
 | tool | returns |
 |---|---|
-| `get_observation` | the same validated Observation `snapshot` writes, or `{"error": {"code", "message"}}` |
+| `get_observation(include_map=false)` | the same validated Observation `snapshot` writes (the visible-tile list only when asked), or `{"error": {"code", "message"}}` |
 | `get_status` | connectivity/readiness for the bound seat (never another seat's state) |
+
+With `--allow-actions` the seat's action catalog is added: `get_turn_brief`, `list_actions`,
+`get_unit_options`, `get_city_options`, `perform_action` and `get_action_result`, described in
+`STATUS.md` and `docs/agent-runner.md`. Clients only ever see opaque action ids.
 
 Logs go to stderr; stdout is the MCP transport. Each call opens a fresh, verified
 session to the in-game realm and closes it, so a seat swap, reload, or shutdown between

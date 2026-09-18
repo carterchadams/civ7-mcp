@@ -144,6 +144,10 @@ does not name blocking types; the `EndTurnBlockingTypes` key does.
 
 ## Lesson: `canStart(MOVE_TO)` does not validate the destination
 
+*Superseded in part: a move that leaves the unit in place with a newly queued operation is now
+confirmed as accepted and queued (turn 66 lesson); an unmoved unit with no pending operation is still
+unknown, as here.*
+
 Live (game 2, turn 13): `canStart` returned `Success: true` for an adjacent mountain plot;
 `sendRequest` was accepted; the engine silently did nothing (unit unmoved, full movement, no
 pending operation). The registry journaled the outcome `unknown`, blocked further actions,
@@ -432,7 +436,8 @@ path had said one turn): the queued operation it did not have when offered (`uni
 proof the order was accepted, reported as `queued: true`.
 
 A unit already carrying a queued operation is not offered fresh moves at all (its cancel stays):
-a third order on the same settler left no signal to confirm by.
+a third order on the same settler left no signal to confirm by. *Narrowed on turn 99 (below): only a
+unit whose current activity is the move itself is withheld; a unit under a standing order is not.*
 
 
 **Priority 5 and 6 research, what the shipped UI does not have.** There is no display/claim artifact

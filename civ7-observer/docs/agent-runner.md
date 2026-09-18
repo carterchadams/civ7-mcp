@@ -31,9 +31,15 @@ The brief is cached within a turn and invalidated by every performed action, so 
 | tool | effect |
 |---|---|
 | `get_turn_brief` | the required decision, bounded options, explicit pause |
-| `list_actions` | the full offer listing, when the bounded options are not enough |
-| `get_unit_options` | one unit's own legal actions, by the unitId a brief shows; far smaller than the full listing |
-| `perform_action` | one offered action id plus a caller-chosen `request_id` (idempotent) |
+| `list_actions` | without arguments a survey capped per kind and per settlement or unit; with `kind` every option of that kind seat-wide, in pages (`cursor`) |
+| `get_unit_options(unit_id, kind?, cursor?)` | one unit's own legal actions, paged over the catalog captured on the first call |
+| `get_city_options(city_id, kind?, cursor?)` | one settlement's own legal actions, paged the same way |
+| `perform_action(action_id, request_id, confirm?, text?)` | one offered action id plus a caller-chosen `request_id` (idempotent); `confirm=true` for destructive offers; `text` for the naming kinds |
+| `get_action_result(request_id)` | the recorded outcome of an earlier action |
+| `get_observation(include_map?)` | the validated observation; the visible-tile list only when asked |
+
+A cursor is bound to the seat, match, turn, age, attachment generation, entity and kind filter and
+returns `REFRESH_REQUIRED` once any of those changed; every option is still re-checked at perform.
 
 The model can only ever name an action id the host offered it this turn. An invented id is refused
 by shape before any session is opened, and an id from another match or generation is refused by the
@@ -58,30 +64,26 @@ decision kind in the brief, with the required decision first.
 
 ## Per-seat workspace
 
-`<workspace>/seat<N>/` holds `plan.json` and `PLAN.md` (the agent's own commitments, at most three
-open), `friction.jsonl`, and `transcript.jsonl`. Default root is the host state directory. Plan
-edits are applied atomically under a revision, so a stale edit is refused rather than silently
-overwriting. A plan written for a different match or attachment generation is marked
-`needs_review` rather than carried over.
+`<state>/sessions/seat<N>/` is the seat's session directory (see below): `PLAN.md`, `FRICTION.md`,
+`README.md` and a copy of the skill cards. The plan is injected into every prompt, bounded at
+16 000 bytes with the overrun stated.
 
 ## Friction is the backlog
 
-When the model lacks an action or a fact, it calls `report_friction` instead of guessing. Each
-entry records the kind (`missing_action`, `missing_information`, `unclear_option`, `blocked`), what
-it was trying to do, what specifically would have let it decide, and the seat, match, turn and the
-decision the game was blocking on. `python -m civ7_observer friction --player N` prints that
-backlog; it is the input to the next round of action implementation.
+When the model lacks an action or a fact, it appends an entry to `FRICTION.md` (the format is in
+the directory's README) instead of guessing: the kind (`missing_action`, `missing_information`,
+`unclear_option`, `blocked`), what it was trying to do, and what specifically would have let it
+decide. `python -m civ7_observer friction --player N` prints that backlog; the driver prints new
+entries after each turn; `docs/friction-triage.md` records the host's answer to each one.
 
 ## Playing through the MCP server instead of the direct API
 
 `demo/agent-game.py` plays a whole hotseat game with no API key: for each seat turn it launches an
-isolated `claude -p` session (`--tools ""`, `--strict-mcp-config`) whose only tools belong to one
-MCP server bound to that seat with `--allow-actions`. The server exposes the same six tools the
-in-process runner hands its model, under the same names (`get_turn_brief`, `list_actions`,
-`perform_action`, `load_skill`, `update_plan`, `report_friction`), plus `get_plan`,
-`get_action_result` and `get_observation`. The session's system prompt is assembled by the same
-function (`runner.assemble_system_prompt`) from a read-only brief the driver takes first, so the
-routed cards and the seat's plan are identical to the direct-API path.
+isolated `claude -p` session whose only MCP tools belong to one server bound to that seat with
+`--allow-actions` (the eight game tools above; nothing about plans, skills or friction is a tool),
+plus the client's file tools confined to the seat's session directory. The session's system prompt
+is assembled by the same function (`runner.assemble_system_prompt`) from a read-only brief the
+driver takes first, so the routed cards and the seat's plan are identical to the direct-API path.
 
 The driver never acts on the game. After each seat it reads the seat's journal (did an `END_TURN`
 confirm on this turn?), the seat's friction backlog and the seat context, prints one line per seat
@@ -90,8 +92,18 @@ look. Runs go to `runs/agent-game/` (`log.jsonl`, and per seat turn the system p
 stream-json transcript and the closing report).
 
 ```
-python demo/agent-game.py --seats 0 1 2 3 --rounds 5 --model sonnet [--raise-curtain]
+python demo/agent-game.py --seats 0 1 2 3 --rounds 5 --model sonnet [--raise-curtain] [--effort low|medium|high|default]
+                          [--budget-usd 2.0] [--timeout 1200] [--test-opportunities 2] [--directives PATH]
 ```
+
+One driver at a time owns the seats: it holds `<state>/driver.lock` for its whole run (a second
+driver is refused naming the holder; a dead holder is taken over; an unreadable lock is never
+cleared). To stop it cleanly, create `<state>/driver.stop`; it is honoured at the next seat boundary
+and consumed. Every turn's `log.jsonl` row names its outcome (`turn_ended`, `unknown_outcome`,
+`timeout`, `budget_exhausted`, `turn_cap`, `error`, `not_ended`) with a `stopReason`, and records the
+settings it ran under in `run` (model, effort, budget, timeout, curtain mode, opportunities, prompt
+bytes, revision). A game that has gone away at a boundary is a `game_unavailable` stop with exit
+code 2. The evidence for these guarantees is in `docs/recovery-and-curtain-acceptance.md`.
 
 Before every seat turn the driver tidies the hotseat UI (`curtain.tidy`, a UI-only payload that
 sends no engine operation): the stock curtain component mounts one instance per turn activation and
@@ -131,15 +143,22 @@ available and checking every turn until then. `--directives PATH` points the dri
 ## The live-test ledger
 
 `docs/action-live-test-todo.json` is the repository's list of live-test cases: one per implemented
-action kind, plus one placeholder per item of the remaining-actions plan. `tools/build_test_ledger.py`
-regenerates it (keeping recorded evidence), along with the human checklist
-`docs/action-live-test-checklist.md` and the coverage table `docs/action-coverage.md`, and seeds live
-status from the seat journals on this host. Implementation status and live status are kept apart: an
-action is live-verified only by a confirmed receipt in a real game.
+action kind, variant cases where one receipt shape is not enough (a queued move is not an arrival;
+a war is not an influence project), and the plan's families as variants with a disposition
+(implemented, partial, already covered, native dormant, excluded) and the evidence behind it.
+`tools/build_test_ledger.py` regenerates it (keeping recorded evidence), along with the checklist
+`docs/action-live-test-checklist.md` and the coverage report `docs/action-coverage.md`, and seeds live
+status from the seat journals on this host. Each kind case carries a fingerprint of the source lines
+naming it: a pass earned under an older implementation reads `retest` and is offered again.
+Implementation status and live status are kept apart: an action is live-verified only by a confirmed
+receipt, under the current contract, in a real game.
 
-Each seat turn, the driver picks at most two open cases whose kinds that seat is being offered right
-now and puts a short "testing opportunities" note in its prompt. After the turn it correlates the
-seat's receipts with the cases: a confirmed receipt of the case's kind passes it and it leaves the
-prompts; an unknown marks it inconclusive. Results live per match and per seat under
-`<state>/testing/<match>/`, with a sanitized `status.json` of counts only. The agent's own
-`TESTED:` line in its summary is a courtesy for the reader, not the evidence.
+Each seat turn, the driver picks a bounded number of open cases (two by default,
+`--test-opportunities` raises it) whose kinds that seat is being offered right now and puts a short
+"testing opportunities" note in its prompt; a high-consequence case (a war, a razing, a strike, a
+disbanding) is never suggested. After the turn it correlates the seat's receipts with the cases: a
+confirmed receipt whose effect matches the case's variant passes it; an unknown leaves it
+`inconclusive`, a rejection `rejected`; each request counts once, and failures are kept even after a
+later pass. Results live per match and per seat under `<state>/testing/<match>/`, with a
+`status.json` of statuses and counts only. The agent's own `TESTED:` line is a courtesy for the
+reader, not the evidence.
