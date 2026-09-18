@@ -20,7 +20,7 @@ from mcp.server.fastmcp import FastMCP
 from mcp.types import ToolAnnotations
 
 from civ7_observer import __version__, cdp, schema
-from civ7_observer.actions import ACTION_ID, PUBLIC_KIND, REQUEST_ID, ActionRegistry
+from civ7_observer.actions import ACTION_ID, PUBLIC_KIND, REQUEST_ID, ActionRegistry, _bind_ok
 from civ7_observer.attachment import state_dir
 from civ7_observer.brief import build_brief
 from civ7_observer.service import ObserverError, open_game_session
@@ -70,7 +70,8 @@ def _bounded(options: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], int]:
 # more of the game than the first call did, and every handle is still revalidated at perform time.
 PAGE_TTL_S = 15 * 60
 PAGE_STORE_MAX = 64
-PAGE_BYTES_MAX = 512 * 1024
+PAGE_BYTES_MAX = 8 * 1024 * 1024        # a captured catalog larger than this is refused with a typed error, never truncated
+PAGE_RESPONSE_BYTES = 48 * 1024          # one page's encoded options; rows are added until the next would exceed it
 CURSOR_ERROR = "REFRESH_REQUIRED"
 
 
@@ -87,12 +88,12 @@ class PageStore:
             oldest = min(self.pages, key=lambda t: self.pages[t]["created"])
             del self.pages[oldest]
 
-    def put(self, scope: dict[str, Any], options: list[dict[str, Any]]) -> str | None:
+    def put(self, scope: dict[str, Any], options: list[dict[str, Any]], *, attachment: Any = None) -> str | None:
         self._sweep()
         if len(json.dumps(options)) > PAGE_BYTES_MAX:
             return None
         token = secrets.token_urlsafe(12)
-        self.pages[token] = {"scope": scope, "options": options, "created": self.clock() + 1e-9}
+        self.pages[token] = {"scope": scope, "options": options, "attachment": attachment, "created": self.clock() + 1e-9}
         self._sweep()   # the newest page is kept; the oldest make room
         return token
 
@@ -101,16 +102,41 @@ class PageStore:
         return self.pages.get(token)
 
 
+def _take_page(ordered: list[dict[str, Any]], offset: int, size: int, byte_cap: int) -> list[dict[str, Any]] | None:
+    """Rows from `offset` while both the row cap and the encoded byte cap hold. None when even the
+    first row would not fit: that row cannot be served through this tool at all."""
+    page: list[dict[str, Any]] = []
+    used = 2   # the brackets
+    for o in ordered[offset: offset + size]:
+        encoded = len(json.dumps(o)) + 1
+        if page and used + encoded > byte_cap:
+            break
+        if not page and encoded > byte_cap:
+            return None
+        page.append(o)
+        used += encoded
+    return page
+
+
 def _page(store: PageStore, scope: dict[str, Any], options: list[dict[str, Any]] | None, cursor: str | None,
-          *, size: int = MAX_ENTITY_OPTIONS) -> dict[str, Any]:
+          *, size: int = MAX_ENTITY_OPTIONS, byte_cap: int = PAGE_RESPONSE_BYTES, attachment: Any = None) -> dict[str, Any]:
     """First call: capture and order `options`, return page 0 and a cursor. Continuation: the stored
-    page at the cursor's offset, only while the scope it was captured under still holds."""
+    rows from the cursor's offset, only while the scope it was captured under still holds. A page
+    holds at most `size` rows and `byte_cap` encoded bytes; a set that cannot be retained, or a row
+    that cannot fit, is a typed error, never a silently shortened success."""
     if cursor is None:
         ordered = _ordered(options or [])
-        token = store.put(scope, ordered) if len(ordered) > size else None
-        page = ordered[:size]
+        token = None
+        if len(ordered) > 0:
+            token = store.put(scope, ordered, attachment=attachment)
+            if token is None:
+                return {"error": {"code": "CATALOG_TOO_LARGE", "message": "too many options to page; narrow the request with `kind`"}}
+        page = _take_page(ordered, 0, size, byte_cap)
+        if page is None:
+            return {"error": {"code": "RESPONSE_TOO_LARGE", "message": "a single option exceeds the response budget; narrow the request with `kind`"}}
+        nxt = len(page)
         return {"count": len(ordered), "shown": len(page), "omitted": len(ordered) - len(page), "options": page,
-                "cursor": f"{token}.{size}" if token and len(ordered) > size else None, "page": 0}
+                "cursor": f"{token}.{nxt}" if token and nxt < len(ordered) else None, "page": 0, "attachment": attachment}
     try:
         token, offset_text = cursor.rsplit(".", 1)
         offset = int(offset_text)
@@ -123,11 +149,14 @@ def _page(store: PageStore, scope: dict[str, Any], options: list[dict[str, Any]]
         return {"error": {"code": CURSOR_ERROR, "message": "the game, seat, entity or filter changed since these options were captured; call again without a cursor",
                           "captured": {k: v for k, v in entry["scope"].items() if k in ("turn", "generation", "entity", "kind")}}}
     ordered = entry["options"]
-    if offset < 0 or offset > len(ordered) or offset % size != 0:
-        return {"error": {"code": "INVALID_ARGUMENT", "message": "cursor offset is not a page boundary of these options"}}
-    page = ordered[offset: offset + size]
-    return {"count": len(ordered), "shown": len(page), "omitted": max(0, len(ordered) - offset - len(page)), "options": page,
-            "cursor": f"{token}.{offset + size}" if offset + size < len(ordered) else None, "page": offset // size}
+    if offset < 0 or offset > len(ordered):
+        return {"error": {"code": "INVALID_ARGUMENT", "message": "cursor offset is outside these options"}}
+    page = _take_page(ordered, offset, size, byte_cap)
+    if page is None:
+        return {"error": {"code": "RESPONSE_TOO_LARGE", "message": "a single option exceeds the response budget; narrow the request with `kind`"}}
+    nxt = offset + len(page)
+    return {"count": len(ordered), "shown": len(page), "omitted": max(0, len(ordered) - nxt), "options": page,
+            "cursor": f"{token}.{nxt}" if nxt < len(ordered) else None, "page": offset, "attachment": entry.get("attachment")}
 
 
 def default_journal(player: int) -> Path:
@@ -350,16 +379,22 @@ def build_server(
 
     def _scope(gs, listing: dict[str, Any] | None, *, entity: Any, kind: str | None) -> dict[str, Any]:
         generation = listing["generation"] if listing is not None else registry.shared.generation(gs, advance=False)[0]
-        return {"seat": bound, "match": gs.context.game_guid, "turn": gs.context.turn, "age": gs.context.age,
-                "generation": generation, "entity": entity, "kind": kind}
+        # the active seat, not the configured one: a hotseat handoff within a turn changes it
+        return {"seat": bound, "active": [gs.context.local_player_id, gs.context.local_observer_id], "match": gs.context.game_guid,
+                "turn": gs.context.turn, "age": gs.context.age, "generation": generation, "entity": entity, "kind": kind}
 
     def _entity_options(gs, *, key: str, entity_id: int, kind: str | None, cursor: str | None, size: int = MAX_ENTITY_OPTIONS) -> dict[str, Any]:
         if cursor is not None:
-            # a continuation re-reads nothing: the captured page is served while its scope still holds
-            return {**_page(pages, _scope(gs, None, entity=(key, entity_id), kind=kind), None, cursor, size=size), "attachment": None, "listing": None}
+            # A continuation re-enumerates nothing, but it is served only to the seat that is active
+            # now, exactly as the first page was (a same-turn handoff makes it WRONG_PLAYER); every
+            # row is still revalidated, readiness included, when it is performed.
+            _bind_ok(gs, bound)
+            out = _page(pages, _scope(gs, None, entity=(key, entity_id), kind=kind), None, cursor, size=size)
+            return {**out, "listing": None, "reconciliationRequired": bool(registry.needs_reconciliation())}
         listing = registry.list_offers(gs, player=bound, mode=mode)
         options = [o for o in listing["offers"] if o.get(key) == entity_id and (kind is None or o.get("kind") == kind)]
-        return {**_page(pages, _scope(gs, listing, entity=(key, entity_id), kind=kind), options, None, size=size), "attachment": listing["attachment"], "listing": listing}
+        out = _page(pages, _scope(gs, listing, entity=(key, entity_id), kind=kind), options, None, size=size, attachment=listing["attachment"])
+        return {**out, "listing": listing, "reconciliationRequired": listing["reconciliationRequired"]}
 
     @mcp.tool(name="list_actions", description=LIST_DESCRIPTION, annotations=READ_ONLY)
     def list_actions(kind: str | None = None, cursor: str | None = None) -> dict[str, Any]:
@@ -372,9 +407,8 @@ def build_server(
         out = _with_session(lambda gs: _entity_options(gs, key="kind", entity_id=kind, kind=kind, cursor=cursor))
         if "error" in out:
             return out
-        listing = out.pop("listing")
-        return {"kind": kind, **{k: v for k, v in out.items() if k != "attachment"}, "attachment": out["attachment"],
-                "reconciliationRequired": listing["reconciliationRequired"] if listing else None}
+        out.pop("listing")
+        return {"kind": kind, **out}
 
     def _entity_tool(key: str, id_name: str, entity_id: Any, kind: str | None, cursor: str | None) -> dict[str, Any]:
         if isinstance(entity_id, bool) or not isinstance(entity_id, int):
@@ -401,8 +435,7 @@ def build_server(
                 note = "this unit is no longer in the seat's roster; it was lost, disbanded or converted since it was last seen"
             elif present is True and out["count"] == 0:
                 note = "this unit is still yours but has no legal action this turn" + (f" of kind {kind}" if kind else "")
-        return {"unitId": unit_id, "present": present, "note": note, **{k: v for k, v in out.items() if k != "attachment"},
-                "attachment": out["attachment"], "reconciliationRequired": listing["reconciliationRequired"] if listing else None}
+        return {"unitId": unit_id, "present": present, "note": note, **out}
 
     @mcp.tool(name="get_city_options", description=CITY_OPTIONS_DESCRIPTION, annotations=READ_ONLY)
     def get_city_options(city_id: int, kind: str | None = None, cursor: str | None = None) -> dict[str, Any]:
@@ -410,10 +443,9 @@ def build_server(
         if "error" in out:
             return out
         listing = out.pop("listing")
-        return {"cityId": city_id, **{k: v for k, v in out.items() if k != "attachment"}, "attachment": out["attachment"],
+        return {"cityId": city_id, **out,
                 "note": ("one option per building and placement plot; every distinct thing this settlement can do is "
-                         "shown once before any repeats; `cursor` continues" if out.get("omitted") else None),
-                "reconciliationRequired": listing["reconciliationRequired"] if listing else None}
+                         "shown once before any repeats; `cursor` continues" if out.get("omitted") else None)}
 
     @mcp.tool(name="perform_action", description=PERFORM_DESCRIPTION, annotations=MUTATING)
     def perform_action(action_id: str, request_id: str, confirm: bool = False, text: str | None = None) -> dict[str, Any]:

@@ -338,7 +338,7 @@ def test_city_options_page_through_a_captured_set_exactly_once(tmp_path):
         page = tool(s, "get_city_options").fn(city_id=65536, cursor=cursor)
         assert "error" not in page, page
         seen += [o["actionId"] for o in page["options"]]
-        assert page["count"] == 93 and page["page"] == pages and page["attachment"] is None, "a continuation re-enumerates nothing"
+        assert page["count"] == 93 and page["page"] == 40 * pages and page["attachment"] == first["attachment"], "a continuation re-enumerates nothing and returns the captured attachment"
         cursor, pages = page["cursor"], pages + 1
     assert pages == 3 and len(seen) == 93 and len(set(seen)) == 93, "every captured option exactly once"
     # the first page shows every distinct building before any repeats
@@ -365,6 +365,34 @@ def test_cursors_fail_safely_when_stale_foreign_or_malformed(tmp_path):
     assert tool(s, "get_city_options").fn(city_id=65536, kind="no_such_kind")["error"]["code"] == "INVALID_ARGUMENT"
 
 
+def test_a_continuation_is_refused_after_a_same_turn_seat_handoff(tmp_path):
+    from test_brief import offers_with
+    ctx = json.dumps(GAME)
+    other = json.dumps({**GAME, "localPlayerId": 2, "localObserverId": 2})   # same turn and age: only the active seat changed
+    payload = json.dumps(offers_with(_city_offers(45), end_can_start=False, blocking="PRODUCTION"))
+    s, _ = make_acting({"a": [reply(1, ctx), reply(1, ctx), reply(2, payload), reply(3, ctx), reply(1, other), reply(1, other)]}, journal=tmp_path / "j.jsonl")
+    first = tool(s, "get_city_options").fn(city_id=65536)
+    second = tool(s, "get_city_options").fn(city_id=65536, cursor=first["cursor"])
+    assert second["error"]["code"] == "WRONG_PLAYER", "the captured rows belong to a seat that is no longer active"
+
+
+def test_pages_are_bounded_in_bytes_and_a_large_catalog_is_still_fully_retrievable(tmp_path):
+    from civ7_observer.server import PAGE_RESPONSE_BYTES, PageStore, _page
+    big = [{"actionId": str(i), "kind": "produce_constructible", "description": "x" * 14000} for i in range(41)]
+    store = PageStore(); scope = {"seat": 1}
+    first = _page(store, scope, big, None)
+    assert "error" not in first and first["cursor"] and first["shown"] < 40 and first["omitted"] == 41 - first["shown"]
+    assert len(json.dumps(first["options"])) <= PAGE_RESPONSE_BYTES
+    seen, cursor = [o["actionId"] for o in first["options"]], first["cursor"]
+    while cursor:
+        page = _page(store, scope, None, cursor)
+        assert "error" not in page and len(json.dumps(page["options"])) <= PAGE_RESPONSE_BYTES
+        seen += [o["actionId"] for o in page["options"]]; cursor = page["cursor"]
+    assert len(seen) == 41 and len(set(seen)) == 41, "every option exactly once, no page over budget"
+    huge = _page(PageStore(), scope, [{"actionId": "h", "description": "y" * (PAGE_RESPONSE_BYTES + 10)}], None)
+    assert huge["error"]["code"] == "RESPONSE_TOO_LARGE"
+
+
 def test_list_actions_with_a_kind_lists_every_option_of_that_kind_seat_wide_in_pages(tmp_path):
     from test_brief import offers_with
     ctx = json.dumps(GAME)
@@ -388,7 +416,8 @@ def test_page_store_is_bounded_in_time_count_and_bytes():
     assert all(tokens) and len(store.pages) == 3, "the oldest pages make room"
     clock[0] = 101
     assert store.get(tokens[-1]) is None, "pages expire"
-    assert store.put({"n": 9}, [{"blob": "x" * (600 * 1024)}]) is None, "an oversized set is not retained"
+    assert store.put({"n": 9}, [{"blob": "x" * (9 * 1024 * 1024)}]) is None, "an oversized set is not retained"
+    assert _page(PageStore(), {"n": 9}, [{"blob": "x" * (9 * 1024 * 1024)}], None)["error"]["code"] == "CATALOG_TOO_LARGE", "and never served as a shortened success"
     scope = {"seat": 1, "turn": 1}
     out = _page(PageStore(), scope, [{"actionId": str(i)} for i in range(5)], None, size=2)
     assert [o["actionId"] for o in out["options"]] == ["0", "1"] and out["cursor"].endswith(".2")
