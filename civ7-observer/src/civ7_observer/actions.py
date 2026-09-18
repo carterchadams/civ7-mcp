@@ -13,6 +13,7 @@ from typing import Any
 
 from civ7_observer import cdp
 from civ7_observer.attachment import SharedState, state_dir
+from civ7_observer.contract import fingerprint as contract_fingerprint
 from civ7_observer.payloads import TEXT_TOKEN, load_payload, render_action_payload, render_payload
 from civ7_observer.probe import write_atomic
 from civ7_observer.service import GameSession, ObserverError
@@ -148,6 +149,60 @@ def _load(gs: GameSession, expression: str) -> dict[str, Any]:
         r = data["refused"]
         raise ObserverError(str(r.get("code", "REFUSED")), str(r.get("message", "")), **{k: v for k, v in r.items() if k not in ("code", "message")})
     return data
+
+
+def _effect_names() -> dict[str, str]:
+    """The effect name the poll path records for each kind, read from this module's own confirm
+    section so the two paths cannot drift apart silently."""
+    src = Path(__file__).read_text(encoding="utf-8")
+    start = src.index("def _confirm(")
+    names: dict[str, str] = {}
+    current: list[str] = []
+    for line in src[start:].splitlines():
+        m = re.match(r'^\s{12,16}(?:el)?if kind (?:==|in) \(?([^:]+)\)?:', line)
+        if m:
+            current = re.findall(r'"([A-Z_]+)"', m.group(1))
+            continue
+        e = re.search(r'effect = \{"([A-Za-z]+)"', line)
+        if e and current:
+            for k in current:
+                names.setdefault(k, e.group(1))
+    return names
+
+
+_EFFECT_NAMES: dict[str, str] | None = None
+
+
+def immediate_effect(kind: str, offer: dict[str, Any], readback: dict[str, Any]) -> dict[str, Any]:
+    """A typed effect for a confirmation the payload itself established, named as the poll path names
+    the same outcome. Kinds with variants decide the name from the read-back."""
+    global _EFFECT_NAMES
+    if _EFFECT_NAMES is None:
+        _EFFECT_NAMES = _effect_names()
+    if kind == "MOVE_UNIT":
+        loc, target = readback.get("location"), readback.get("target")
+        if isinstance(loc, dict) and isinstance(target, dict) and loc.get("x") == target.get("x") and loc.get("y") == target.get("y"):
+            return {"unitLocation": {"unitId": offer["arg"], "x": offer.get("arg2"), "y": offer.get("arg3")}}
+        return {"unitMoved": {"unitId": offer["arg"], "toward": [offer.get("arg2"), offer.get("arg3")], "now": [loc.get("x"), loc.get("y")] if isinstance(loc, dict) else None, "arrived": False}}
+    if kind == "START_DIPLOMATIC_ACTION":
+        if readback.get("wasAtWar") is False and readback.get("atWar") is True:
+            return {"warDeclared": {"targetPlayerId": offer["arg"], "actionType": offer.get("arg2")}}
+        if readback.get("wasAllied") is False and readback.get("allied") is True:
+            return {"allianceFormed": {"targetPlayerId": offer["arg"]}}
+        name = "diplomaticProjectStarted" if offer.get("expect") == "event" else "diplomaticActionStarted"
+        return {name: {"targetPlayerId": offer["arg"], "actionType": offer.get("arg2"), "identity": "event"}}
+    if kind in TABLE_OPERATION_KINDS or kind in TABLE_COMMAND_KINDS:
+        label = {"unitId": offer["arg"], "action": PUBLIC_KIND[kind], "at": [offer.get("arg2"), offer.get("arg3")] if isinstance(offer.get("arg2"), int) and offer["arg2"] >= 0 else None}
+        want = offer.get("expect")
+        name = {"used": "unitActed", "moved": "unitMoved", "offmap": "unitTravelling", "gold": "goldSpent", "asleep": "unitAutomated"}.get(want, "unitActed")
+        return {name: {**label, **{k: v for k, v in readback.items() if k not in ("kind", "matches")}}}
+    if kind in ("NAME_UNIT", "NAME_CITY"):
+        return {("unitRenamed" if kind == "NAME_UNIT" else "cityRenamed"): {"id": offer["arg"], "name": readback.get("name")}}
+    if kind in UNIT_COMMAND_KINDS:
+        name = "resettled" if kind == "RESETTLE" else _EFFECT_NAMES.get(kind, "unitCommanded")
+        return {name: {"unitId": offer["arg"], **{k: v for k, v in readback.items() if k not in ("kind", "matches")}}}
+    name = _EFFECT_NAMES.get(kind) or PUBLIC_KIND.get(kind, kind.lower())
+    return {name: {k: v for k, v in readback.items() if k not in ("kind", "matches")}}
 
 
 def _bind_ok(gs: GameSession, player: int) -> None:
@@ -296,6 +351,8 @@ class ActionRegistry:
         return {"requestId": request_id, "actionId": action_id, "kind": offer["kind"], "arg": offer["arg"],
                 "arg2": offer.get("arg2", 0), "arg3": offer.get("arg3", 0), "pre": offer["pre"], "seat": player,
                 "turn": offer["turn"], "age": offer["age"], "match": offer["match"], "generation": offer["generation"],
+                # the implementation this receipt proves, stamped when the action is executed
+                "contract": contract_fingerprint(offer["kind"]),
                 **({"text": offer["text"]} if offer.get("text") is not None else {})}
 
     def _generation(self, gs: GameSession, *, advance: bool) -> tuple[int, bool]:
@@ -894,9 +951,12 @@ class ActionRegistry:
         kind = offer["kind"]
         immediate = None
         if kind == "END_TURN" and readback.get("sentComplete") is True:
-            immediate = {"source": "payload", "hasSentTurnComplete": True, "gameGuid": offer["match"], "turn": offer["turn"], "localPlayerId": player}
+            immediate = {"source": "payload", "hasSentTurnComplete": True, "gameGuid": offer["match"], "turn": offer["turn"], "localPlayerId": player,
+                         "effect": {"hasSentTurnComplete": True}}
         elif kind != "END_TURN" and readback.get("matches") is True:
-            immediate = {"source": "payload", **readback, "gameGuid": offer["match"], "turn": offer["turn"], "localPlayerId": player}
+            # the same typed effect the poll would record, so a receipt reads the same either way
+            immediate = {"source": "payload", **readback, "gameGuid": offer["match"], "turn": offer["turn"], "localPlayerId": player,
+                         "effect": immediate_effect(kind, offer, readback)}
         if immediate is not None:
             return immediate
         expr = render_payload("readback.js", bound_player_id=player)

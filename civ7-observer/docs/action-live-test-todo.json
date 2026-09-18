@@ -7,11 +7,11 @@
       "expected_kind": "SET_TECH_TREE_NODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "0b81f33e9135",
-      "passed_fingerprint": "0b81f33e9135",
+      "contract_fingerprint": "ec59b12c62bb",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "research"
@@ -22,12 +22,11 @@
       "expected_evidence": "a confirmed `SET_TECH_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 199,
+          "confirmed": 217,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "techResearching": 104
+          "unknown": 0,
+          "matched": 217,
+          "stamps": []
         }
       }
     },
@@ -37,11 +36,11 @@
       "expected_kind": "SET_CULTURE_TREE_NODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "89a68e3c5023",
-      "passed_fingerprint": "89a68e3c5023",
+      "contract_fingerprint": "1dd7d2edc616",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "civic"
@@ -52,12 +51,11 @@
       "expected_evidence": "a confirmed `SET_CULTURE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 176,
+          "confirmed": 183,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "civicResearching": 75
+          "unknown": 0,
+          "matched": 183,
+          "stamps": []
         }
       }
     },
@@ -67,11 +65,11 @@
       "expected_kind": "SET_TECH_TREE_TARGET_NODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "649c49d51503",
-      "passed_fingerprint": "649c49d51503",
+      "contract_fingerprint": "f5a84778290f",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "research_goal"
@@ -84,10 +82,9 @@
         "journal": {
           "confirmed": 5,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "treeGoal": 5
+          "unknown": 0,
+          "matched": 5,
+          "stamps": []
         }
       }
     },
@@ -97,11 +94,11 @@
       "expected_kind": "SET_CULTURE_TREE_TARGET_NODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ee1407458512",
-      "passed_fingerprint": "ee1407458512",
+      "contract_fingerprint": "f5a84778290f",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "civic_goal"
@@ -114,10 +111,9 @@
         "journal": {
           "confirmed": 2,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "treeGoal": 2
+          "unknown": 0,
+          "matched": 2,
+          "stamps": []
         }
       }
     },
@@ -127,11 +123,11 @@
       "expected_kind": "END_TURN",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "877c01bd9f63",
-      "passed_fingerprint": "877c01bd9f63",
+      "contract_fingerprint": "01e944799526",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "end_turn"
@@ -142,11 +138,12 @@
       "expected_evidence": "a confirmed `END_TURN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 685,
+          "confirmed": 730,
           "rejected": 4,
-          "unknown": 0
-        },
-        "effects": {}
+          "unknown": 0,
+          "matched": 730,
+          "stamps": []
+        }
       }
     },
     {
@@ -155,11 +152,11 @@
       "expected_kind": "SKIP_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d9122040d3e5",
-      "passed_fingerprint": "d9122040d3e5",
+      "contract_fingerprint": "09d45bce8e6d",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "skip_unit"
@@ -170,12 +167,11 @@
       "expected_evidence": "a confirmed `SKIP_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3823,
-          "rejected": 16,
-          "unknown": 0
-        },
-        "effects": {
-          "unitNoLongerReady": 3663
+          "confirmed": 4463,
+          "rejected": 18,
+          "unknown": 0,
+          "matched": 4463,
+          "stamps": []
         }
       }
     },
@@ -185,11 +181,11 @@
       "expected_kind": "MOVE_UNIT",
       "variant": "default",
       "expected_effect": "unitLocation",
-      "contract_fingerprint": "27d9e37ce83b",
-      "passed_fingerprint": "27d9e37ce83b",
+      "contract_fingerprint": "6492840a1b46",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "move_unit"
@@ -200,13 +196,11 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitLocation` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2197,
-          "rejected": 32,
-          "unknown": 4
-        },
-        "effects": {
-          "unitLocation": 2173,
-          "unitMoved": 22
+          "confirmed": 2242,
+          "rejected": 33,
+          "unknown": 4,
+          "matched": 2242,
+          "stamps": []
         }
       }
     },
@@ -216,11 +210,11 @@
       "expected_kind": "MOVE_UNIT",
       "variant": "standing",
       "expected_effect": "unitMoved",
-      "contract_fingerprint": "27d9e37ce83b",
-      "passed_fingerprint": "27d9e37ce83b",
+      "contract_fingerprint": "6492840a1b46",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "move_unit"
@@ -231,13 +225,11 @@
       "expected_evidence": "a confirmed `MOVE_UNIT` receipt whose effect is `unitMoved` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2197,
-          "rejected": 32,
-          "unknown": 4
-        },
-        "effects": {
-          "unitLocation": 2173,
-          "unitMoved": 22
+          "confirmed": 25,
+          "rejected": 33,
+          "unknown": 4,
+          "matched": 25,
+          "stamps": []
         }
       }
     },
@@ -247,11 +239,11 @@
       "expected_kind": "PRODUCE_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "cfde858eb73b",
-      "passed_fingerprint": "cfde858eb73b",
+      "contract_fingerprint": "e64e4144c174",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "produce_unit"
@@ -262,13 +254,11 @@
       "expected_evidence": "a confirmed `PRODUCE_UNIT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 184,
+          "confirmed": 204,
           "rejected": 2,
-          "unknown": 1
-        },
-        "effects": {
-          "cityProduction": 8,
-          "queued": 170
+          "unknown": 1,
+          "matched": 204,
+          "stamps": []
         }
       }
     },
@@ -278,11 +268,11 @@
       "expected_kind": "PRODUCE_PROJECT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "68f19d7e9e10",
-      "passed_fingerprint": "68f19d7e9e10",
+      "contract_fingerprint": "0c4853c70d06",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "produce_project"
@@ -295,10 +285,9 @@
         "journal": {
           "confirmed": 5,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "projectQueued": 5
+          "unknown": 0,
+          "matched": 5,
+          "stamps": []
         }
       }
     },
@@ -308,11 +297,11 @@
       "expected_kind": "FOUND_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ffc05225df51",
-      "passed_fingerprint": "ffc05225df51",
+      "contract_fingerprint": "323b0095829f",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "found_city"
@@ -325,10 +314,9 @@
         "journal": {
           "confirmed": 41,
           "rejected": 5,
-          "unknown": 5
-        },
-        "effects": {
-          "settlementFounded": 41
+          "unknown": 5,
+          "matched": 41,
+          "stamps": []
         }
       }
     },
@@ -338,11 +326,11 @@
       "expected_kind": "EXPAND_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "bf55d206e453",
-      "passed_fingerprint": "bf55d206e453",
+      "contract_fingerprint": "32673a3c5ea8",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "expand_city"
@@ -353,12 +341,11 @@
       "expected_evidence": "a confirmed `EXPAND_CITY` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 333,
+          "confirmed": 362,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "populationPlaced": 333
+          "unknown": 0,
+          "matched": 362,
+          "stamps": []
         }
       }
     },
@@ -368,11 +355,11 @@
       "expected_kind": "PRODUCE_CONSTRUCTIBLE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "95b523fd4088",
-      "passed_fingerprint": "95b523fd4088",
+      "contract_fingerprint": "9cc4312ddf24",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "produce_constructible"
@@ -383,12 +370,11 @@
       "expected_evidence": "a confirmed `PRODUCE_CONSTRUCTIBLE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 170,
-          "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "queued": 170
+          "confirmed": 211,
+          "rejected": 2,
+          "unknown": 0,
+          "matched": 211,
+          "stamps": []
         }
       }
     },
@@ -398,11 +384,11 @@
       "expected_kind": "CHANGE_TRADITION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2781ce2f32ce",
-      "passed_fingerprint": "2781ce2f32ce",
+      "contract_fingerprint": "746602f87221",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "activate_tradition"
@@ -413,12 +399,11 @@
       "expected_evidence": "a confirmed `CHANGE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 111,
-          "rejected": 5,
-          "unknown": 0
-        },
-        "effects": {
-          "traditionActive": 111
+          "confirmed": 114,
+          "rejected": 6,
+          "unknown": 0,
+          "matched": 114,
+          "stamps": []
         }
       }
     },
@@ -428,11 +413,11 @@
       "expected_kind": "CONSIDER_ASSIGN_TRADITIONS",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "27236f5f0d9e",
-      "passed_fingerprint": "27236f5f0d9e",
+      "contract_fingerprint": "923d106bfdeb",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "confirm_traditions"
@@ -443,13 +428,11 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_TRADITIONS` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 74,
+          "confirmed": 79,
           "rejected": 0,
-          "unknown": 2
-        },
-        "effects": {
-          "endTurnBlocking": 57,
-          "traditionsNotificationCleared": 57
+          "unknown": 2,
+          "matched": 79,
+          "stamps": []
         }
       }
     },
@@ -459,11 +442,11 @@
       "expected_kind": "CHOOSE_NARRATIVE_STORY_DIRECTION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "70b209979bdd",
-      "passed_fingerprint": "70b209979bdd",
+      "contract_fingerprint": "91e1ac51c7be",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "narrative_choice"
@@ -474,12 +457,11 @@
       "expected_evidence": "a confirmed `CHOOSE_NARRATIVE_STORY_DIRECTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 75,
+          "confirmed": 77,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "storyResolved": 75
+          "unknown": 0,
+          "matched": 77,
+          "stamps": []
         }
       }
     },
@@ -489,11 +471,11 @@
       "expected_kind": "FOUND_PANTHEON",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "b855cdf19bf2",
-      "passed_fingerprint": "b855cdf19bf2",
+      "contract_fingerprint": "6ee6a883833a",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "found_pantheon"
@@ -506,10 +488,9 @@
         "journal": {
           "confirmed": 4,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "pantheonFounded": 4
+          "unknown": 0,
+          "matched": 4,
+          "stamps": []
         }
       }
     },
@@ -519,11 +500,11 @@
       "expected_kind": "CHANGE_GOVERNMENT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "c593bc7a81c2",
-      "passed_fingerprint": "c593bc7a81c2",
+      "contract_fingerprint": "ba79a2ab3b7b",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "change_government"
@@ -536,10 +517,9 @@
         "journal": {
           "confirmed": 10,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "governmentType": 8
+          "unknown": 0,
+          "matched": 10,
+          "stamps": []
         }
       }
     },
@@ -549,11 +529,11 @@
       "expected_kind": "BUY_ATTRIBUTE_TREE_NODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "8f7757edf6e7",
-      "passed_fingerprint": "8f7757edf6e7",
+      "contract_fingerprint": "8884cbc3c370",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "buy_attribute"
@@ -564,12 +544,11 @@
       "expected_evidence": "a confirmed `BUY_ATTRIBUTE_TREE_NODE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 18,
+          "confirmed": 19,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "attributeNodeState": 18
+          "unknown": 0,
+          "matched": 19,
+          "stamps": []
         }
       }
     },
@@ -579,11 +558,11 @@
       "expected_kind": "CONSIDER_ASSIGN_ATTRIBUTE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "edcc05f98005",
-      "passed_fingerprint": "edcc05f98005",
+      "contract_fingerprint": "2f1b5a54ae92",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "consider_attributes"
@@ -596,10 +575,9 @@
         "journal": {
           "confirmed": 5,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "attributeNotificationCleared": 5
+          "unknown": 0,
+          "matched": 5,
+          "stamps": []
         }
       }
     },
@@ -609,11 +587,11 @@
       "expected_kind": "CHOOSE_GOLDEN_AGE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "f3b8e0e6a105",
-      "passed_fingerprint": "f3b8e0e6a105",
+      "contract_fingerprint": "32c471051e08",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "choose_celebration"
@@ -626,10 +604,9 @@
         "journal": {
           "confirmed": 94,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "celebrationChosen": 94
+          "unknown": 0,
+          "matched": 94,
+          "stamps": []
         }
       }
     },
@@ -639,11 +616,11 @@
       "expected_kind": "ASSIGN_RESOURCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2caf1d3276a3",
-      "passed_fingerprint": "2caf1d3276a3",
+      "contract_fingerprint": "52861f1662ae",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "assign_resource"
@@ -656,10 +633,9 @@
         "journal": {
           "confirmed": 110,
           "rejected": 8,
-          "unknown": 1
-        },
-        "effects": {
-          "resourceAssigned": 109
+          "unknown": 1,
+          "matched": 110,
+          "stamps": []
         }
       }
     },
@@ -669,11 +645,11 @@
       "expected_kind": "CONSIDER_ASSIGN_RESOURCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "99b2f0b28ba0",
-      "passed_fingerprint": "99b2f0b28ba0",
+      "contract_fingerprint": "b031ac7e4134",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "consider_resources"
@@ -684,12 +660,11 @@
       "expected_evidence": "a confirmed `CONSIDER_ASSIGN_RESOURCE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 54,
+          "confirmed": 57,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "resourceNotificationCleared": 54
+          "unknown": 0,
+          "matched": 57,
+          "stamps": []
         }
       }
     },
@@ -699,11 +674,11 @@
       "expected_kind": "PROMOTE_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "95ef57ed2fc7",
-      "passed_fingerprint": "95ef57ed2fc7",
+      "contract_fingerprint": "29d0444facaa",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "promote_unit"
@@ -716,10 +691,9 @@
         "journal": {
           "confirmed": 32,
           "rejected": 0,
-          "unknown": 2
-        },
-        "effects": {
-          "unitPromoted": 30
+          "unknown": 2,
+          "matched": 32,
+          "stamps": []
         }
       }
     },
@@ -729,11 +703,11 @@
       "expected_kind": "CHOOSE_TOWN_PROJECT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "34d6022aaf95",
-      "passed_fingerprint": "34d6022aaf95",
+      "contract_fingerprint": "5400f1b179fe",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "town_project"
@@ -746,10 +720,9 @@
         "journal": {
           "confirmed": 10,
           "rejected": 4,
-          "unknown": 4
-        },
-        "effects": {
-          "townProject": 10
+          "unknown": 4,
+          "matched": 10,
+          "stamps": []
         }
       }
     },
@@ -759,11 +732,11 @@
       "expected_kind": "CONSIDER_TOWN_PROJECT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "47446dc00d72",
-      "passed_fingerprint": "47446dc00d72",
+      "contract_fingerprint": "6069a2c452e0",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "keep_town_focus"
@@ -774,12 +747,11 @@
       "expected_evidence": "a confirmed `CONSIDER_TOWN_PROJECT` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 38,
+          "confirmed": 45,
           "rejected": 0,
-          "unknown": 1
-        },
-        "effects": {
-          "townFocusKept": 20
+          "unknown": 1,
+          "matched": 45,
+          "stamps": []
         }
       }
     },
@@ -789,11 +761,11 @@
       "expected_kind": "PURCHASE_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "9572037b0a98",
-      "passed_fingerprint": "0a9ebfa816d8",
+      "contract_fingerprint": "1b2f6ba11b65",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "purchase_unit"
@@ -806,10 +778,9 @@
         "journal": {
           "confirmed": 4,
           "rejected": 1,
-          "unknown": 0
-        },
-        "effects": {
-          "unitPurchased": 4
+          "unknown": 0,
+          "matched": 4,
+          "stamps": []
         }
       }
     },
@@ -819,11 +790,11 @@
       "expected_kind": "PURCHASE_CONSTRUCTIBLE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "7454a277d0d1",
-      "passed_fingerprint": "7454a277d0d1",
+      "contract_fingerprint": "4f8926a10309",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "purchase_constructible"
@@ -836,10 +807,9 @@
         "journal": {
           "confirmed": 1,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "constructiblePurchased": 1
+          "unknown": 0,
+          "matched": 1,
+          "stamps": []
         }
       }
     },
@@ -849,11 +819,11 @@
       "expected_kind": "UPGRADE_TOWN",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d65c315d85cb",
-      "passed_fingerprint": "d65c315d85cb",
+      "contract_fingerprint": "89de1c089791",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "promote_town_to_city"
@@ -864,12 +834,11 @@
       "expected_evidence": "a confirmed `UPGRADE_TOWN` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 8,
+          "confirmed": 9,
           "rejected": 2,
-          "unknown": 0
-        },
-        "effects": {
-          "townUpgraded": 8
+          "unknown": 0,
+          "matched": 9,
+          "stamps": []
         }
       }
     },
@@ -879,11 +848,11 @@
       "expected_kind": "CHOOSE_AGE_CIVILIZATION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "3d935e461a84",
-      "passed_fingerprint": "3d935e461a84",
+      "contract_fingerprint": "5142101856bd",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "choose_age_civilization"
@@ -896,9 +865,10 @@
         "journal": {
           "confirmed": 3,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {}
+          "unknown": 0,
+          "matched": 3,
+          "stamps": []
+        }
       }
     },
     {
@@ -907,11 +877,11 @@
       "expected_kind": "SET_AGE_TRANSITION_DATA",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "4c201f5e7dd1",
-      "passed_fingerprint": "4c201f5e7dd1",
+      "contract_fingerprint": "9f80d87e31e0",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "finish_age_transition"
@@ -924,11 +894,9 @@
         "journal": {
           "confirmed": 3,
           "rejected": 0,
-          "unknown": 2
-        },
-        "effects": {
-          "civilizationChoiceClosed": 1,
-          "endTurnBlocking": 1
+          "unknown": 2,
+          "matched": 3,
+          "stamps": []
         }
       }
     },
@@ -938,11 +906,11 @@
       "expected_kind": "ADVANCED_START_MODIFY_DECK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "06c5b0b1f92e",
-      "passed_fingerprint": "06c5b0b1f92e",
+      "contract_fingerprint": "f7c4a5b109c3",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "pick_legacy_card"
@@ -955,10 +923,9 @@
         "journal": {
           "confirmed": 12,
           "rejected": 6,
-          "unknown": 1
-        },
-        "effects": {
-          "legacyCardAdded": 11
+          "unknown": 1,
+          "matched": 12,
+          "stamps": []
         }
       }
     },
@@ -968,11 +935,11 @@
       "expected_kind": "ADVANCED_START_MARK_COMPLETED",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d35ef7541d57",
-      "passed_fingerprint": "d35ef7541d57",
+      "contract_fingerprint": "e70dcf17f167",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "finish_legacy_deck"
@@ -985,10 +952,9 @@
         "journal": {
           "confirmed": 4,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "legacyDeckCompleted": 4
+          "unknown": 0,
+          "matched": 4,
+          "stamps": []
         }
       }
     },
@@ -998,11 +964,11 @@
       "expected_kind": "RESPOND_DIPLOMATIC_FIRST_MEET",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a7748c625f7f",
-      "passed_fingerprint": "a7748c625f7f",
+      "contract_fingerprint": "6c96f03d2148",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "greet_new_civilization"
@@ -1015,10 +981,9 @@
         "journal": {
           "confirmed": 3,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "firstMeetAnswered": 3
+          "unknown": 0,
+          "matched": 3,
+          "stamps": []
         }
       }
     },
@@ -1028,11 +993,11 @@
       "expected_kind": "MAKE_TRADE_ROUTE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "3104f762d42b",
-      "passed_fingerprint": "3104f762d42b",
+      "contract_fingerprint": "f1aa7471c19a",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "make_trade_route"
@@ -1045,10 +1010,9 @@
         "journal": {
           "confirmed": 2,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "tradeRouteStarted": 2
+          "unknown": 0,
+          "matched": 2,
+          "stamps": []
         }
       }
     },
@@ -1058,11 +1022,11 @@
       "expected_kind": "SEND_MERCHANT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "87e473ddfdf9",
-      "passed_fingerprint": "87e473ddfdf9",
+      "contract_fingerprint": "071a5195df42",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "send_merchant"
@@ -1075,10 +1039,9 @@
         "journal": {
           "confirmed": 28,
           "rejected": 5,
-          "unknown": 0
-        },
-        "effects": {
-          "merchantSent": 28
+          "unknown": 0,
+          "matched": 28,
+          "stamps": []
         }
       }
     },
@@ -1088,7 +1051,7 @@
       "expected_kind": "KEEP_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "485a6f85b238",
+      "contract_fingerprint": "f44f27aee759",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1109,7 +1072,7 @@
       "expected_kind": "RAZE_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d93f29f438d9",
+      "contract_fingerprint": "e1fbc038717b",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1130,7 +1093,7 @@
       "expected_kind": "LIBERATE_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a992ad63ca2e",
+      "contract_fingerprint": "58fa779134a7",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1151,7 +1114,7 @@
       "expected_kind": "CHOOSE_CITY_STATE_BONUS",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2bcfa7969071",
+      "contract_fingerprint": "8599609418dc",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1172,11 +1135,11 @@
       "expected_kind": "SUPPORT_DIPLOMATIC_ACTION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ad36749d0bd7",
-      "passed_fingerprint": "ad36749d0bd7",
+      "contract_fingerprint": "1d0d470b49aa",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "support_diplomatic_action"
@@ -1187,12 +1150,11 @@
       "expected_evidence": "a confirmed `SUPPORT_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 2,
+          "confirmed": 3,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "diplomaticActionSupported": 2
+          "unknown": 0,
+          "matched": 3,
+          "stamps": []
         }
       }
     },
@@ -1202,7 +1164,7 @@
       "expected_kind": "VIEWED_ADVISOR_WARNING",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "22b147d8d175",
+      "contract_fingerprint": "3774f628414e",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1223,7 +1185,7 @@
       "expected_kind": "DECLARE_WAR",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "92da7c34ee59",
+      "contract_fingerprint": "a6244a6ba69b",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1244,7 +1206,7 @@
       "expected_kind": "PROPOSE_PEACE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5af7378fcc14",
+      "contract_fingerprint": "9536bf93c1bc",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1265,7 +1227,7 @@
       "expected_kind": "ACCEPT_PEACE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "054ecc31fb7b",
+      "contract_fingerprint": "1a5c52c7c51c",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1286,7 +1248,7 @@
       "expected_kind": "REJECT_PEACE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "6f44d89d7b09",
+      "contract_fingerprint": "1a5c52c7c51c",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1307,7 +1269,7 @@
       "expected_kind": "PILLAGE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2567aa181ab8",
+      "contract_fingerprint": "ec7d65715252",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1328,7 +1290,7 @@
       "expected_kind": "COASTAL_RAID",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2567aa181ab8",
+      "contract_fingerprint": "ec7d65715252",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1349,7 +1311,7 @@
       "expected_kind": "PILLAGE_ROUTE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2567aa181ab8",
+      "contract_fingerprint": "ec7d65715252",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1370,7 +1332,7 @@
       "expected_kind": "PLUNDER_TRADE_ROUTE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "77d75dc26a7c",
+      "contract_fingerprint": "30a0fe25ae98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1391,7 +1353,7 @@
       "expected_kind": "SPREAD_RELIGION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ea6ab0a531d0",
+      "contract_fingerprint": "f8fab933afc7",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1412,11 +1374,11 @@
       "expected_kind": "TOWN_GROWTH_MODE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "95698a6f5a90",
-      "passed_fingerprint": "95698a6f5a90",
+      "contract_fingerprint": "16e253051b0e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "town_growth_mode"
@@ -1429,10 +1391,9 @@
         "journal": {
           "confirmed": 1,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "townGrowing": 1
+          "unknown": 0,
+          "matched": 1,
+          "stamps": []
         }
       }
     },
@@ -1442,11 +1403,11 @@
       "expected_kind": "QUEUE_REMOVE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ef9ba3cd781c",
-      "passed_fingerprint": "ef9ba3cd781c",
+      "contract_fingerprint": "4594c5b13d27",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "queue_remove"
@@ -1457,12 +1418,11 @@
       "expected_evidence": "a confirmed `QUEUE_REMOVE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 9,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "queueEdited": 1
+          "unknown": 0,
+          "matched": 9,
+          "stamps": []
         }
       }
     },
@@ -1472,7 +1432,7 @@
       "expected_kind": "QUEUE_MOVE_UP",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "7009dbbc0678",
+      "contract_fingerprint": "d332018c5116",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1493,7 +1453,7 @@
       "expected_kind": "QUEUE_MOVE_DOWN",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2bc40c421ed4",
+      "contract_fingerprint": "d332018c5116",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1514,11 +1474,11 @@
       "expected_kind": "DEACTIVATE_TRADITION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "b08b19819419",
-      "passed_fingerprint": "b08b19819419",
+      "contract_fingerprint": "688e26645101",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "deactivate_tradition"
@@ -1529,12 +1489,11 @@
       "expected_evidence": "a confirmed `DEACTIVATE_TRADITION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 3,
+          "confirmed": 4,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "traditionDeactivated": 3
+          "unknown": 0,
+          "matched": 4,
+          "stamps": []
         }
       }
     },
@@ -1544,11 +1503,11 @@
       "expected_kind": "UNASSIGN_RESOURCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "9be7a0b9b006",
-      "passed_fingerprint": "9be7a0b9b006",
+      "contract_fingerprint": "01762edd9f88",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "unassign_resource"
@@ -1561,10 +1520,9 @@
         "journal": {
           "confirmed": 5,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "resourceUnassigned": 5
+          "unknown": 0,
+          "matched": 5,
+          "stamps": []
         }
       }
     },
@@ -1574,11 +1532,11 @@
       "expected_kind": "SWAP_RESOURCES",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a286dc276e92",
-      "passed_fingerprint": "a286dc276e92",
+      "contract_fingerprint": "b8fac8cdbcc3",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "swap_resources"
@@ -1591,10 +1549,9 @@
         "journal": {
           "confirmed": 2,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "resourcesSwapped": 2
+          "unknown": 0,
+          "matched": 2,
+          "stamps": []
         }
       }
     },
@@ -1604,11 +1561,11 @@
       "expected_kind": "WAKE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ad5ce9ef0c42",
-      "passed_fingerprint": "ad5ce9ef0c42",
+      "contract_fingerprint": "ed5be0746669",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "wake_unit"
@@ -1619,12 +1576,11 @@
       "expected_evidence": "a confirmed `WAKE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 4,
+          "confirmed": 5,
           "rejected": 0,
-          "unknown": 1
-        },
-        "effects": {
-          "unitCommand": 3
+          "unknown": 1,
+          "matched": 5,
+          "stamps": []
         }
       }
     },
@@ -1634,7 +1590,7 @@
       "expected_kind": "CANCEL",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "cad8c2bebc11",
+      "contract_fingerprint": "ed5be0746669",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1655,11 +1611,11 @@
       "expected_kind": "UNIT_ORDER",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "f96cfd0878c6",
-      "passed_fingerprint": "f96cfd0878c6",
+      "contract_fingerprint": "506724599b5e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "unit_order"
@@ -1670,12 +1626,11 @@
       "expected_evidence": "a confirmed `UNIT_ORDER` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 602,
+          "confirmed": 624,
           "rejected": 1,
-          "unknown": 1
-        },
-        "effects": {
-          "unitNoLongerReady": 56
+          "unknown": 1,
+          "matched": 624,
+          "stamps": []
         }
       }
     },
@@ -1685,11 +1640,11 @@
       "expected_kind": "DISBAND_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5f022602a69f",
-      "passed_fingerprint": "5f022602a69f",
+      "contract_fingerprint": "1f939e202b56",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "disband_unit"
@@ -1702,10 +1657,9 @@
         "journal": {
           "confirmed": 2,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "unitDisbanded": 2
+          "unknown": 0,
+          "matched": 2,
+          "stamps": []
         }
       }
     },
@@ -1715,11 +1669,11 @@
       "expected_kind": "ASSIGN_WORKER",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5501fdd5970f",
-      "passed_fingerprint": "5501fdd5970f",
+      "contract_fingerprint": "816ad409057e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "assign_specialist"
@@ -1732,10 +1686,9 @@
         "journal": {
           "confirmed": 3,
           "rejected": 1,
-          "unknown": 1
-        },
-        "effects": {
-          "specialistAssigned": 3
+          "unknown": 1,
+          "matched": 3,
+          "stamps": []
         }
       }
     },
@@ -1745,7 +1698,7 @@
       "expected_kind": "CANCEL_ALLIANCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "4f30b3a1ae4d",
+      "contract_fingerprint": "5778e3d6bf95",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1766,7 +1719,7 @@
       "expected_kind": "ATTACK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "195e637e88f2",
+      "contract_fingerprint": "4fe4aeb317a2",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1787,7 +1740,7 @@
       "expected_kind": "UPGRADE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a370c092d783",
+      "contract_fingerprint": "a7d06edabbdb",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1808,7 +1761,7 @@
       "expected_kind": "PACK_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "23103031d7c0",
+      "contract_fingerprint": "a7d06edabbdb",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1829,7 +1782,7 @@
       "expected_kind": "ADD_TO_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d8d6f68f776c",
+      "contract_fingerprint": "a7d06edabbdb",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1850,7 +1803,7 @@
       "expected_kind": "REMOVE_FROM_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "bde4a6c2933d",
+      "contract_fingerprint": "bf4f18653097",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1871,7 +1824,7 @@
       "expected_kind": "UNPACK_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "95b174013607",
+      "contract_fingerprint": "bf4f18653097",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1892,7 +1845,7 @@
       "expected_kind": "ACTIVATE_GREAT_PERSON",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "03b3ab47d4af",
+      "contract_fingerprint": "76b6f12b224e",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -1913,11 +1866,11 @@
       "expected_kind": "RESPOND_DIPLOMATIC_ACTION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "9f2de6e0ab8b",
-      "passed_fingerprint": "9f2de6e0ab8b",
+      "contract_fingerprint": "f40c831be2da",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "respond_to_proposal"
@@ -1928,12 +1881,11 @@
       "expected_evidence": "a confirmed `RESPOND_DIPLOMATIC_ACTION` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 5,
+          "confirmed": 8,
           "rejected": 0,
-          "unknown": 1
-        },
-        "effects": {
-          "proposalAnswered": 4
+          "unknown": 1,
+          "matched": 8,
+          "stamps": []
         }
       }
     },
@@ -1943,11 +1895,11 @@
       "expected_kind": "FOUND_RELIGION",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2c30dcdfc49c",
-      "passed_fingerprint": "2c30dcdfc49c",
+      "contract_fingerprint": "73b8ad1e7cf5",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "found_religion"
@@ -1960,10 +1912,9 @@
         "journal": {
           "confirmed": 2,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "religionFounded": 2
+          "unknown": 0,
+          "matched": 2,
+          "stamps": []
         }
       }
     },
@@ -1973,11 +1924,11 @@
       "expected_kind": "ADD_BELIEF",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5314b1adb446",
-      "passed_fingerprint": "5314b1adb446",
+      "contract_fingerprint": "a7cc33f0e658",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "add_belief"
@@ -1990,10 +1941,9 @@
         "journal": {
           "confirmed": 6,
           "rejected": 0,
-          "unknown": 1
-        },
-        "effects": {
-          "beliefAdded": 5
+          "unknown": 1,
+          "matched": 6,
+          "stamps": []
         }
       }
     },
@@ -2003,11 +1953,11 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "default",
       "expected_effect": "diplomaticActionStarted",
-      "contract_fingerprint": "01826cac245e",
-      "passed_fingerprint": "098aa9222ea8",
+      "contract_fingerprint": "ec0ef4775d79",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "start_diplomatic_action"
@@ -2018,12 +1968,11 @@
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `diplomaticActionStarted` in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 5,
+          "confirmed": 9,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "diplomaticActionStarted": 5
+          "unknown": 0,
+          "matched": 9,
+          "stamps": []
         }
       }
     },
@@ -2033,7 +1982,7 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "free",
       "expected_effect": "diplomaticProjectStarted",
-      "contract_fingerprint": "01826cac245e",
+      "contract_fingerprint": "ec0ef4775d79",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2046,16 +1995,7 @@
       "consequence_class": "medium",
       "procedure": "start a free diplomatic project (its own event is the proof)",
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `diplomaticProjectStarted` in the seat journal",
-      "evidence_refs": {
-        "journal": {
-          "confirmed": 5,
-          "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "diplomaticActionStarted": 5
-        }
-      }
+      "evidence_refs": {}
     },
     {
       "case_id": "LT-start_diplomatic_action-war",
@@ -2063,7 +2003,7 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "war",
       "expected_effect": "warDeclared",
-      "contract_fingerprint": "01826cac245e",
+      "contract_fingerprint": "ec0ef4775d79",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2076,16 +2016,7 @@
       "consequence_class": "high",
       "procedure": "declare war through a diplomatic action (only in a war the seat would fight anyway)",
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `warDeclared` in the seat journal",
-      "evidence_refs": {
-        "journal": {
-          "confirmed": 5,
-          "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "diplomaticActionStarted": 5
-        }
-      }
+      "evidence_refs": {}
     },
     {
       "case_id": "LT-start_diplomatic_action-alliance",
@@ -2093,7 +2024,7 @@
       "expected_kind": "START_DIPLOMATIC_ACTION",
       "variant": "alliance",
       "expected_effect": "allianceFormed",
-      "contract_fingerprint": "01826cac245e",
+      "contract_fingerprint": "ec0ef4775d79",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2106,16 +2037,7 @@
       "consequence_class": "medium",
       "procedure": "form an alliance through a diplomatic action",
       "expected_evidence": "a confirmed `START_DIPLOMATIC_ACTION` receipt whose effect is `allianceFormed` in the seat journal",
-      "evidence_refs": {
-        "journal": {
-          "confirmed": 5,
-          "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "diplomaticActionStarted": 5
-        }
-      }
+      "evidence_refs": {}
     },
     {
       "case_id": "LT-select_capital",
@@ -2123,7 +2045,7 @@
       "expected_kind": "SELECT_CAPITAL",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "7eb109fb9d5d",
+      "contract_fingerprint": "68be98ea1d0b",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2144,7 +2066,7 @@
       "expected_kind": "CHOOSE_SYNCRETISM_UNITS",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d62058e3f8fd",
+      "contract_fingerprint": "86320aa0a817",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2165,7 +2087,7 @@
       "expected_kind": "CHOOSE_SYNCRETISM_INFRASTRUCTURE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d958b12b5456",
+      "contract_fingerprint": "86320aa0a817",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2186,7 +2108,7 @@
       "expected_kind": "CHOOSE_SYNCRETISM_SELF",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "05631b570b4c",
+      "contract_fingerprint": "86320aa0a817",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2207,7 +2129,7 @@
       "expected_kind": "ADVANCED_START_REMOVE_CARD",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d63ffd9840c7",
+      "contract_fingerprint": "a567979e4107",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2228,7 +2150,7 @@
       "expected_kind": "ADVANCED_START_PLACE_SETTLEMENT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "feb9826661b9",
+      "contract_fingerprint": "da1a38939cd9",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2249,7 +2171,7 @@
       "expected_kind": "RESETTLE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "24bde9f61268",
+      "contract_fingerprint": "c416601e0f40",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2270,7 +2192,7 @@
       "expected_kind": "EXCAVATE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "24474f58cb89",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2291,7 +2213,7 @@
       "expected_kind": "RESEARCH_ARTIFACTS",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2531d80d05da",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2312,7 +2234,7 @@
       "expected_kind": "AIR_ATTACK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "7f78792cd4f8",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2333,7 +2255,7 @@
       "expected_kind": "NAVAL_ATTACK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "19e34fd877bb",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2354,7 +2276,7 @@
       "expected_kind": "CARGO_DROP",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "83f158040620",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2375,7 +2297,7 @@
       "expected_kind": "UNIT_AIR_DROP",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ee5a1ce56f34",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2396,11 +2318,11 @@
       "expected_kind": "AUTOMATE_EXPLORE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "66e61d07ba38",
-      "passed_fingerprint": "66e61d07ba38",
+      "contract_fingerprint": "c658d2260bf5",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "automate_explore"
@@ -2411,12 +2333,11 @@
       "expected_evidence": "a confirmed `AUTOMATE_EXPLORE` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 24,
+          "confirmed": 118,
           "rejected": 0,
-          "unknown": 0
-        },
-        "effects": {
-          "unitAutomated": 24
+          "unknown": 0,
+          "matched": 118,
+          "stamps": []
         }
       }
     },
@@ -2426,7 +2347,7 @@
       "expected_kind": "WMD_STRIKE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "f7c92f97a40f",
+      "contract_fingerprint": "c658d2260bf5",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2447,11 +2368,11 @@
       "expected_kind": "MOVE_GREAT_WORK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "804bdd87f07e",
-      "passed_fingerprint": "804bdd87f07e",
+      "contract_fingerprint": "5c1edafb887e",
+      "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
-      "live_status": "passed",
+      "live_status": "passed_historical",
       "eligibility": {
         "offered": [
           "move_great_work"
@@ -2462,12 +2383,11 @@
       "expected_evidence": "a confirmed `MOVE_GREAT_WORK` receipt in the seat journal",
       "evidence_refs": {
         "journal": {
-          "confirmed": 1,
+          "confirmed": 3,
           "rejected": 1,
-          "unknown": 1
-        },
-        "effects": {
-          "greatWorkMoved": 1
+          "unknown": 1,
+          "matched": 3,
+          "stamps": []
         }
       }
     },
@@ -2477,7 +2397,7 @@
       "expected_kind": "NAME_UNIT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "08d12dd39436",
+      "contract_fingerprint": "9fe5142296a2",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2498,7 +2418,7 @@
       "expected_kind": "NAME_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "0fc26a04cb44",
+      "contract_fingerprint": "f2e3bd4dd875",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2519,7 +2439,7 @@
       "expected_kind": "REINFORCE_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "f7cd46218d9e",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2540,7 +2460,7 @@
       "expected_kind": "REBASE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "b4509152e779",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2561,7 +2481,7 @@
       "expected_kind": "TELEPORT_TO_CITY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "f97389d7433a",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2582,7 +2502,7 @@
       "expected_kind": "ESTABLISH_BASE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "6ccc4c0cf170",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2603,7 +2523,7 @@
       "expected_kind": "DISPERSE_INDEPENDENT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "e76df9ba2380",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2624,7 +2544,7 @@
       "expected_kind": "CONVERT_ADJACENT_INDEPENDENT_TO_CITYSTATE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "8296d1d64468",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2645,7 +2565,7 @@
       "expected_kind": "REPAIR",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "eab940a280e4",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2666,7 +2586,7 @@
       "expected_kind": "REMOVE_FEATURE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5364fa7bb655",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2687,7 +2607,7 @@
       "expected_kind": "REMOVE_IMPROVEMENT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a885a5d2baec",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2708,7 +2628,7 @@
       "expected_kind": "PLANT_FOREST",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5a947661b445",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2729,7 +2649,7 @@
       "expected_kind": "HARVEST_RESOURCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "20e3d28fa1dd",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2750,7 +2670,7 @@
       "expected_kind": "BUILD_IMPROVEMENT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "467be9062620",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2771,7 +2691,7 @@
       "expected_kind": "EMBED_LOOKOUT",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "340170a37443",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2792,7 +2712,7 @@
       "expected_kind": "SEARCH",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "bec638875a2a",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2813,7 +2733,7 @@
       "expected_kind": "AERIAL_RECON",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "eae11f4e3c5c",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2834,7 +2754,7 @@
       "expected_kind": "CALL_REINFORCEMENTS",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ea6b69beedb7",
+      "contract_fingerprint": "661109c6cc98",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2855,7 +2775,7 @@
       "expected_kind": "CONNECT_WITH_ROAD",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "ce46387d3bcf",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2876,7 +2796,7 @@
       "expected_kind": "MOVE_BY_RAIL",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "09da75cb91bc",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2897,7 +2817,7 @@
       "expected_kind": "UPGRADE_ARMY",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2be9cc636b44",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2918,7 +2838,7 @@
       "expected_kind": "FOCUSED_ATTACK_LAND_MELEE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "4762aeccc6e8",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2939,7 +2859,7 @@
       "expected_kind": "FOCUSED_ATTACK_LAND_RANGED",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "a98ca13c2143",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2960,7 +2880,7 @@
       "expected_kind": "FOCUSED_ATTACK_SEA_MELEE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "980170bc00e8",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -2981,7 +2901,7 @@
       "expected_kind": "FOCUSED_ATTACK_SEA_RANGED",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "d55b8a6f96d1",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3002,7 +2922,7 @@
       "expected_kind": "FOCUSED_ATTACK_AIR_TO_AIR",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "9683333e4450",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3023,7 +2943,7 @@
       "expected_kind": "FOCUSED_ATTACK_AIR_TO_LAND",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "e262451761a4",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3044,7 +2964,7 @@
       "expected_kind": "FOCUSED_ATTACK_AIR_BOMB",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "78ab20eeb023",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3065,7 +2985,7 @@
       "expected_kind": "ARMY_OVERRUN",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "754a24632b3f",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3086,7 +3006,7 @@
       "expected_kind": "COMMANDER_ATTACK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "22b39162d6e2",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3107,7 +3027,7 @@
       "expected_kind": "STONE_TRAP",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "eabc8daca1c7",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3128,7 +3048,7 @@
       "expected_kind": "TREAT_SICK",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "16e0cdee785a",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3149,7 +3069,7 @@
       "expected_kind": "CLAIM_RESOURCE",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "2d3acc83e5e9",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3170,7 +3090,7 @@
       "expected_kind": "SCORCHED_EARTH",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "bb42f5ae4e2c",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3191,7 +3111,7 @@
       "expected_kind": "DISPERSE_CLAN",
       "variant": "default",
       "expected_effect": null,
-      "contract_fingerprint": "5042aa34ea84",
+      "contract_fingerprint": "aff5a103f304",
       "passed_fingerprint": null,
       "priority": 3,
       "implementation_status": "offline_verified",
@@ -3303,7 +3223,7 @@
             "support_diplomatic_action"
           ],
           "evidence": "SUPPORT_DIPLOMATIC_ACTION {ID, Type: DIPLOMACY_TOKEN_GLOBAL, Amount: 1, SubType}",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "oppose a side",
@@ -3312,7 +3232,7 @@
             "support_diplomatic_action"
           ],
           "evidence": "SubType picks the side backed (true initiator, false target); opposing the initiator is supporting the target, as the shipped details screen does",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "retract support, larger amounts",
@@ -3335,7 +3255,7 @@
             "start_diplomatic_action"
           ],
           "evidence": "the engine's own getProjectDataForUI listing supplies operation, price and targetList2",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "free projects",
@@ -3344,7 +3264,7 @@
             "start_diplomatic_action"
           ],
           "evidence": "confirmed by the project's own event among the seat's actions against the target (Game.Diplomacy.getPlayerEvents, initialPlayer = seat), as the shipped panel reads it back",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3404,7 +3324,7 @@
             "move_great_work"
           ],
           "evidence": "a relic is a great work; it is placed with move_great_work (shipped UI has no separate relic action)",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3438,7 +3358,7 @@
             "deactivate_tradition"
           ],
           "evidence": "CHANGE_TRADITION into an empty slot",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "replace",
@@ -3448,7 +3368,7 @@
             "activate_tradition"
           ],
           "evidence": "a replacement is a deactivation then an activation",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3465,7 +3385,7 @@
             "swap_resources"
           ],
           "evidence": "ASSIGN_RESOURCE with no city / two sends",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3481,7 +3401,7 @@
             "town_growth_mode"
           ],
           "evidence": "CHANGE_GROWTH_MODE {Type: EXPAND, ProjectType: NO_PROJECT}",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3565,7 +3485,7 @@
             "finish_legacy_deck"
           ],
           "evidence": "ADVANCED_START_USE_EFFECT per effect at MARK_COMPLETED, as the shipped confirm does",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3626,7 +3546,7 @@
             "promote_unit"
           ],
           "evidence": "the shipped panel reuses UNITCOMMAND_PROMOTE with commander disciplines",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3655,7 +3575,7 @@
             "disband_unit"
           ],
           "evidence": "the shipped UI unloads a treasure fleet with UNITCOMMAND_DISBAND (getDisbandBaseAmount is the payout)",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "build road operation, embark/disembark",
@@ -3815,7 +3735,7 @@
             "start_diplomatic_action"
           ],
           "evidence": "the four espionage projects are diplomatic actions the engine lists like any other",
-          "live": "passed"
+          "live": "passed_historical"
         }
       ]
     },
@@ -3831,7 +3751,7 @@
             "move_unit"
           ],
           "evidence": "MOVE_TO with a multi-turn path, accepted only toward the seat's own settlements",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "automate explore",
@@ -3840,7 +3760,7 @@
             "automate_explore"
           ],
           "evidence": "UNITOPERATION_AUTOMATE_EXPLORE; cancelled with cancel_order",
-          "live": "passed"
+          "live": "passed_historical"
         },
         {
           "variant": "fog / frontier destinations",

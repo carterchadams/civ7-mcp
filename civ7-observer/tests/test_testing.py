@@ -19,8 +19,17 @@ def ledger(tmp_path):
     return TestLedger("MATCH1", root=tmp_path / "testing", definitions=json.loads(json.dumps(DEFS)), families=FAMILIES)
 
 
-def row(kind, status, rid, *, effect=None, turn=5, generation=2):
+FP = {d["expected_kind"]: d["contract_fingerprint"] for d in DEFS}
+
+
+def row(kind, status, rid, *, effect=None, turn=5, generation=2, contract="current"):
+    """A journal row as the host writes it: stamped with the kind's contract at execution. `contract`
+    may name another digest, or None for a receipt from before stamping."""
     r = {"kind": kind, "status": status, "requestId": rid, "turn": turn, "generation": generation}
+    if contract == "current":
+        contract = FP.get(kind)
+    if contract is not None:
+        r["contract"] = contract
     if effect:
         r["confirmedBy"] = {"source": "poll", "effect": {effect: {}}}
     return r
@@ -47,6 +56,40 @@ def test_a_pass_under_an_older_contract_reads_as_retest_and_a_fresh_receipt_repa
     # the contract changes again: the recorded pass is stale once more
     L.by_id["LT-old_pass"]["contract_fingerprint"] = "newer"
     assert L.live_status(L.by_id["LT-old_pass"]) == "retest"
+
+
+def test_a_receipt_is_judged_by_the_stamp_it_carries_not_by_the_contract_at_ingestion(tmp_path):
+    L = ledger(tmp_path)
+    # a receipt from before stamping: kept as historical evidence, still an open opportunity
+    c = L.record_receipts(1, [row("SEND_MERCHANT", "confirmed", "m-0", contract=None)])
+    assert c == [{"case_id": "LT-send_merchant", "live_status": "passed_historical", "seat": 1, "result": "confirmed"}]
+    assert L.live_status(L.by_id["LT-send_merchant"]) == "passed_historical"
+    assert "LT-send_merchant" in [o["case_id"] for o in L.opportunities(1, {"send_merchant"})]
+    # a receipt stamped by a superseded implementation asks for a retest, whatever the ledger's own definitions say
+    L.record_receipts(1, [row("SEND_MERCHANT", "confirmed", "m-1", contract="stale00")])
+    assert L.live_status(L.by_id["LT-send_merchant"]) == "retest"
+    assert L.results(1)["LT-send_merchant"]["passed_fingerprint"] == "stale00", "the stamp on record is the receipt's, not the case's"
+    # only a receipt stamped with the current contract passes
+    L.record_receipts(1, [row("SEND_MERCHANT", "confirmed", "m-2")])
+    assert L.live_status(L.by_id["LT-send_merchant"]) == "passed"
+    assert L.results(1)["LT-send_merchant"]["evidence"][-1]["fingerprint"] == "bbb222"
+
+
+def test_the_shared_evaluator_ranks_rows_the_way_the_ledger_does():
+    from civ7_observer.testing import evaluate
+    case = {"expected_kind": "MOVE_UNIT", "expected_effect": "unitMoved", "contract_fingerprint": "ccc333"}
+    assert evaluate(case, [])["status"] == "not_seen"
+    assert evaluate(case, [row("MOVE_UNIT", "rejected", "r")])["status"] == "rejected"
+    assert evaluate(case, [row("MOVE_UNIT", "rejected", "r"), row("MOVE_UNIT", "unknown", "u")])["status"] == "inconclusive"
+    arrival = row("MOVE_UNIT", "confirmed", "a", effect="unitLocation")
+    assert evaluate(case, [arrival, row("MOVE_UNIT", "unknown", "u")])["status"] == "inconclusive", "another variant's receipt proves nothing here"
+    old = row("MOVE_UNIT", "confirmed", "o", effect="unitMoved", contract=None)
+    assert evaluate(case, [old])["status"] == "passed_historical"
+    stale = row("MOVE_UNIT", "confirmed", "s", effect="unitMoved", contract="old")
+    assert evaluate(case, [old, stale])["status"] == "retest"
+    ev = evaluate(case, [old, stale, row("MOVE_UNIT", "confirmed", "c", effect="unitMoved")])
+    assert ev["status"] == "passed" and ev["passed_fingerprint"] == "ccc333" and ev["matched"] == 3 and ev["stamps"] == ["ccc333", "old"]
+    assert ev["outcomes"] == {"confirmed": 3, "rejected": 0, "unknown": 0}
 
 
 def test_a_receipt_passes_only_the_variant_whose_effect_it_carries(tmp_path):

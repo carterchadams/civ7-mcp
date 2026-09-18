@@ -29,7 +29,7 @@ from civ7_observer.attachment import state_dir
 from civ7_observer.probe import write_atomic
 
 IMPLEMENTED = ("offline_verified", "available_for_live_test", "partial")
-PASSED, RETEST, INCONCLUSIVE, REJECTED, NOT_SEEN = "passed", "retest", "inconclusive", "rejected", "not_seen"
+PASSED, RETEST, HISTORICAL, INCONCLUSIVE, REJECTED, NOT_SEEN = "passed", "retest", "passed_historical", "inconclusive", "rejected", "not_seen"
 DEFINITIONS_NAME = "action-live-test-todo.json"
 OUTCOMES = ("confirmed", "rejected", "unknown")
 
@@ -66,6 +66,42 @@ def effect_keys(row: dict[str, Any]) -> list[str]:
     by = row.get("confirmedBy")
     effect = by.get("effect") if isinstance(by, dict) else None
     return sorted(effect.keys()) if isinstance(effect, dict) else []
+
+
+def evaluate(case: dict[str, Any], rows: list[dict[str, Any]]) -> dict[str, Any]:
+    """The one evaluator of live evidence for a case, shared by the generator and the ledger: which
+    journal rows prove the case's variant, and what status they establish under the current contract.
+    A confirmed row whose effect matches the variant and whose stamp equals the current fingerprint
+    passes; a matching row stamped otherwise asks for a retest; an unstamped matching row is
+    historical; then inconclusive, rejected, not seen."""
+    want = case.get("expected_effect")
+    current = case.get("contract_fingerprint")
+    outcomes = {k: 0 for k in OUTCOMES}
+    matched: list[dict[str, Any]] = []
+    for row in rows:
+        if row.get("kind") != case.get("expected_kind") or row.get("status") not in OUTCOMES:
+            continue
+        if row["status"] == "confirmed":
+            if want and want not in effect_keys(row):
+                continue
+            matched.append(row)
+        outcomes[row["status"]] += 1
+    stamps = [r.get("contract") for r in matched]
+    if any(st == current for st in stamps if isinstance(st, str) and current):
+        status = PASSED
+    elif any(isinstance(st, str) for st in stamps):
+        status = RETEST
+    elif matched:
+        status = HISTORICAL
+    elif outcomes["unknown"]:
+        status = INCONCLUSIVE
+    elif outcomes["rejected"]:
+        status = REJECTED
+    else:
+        status = NOT_SEEN
+    return {"status": status, "outcomes": outcomes, "matched": len(matched),
+            "passed_fingerprint": next((st for st in stamps if st == current), None) if status == PASSED else None,
+            "stamps": sorted({st for st in stamps if isinstance(st, str)})}
 
 
 def _empty_record(case: dict[str, Any]) -> dict[str, Any]:
@@ -112,10 +148,13 @@ class TestLedger:
 
     @staticmethod
     def _passed_under(case: dict[str, Any], passed_fingerprint: str | None) -> str:
-        """A pass counts only under the current contract; an older fingerprint asks for a retest.
-        A pass with no fingerprint on record predates fingerprints and is kept as historical."""
+        """A pass counts only under the contract stamped on the receipt that earned it: the current
+        digest passes, another asks for a retest, and a receipt with no stamp (before stamping, or
+        stamped at ingestion) is historical evidence, kept but not current."""
         current = case.get("contract_fingerprint")
-        if current and passed_fingerprint and passed_fingerprint != current:
+        if not passed_fingerprint:
+            return HISTORICAL
+        if current and passed_fingerprint != current:
             return RETEST
         return PASSED
 
@@ -129,11 +168,11 @@ class TestLedger:
             if not rec:
                 continue
             st = rec.get("live_status")
-            if st == PASSED:
-                seen.add(self._passed_under(case, rec.get("passed_fingerprint")))
+            if st in (PASSED, RETEST, HISTORICAL):
+                seen.add(self._passed_under(case, rec.get("passed_fingerprint")))   # re-judged against the contract as it is now
             elif st in (INCONCLUSIVE, REJECTED):
                 seen.add(st)
-        for st in (PASSED, RETEST, INCONCLUSIVE, REJECTED):
+        for st in (PASSED, RETEST, HISTORICAL, INCONCLUSIVE, REJECTED):
             if st in seen:
                 return st
         seed = case.get("live_status", NOT_SEEN)
@@ -210,16 +249,19 @@ class TestLedger:
                 rec["outcomes"][status] = rec["outcomes"].get(status, 0) + 1
                 rec["last_result"], rec["last_turn"] = status, row.get("turn", turn)
                 ref = {"requestId": rid, "turn": row.get("turn", turn), "seat": seat, "generation": row.get("generation"),
-                       "variant": case.get("variant", "default"), "fingerprint": case.get("contract_fingerprint"),
+                       "variant": case.get("variant", "default"), "fingerprint": row.get("contract"),
                        "effect": effects or None, "at": _now()}
                 before = rec["live_status"]
                 if status == "confirmed":
                     rec["evidence"].append(ref)
-                    rec["live_status"] = PASSED
-                    rec["passed_fingerprint"] = case.get("contract_fingerprint")
+                    # judged by the stamp the receipt itself carries: current passes, another asks for a
+                    # retest, none (a receipt from before stamping) is historical evidence
+                    stamp = row.get("contract")
+                    rec["passed_fingerprint"] = stamp if isinstance(stamp, str) else None
+                    rec["live_status"] = self._passed_under(case, rec["passed_fingerprint"])
                 else:
                     rec["failures"].append({**ref, "status": status})
-                    if rec["live_status"] != PASSED:
+                    if rec["live_status"] not in (PASSED, RETEST, HISTORICAL):
                         rec["live_status"] = INCONCLUSIVE if status == "unknown" else REJECTED
                 if rec["live_status"] != before or status != "confirmed":
                     changed.append({"case_id": case["case_id"], "live_status": rec["live_status"], "seat": seat, "result": status})

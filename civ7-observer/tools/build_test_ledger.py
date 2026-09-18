@@ -16,7 +16,6 @@ Three things are kept apart, because a list of names in the catalog proves none 
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import sys
 from pathlib import Path
@@ -24,6 +23,8 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 from civ7_observer.actions import PUBLIC_KIND  # noqa: E402
+from civ7_observer.contract import compute_fingerprint  # noqa: E402
+from civ7_observer.testing import evaluate  # noqa: E402
 
 DOCS = ROOT / "docs"
 DEFS = DOCS / "action-live-test-todo.json"
@@ -136,21 +137,14 @@ FAMILIES = {
 
 
 def fingerprint(internal: str) -> str:
-    """A digest of every source line that names the kind, across the payloads and the host binding."""
-    needle = f'"{internal}"'
-    lines = []
-    for p in SOURCES:
-        if not p.exists():
-            continue
-        for line in p.read_text(encoding="utf-8").splitlines():
-            if needle in line:
-                lines.append(f"{p.name}:{line.strip()}")
-    return hashlib.sha1("\n".join(lines).encode("utf-8")).hexdigest()[:12]
+    """The kind's contract digest over whole offer, dispatch, bind, confirm and read-back regions
+    (see `civ7_observer.contract`), computed from SOURCES so a test may point it elsewhere."""
+    return compute_fingerprint(internal, SOURCES)
 
 
-def journal_evidence(journals: Path | None) -> dict[str, dict]:
-    """Per kind: outcome counts and the effect names seen on confirmed rows."""
-    out: dict[str, dict] = {}
+def journal_rows(journals: Path | None) -> dict[str, list[dict]]:
+    """Every final journal row on this host, grouped by kind."""
+    out: dict[str, list[dict]] = {}
     if not journals or not journals.exists():
         return out
     for p in journals.glob("seat*.jsonl"):
@@ -160,15 +154,8 @@ def journal_evidence(journals: Path | None) -> dict[str, dict]:
             except ValueError:
                 continue
             k, s = row.get("kind"), row.get("status")
-            if not k or s not in ("confirmed", "rejected", "unknown"):
-                continue
-            rec = out.setdefault(k, {"confirmed": 0, "rejected": 0, "unknown": 0, "effects": {}})
-            rec[s] += 1
-            if s == "confirmed":
-                by = row.get("confirmedBy")
-                eff = by.get("effect") if isinstance(by, dict) else None
-                for key in (eff.keys() if isinstance(eff, dict) else []):
-                    rec["effects"][key] = rec["effects"].get(key, 0) + 1
+            if k and s in ("confirmed", "rejected", "unknown"):
+                out.setdefault(k, []).append(row)
     return out
 
 
@@ -189,41 +176,45 @@ def build(journals: Path | None) -> dict:
     if DEFS.exists():
         old = json.loads(DEFS.read_text(encoding="utf-8"))
         prior = {c["case_id"]: c for c in (old.get("cases") if isinstance(old, dict) else old)}
-    evidence = journal_evidence(journals)
+    rows_by_kind = journal_rows(journals)
     public_to_internal = {v: k for k, v in PUBLIC_KIND.items()}
     cases = []
+    by_case: dict[str, dict] = {}
     for internal, public in PUBLIC_KIND.items():
-        seen = evidence.get(internal, {})
         fp = fingerprint(internal)
         variants = VARIANTS.get(public, [("default", None, None)])
         for name, effect, procedure, *rest in variants:
             klass = rest[0] if rest else consequence(public)
             cid = f"LT-{public}" if name == "default" else f"LT-{public}-{name}"
             old = prior.get(cid, {})
-            confirmed = seen.get("confirmed", 0) if not effect else (seen.get("effects") or {}).get(effect, 0)
-            live = "passed" if confirmed else old.get("live_status", "not_seen")
-            # the fingerprint a pass was earned under: kept from before, or set now for a newly seeded pass
-            passed_fp = old.get("passed_fingerprint") or (fp if live == "passed" and old.get("live_status") != "passed" else None)
-            if live == "passed" and not passed_fp:
-                passed_fp = fp   # a historical pass with no record of its contract: baselined at this build
+            # one evaluator for what the journals prove, the same the ledger applies at play time: a
+            # confirmed receipt stamped with the current digest passes, another stamp is a retest, an
+            # unstamped one is historical evidence; nothing is baselined at build time
+            ev = evaluate({"expected_kind": internal, "expected_effect": effect, "contract_fingerprint": fp}, rows_by_kind.get(internal, []))
+            live, passed_fp = ev["status"], ev["passed_fingerprint"]
+            seen = {**ev["outcomes"], "matched": ev["matched"], "stamps": ev["stamps"]} if any(ev["outcomes"].values()) else {}
+            by_case[cid] = live
             cases.append({
                 "case_id": cid, "action_family": public, "expected_kind": internal, "variant": name,
-                "expected_effect": effect, "contract_fingerprint": fp, "passed_fingerprint": passed_fp if live == "passed" else None,
+                "expected_effect": effect, "contract_fingerprint": fp, "passed_fingerprint": passed_fp,
                 "priority": old.get("priority", 3), "implementation_status": old.get("implementation_status", "offline_verified"),
                 "live_status": live, "eligibility": {"offered": [public]},
                 "consequence_class": klass,
                 "procedure": procedure or old.get("procedure", f"take a `{public}` offer when it is strategically sensible"),
                 "expected_evidence": f"a confirmed `{internal}` receipt" + (f" whose effect is `{effect}`" if effect else "") + " in the seat journal",
-                "evidence_refs": {"journal": {k: v for k, v in seen.items() if k != "effects"}, "effects": seen.get("effects", {})} if seen else old.get("evidence_refs", {}),
+                "evidence_refs": {"journal": seen} if seen else {},
             })
     families = []
     for aid, (title, variants) in FAMILIES.items():
         rows = []
         for name, disposition, kinds, note in variants:
             missing = [k for k in kinds if k not in public_to_internal]
+            # a family variant is as live as the least live of its kinds' default cases, under the same evaluator
+            statuses = [by_case.get(f"LT-{k}", "not_seen") for k in kinds]
+            order = ["not_seen", "rejected", "inconclusive", "passed_historical", "retest", "passed"]
+            live = None if not kinds else min(statuses, key=lambda st: order.index(st) if st in order else 0)
             rows.append({"variant": name, "disposition": disposition if not missing else "partial", "kinds": kinds, "evidence": note,
-                         **({"missing_kinds": missing} if missing else {}),
-                         "live": "passed" if kinds and all(evidence.get(public_to_internal.get(k, ""), {}).get("confirmed") for k in kinds) else ("not_seen" if kinds else None)})
+                         **({"missing_kinds": missing} if missing else {}), "live": live})
         families.append({"family": aid, "title": title, "status": family_status(rows), "variants": rows})
     return {"version": 2, "cases": cases, "families": families}
 
@@ -242,18 +233,24 @@ def write_docs(data: dict) -> None:
     defaults = [c for c in cases if c["variant"] == "default"]
     variants = [c for c in cases if c["variant"] != "default"]
     passed_kinds = {c["expected_kind"] for c in cases if c["live_status"] == "passed"}
+    historical_kinds = {c["expected_kind"] for c in cases if c["live_status"] in ("passed_historical", "retest")} - passed_kinds
+    tally = {}
+    for c in cases:
+        tally[c["live_status"]] = tally.get(c["live_status"], 0) + 1
     cov = ["# Action coverage", "", "Generated by `tools/build_test_ledger.py`. Three counts that must not be confused: catalog kinds "
            "(what the MCP can dispatch), variants (what a receipt of a kind can prove), and plan families (what the remaining-actions plan "
            "asked for, each variant with a disposition and its evidence). A confirmed receipt proves the exercised variant under the "
            "implementation it was earned with (`contract_fingerprint`); it does not certify a family.", "",
-           f"- Catalog kinds: {len(kinds)}; with at least one confirmed receipt in this host's journals: {len(passed_kinds)}",
-           f"- Cases: {len(cases)} ({len(defaults)} default, {len(variants)} variants); live-verified: {sum(1 for c in cases if c['live_status'] == 'passed')}",
+           f"- Catalog kinds: {len(kinds)}; live-verified under the current contract: {len(passed_kinds)}; with only historical or superseded receipts: {len(historical_kinds)}",
+           f"- Cases: {len(cases)} ({len(defaults)} default, {len(variants)} variants); by live status: " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items())),
+           "- `passed` needs a confirmed receipt of the case's variant stamped with the kind's current contract digest; `passed_historical` is a receipt from before "
+           "stamping (kept, not current); `retest` a receipt from a superseded implementation; both are offered again as opportunities.",
            f"- Families: {len(families)}; implemented: {sum(1 for f in families if f['status'] == 'implemented')}; partial: {sum(1 for f in families if f['status'] == 'partial')}", "",
-           "## Kinds and variants", "", "| case | engine operation | variant (effect) | live | receipts confirmed/rejected/unknown | consequence |", "|---|---|---|---|---|---|"]
+           "## Kinds and variants", "", "| case | engine operation | variant (effect) | live | receipts (matching the variant, of confirmed/rejected/unknown) | consequence |", "|---|---|---|---|---|---|"]
     for c in cases:
         j = (c.get("evidence_refs") or {}).get("journal") or {}
         var = c["variant"] + (f" (`{c['expected_effect']}`)" if c.get("expected_effect") else "")
-        cov.append(f"| `{c['case_id']}` | `{c['expected_kind']}` | {var} | {c['live_status']} | {j.get('confirmed', 0)}/{j.get('rejected', 0)}/{j.get('unknown', 0)} | {c['consequence_class']} |")
+        cov.append(f"| `{c['case_id']}` | `{c['expected_kind']}` | {var} | {c['live_status']} | {j.get('matched', 0)} matching of {j.get('confirmed', 0)}/{j.get('rejected', 0)}/{j.get('unknown', 0)} | {c['consequence_class']} |")
     cov += ["", "## Families", "", "| family | title | status | variant | disposition | kinds | evidence |", "|---|---|---|---|---|---|---|"]
     for f in families:
         for v in f["variants"]:
@@ -268,9 +265,11 @@ def main() -> int:
     data = build(args.journals)
     DEFS.write_text(json.dumps(data, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     write_docs(data)
-    passed = sum(1 for c in data["cases"] if c["live_status"] == "passed")
+    tally = {}
+    for c in data["cases"]:
+        tally[c["live_status"]] = tally.get(c["live_status"], 0) + 1
     fams = data["families"]
-    print(f"{len(data['cases'])} cases; {passed} live-verified; families implemented {sum(1 for f in fams if f['status'] == 'implemented')}, partial {sum(1 for f in fams if f['status'] == 'partial')}")
+    print(f"{len(data['cases'])} cases; " + ", ".join(f"{k} {v}" for k, v in sorted(tally.items())) + f"; families implemented {sum(1 for f in fams if f['status'] == 'implemented')}, partial {sum(1 for f in fams if f['status'] == 'partial')}")
     return 0
 
 

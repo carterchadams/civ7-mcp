@@ -1973,3 +1973,30 @@ def test_every_public_kind_can_be_rendered_into_the_action_payload():
     # offer was made (the age-decision kinds were merged without their renderer entries and would have).
     from civ7_observer.payloads import ACTION_KINDS
     assert set(actions.PUBLIC_KIND) == set(ACTION_KINDS)
+
+
+# ---- R9: a confirmation the payload itself established carries the same typed effect the poll records
+def test_immediate_confirmations_carry_a_typed_effect_named_as_the_poll_names_it():
+    from civ7_observer.actions import immediate_effect, _effect_names, TABLE_OPERATION_KINDS, TABLE_COMMAND_KINDS, UNIT_COMMAND_KINDS
+    names = _effect_names()
+    assert names["PURCHASE_UNIT"] == "unitPurchased" and names["KEEP_CITY"] == "cityKept" and names["MOVE_UNIT"] == "unitLocation"
+    assert immediate_effect("MOVE_UNIT", {"arg": 5, "arg2": 11, "arg3": 10}, {"matches": True, "location": {"x": 11, "y": 10}, "target": {"x": 11, "y": 10}}) == {"unitLocation": {"unitId": 5, "x": 11, "y": 10}}
+    queued = immediate_effect("MOVE_UNIT", {"arg": 5, "arg2": 11, "arg3": 10}, {"matches": True, "location": {"x": 8, "y": 9}, "target": {"x": 11, "y": 10}})
+    assert list(queued) == ["unitMoved"] and queued["unitMoved"]["arrived"] is False and queued["unitMoved"]["now"] == [8, 9]
+    war = immediate_effect("START_DIPLOMATIC_ACTION", {"arg": 2, "arg2": 7, "expect": "influence"}, {"matches": True, "wasAtWar": False, "atWar": True})
+    assert list(war) == ["warDeclared"]
+    ally = immediate_effect("START_DIPLOMATIC_ACTION", {"arg": 2, "arg2": 7, "expect": "influence"}, {"matches": True, "wasAllied": False, "allied": True, "wasAtWar": False, "atWar": False})
+    assert list(ally) == ["allianceFormed"]
+    started = immediate_effect("START_DIPLOMATIC_ACTION", {"arg": 2, "arg2": 7, "expect": "influence"}, {"matches": True, "startedNow": True, "wasAtWar": False, "atWar": False})
+    assert started == {"diplomaticActionStarted": {"targetPlayerId": 2, "actionType": 7, "identity": "event"}}
+    free = immediate_effect("START_DIPLOMATIC_ACTION", {"arg": 2, "arg2": 7, "expect": "event"}, {"matches": True, "startedNow": True})
+    assert list(free) == ["diplomaticProjectStarted"]
+    assert list(immediate_effect("PURCHASE_UNIT", {"arg": 3, "arg2": 44}, {"matches": True, "ofType": 2})) == ["unitPurchased"]
+    for kind in sorted(TABLE_OPERATION_KINDS | TABLE_COMMAND_KINDS):
+        for want, name in (("used", "unitActed"), ("moved", "unitMoved"), ("offmap", "unitTravelling"), ("gold", "goldSpent"), ("asleep", "unitAutomated")):
+            e = immediate_effect(kind, {"arg": 1, "arg2": -1, "arg3": -1, "expect": want}, {"matches": True})
+            assert list(e) == [name] and e[name]["unitId"] == 1 and e[name]["action"]
+    assert list(immediate_effect("RESETTLE", {"arg": 9}, {"matches": True})) == ["resettled"]
+    assert list(immediate_effect("NAME_CITY", {"arg": 9}, {"matches": True, "name": "Ur"})) == ["cityRenamed"]
+    for kind in UNIT_COMMAND_KINDS:
+        assert immediate_effect(kind, {"arg": 9}, {"matches": True}), kind

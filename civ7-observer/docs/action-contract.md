@@ -490,3 +490,12 @@ constructible list the treasury stands alone and the receipt says `treasuryOnly`
 once); a `cursor` is bound to seat, match, turn, age, attachment generation, entity and kind filter and
 returns `REFRESH_REQUIRED` when any of them changed. Counts describe the captured catalog, which is what
 the game's own legality check offered the seat; nothing is claimed about native completeness beyond it.
+
+**Lesson (review of 2026-09-17, offline):** a receipt proves the implementation that produced it, not the
+one reading it. Fingerprints over the lines that *name* a kind missed every guard and read-back body
+change; baselining an unstamped pass at build time made a changed implementation look verified. The
+digest now covers the whole offer block, dispatch branch, bind and confirm blocks and the read-back
+signals they consult (`src/civ7_observer/contract.py`); the host stamps each journal row with it at
+execution (`contract`), and a pass is judged by the stamp the receipt carries: current passes,
+superseded asks for a retest, none is historical. Payload-established confirmations carry the same
+typed `effect` the poll would record, so a receipt reads the same whichever path confirmed it.

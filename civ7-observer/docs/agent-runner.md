@@ -148,10 +148,15 @@ a war is not an influence project), and the plan's families as variants with a d
 (implemented, partial, already covered, native dormant, excluded) and the evidence behind it.
 `tools/build_test_ledger.py` regenerates it (keeping recorded evidence), along with the checklist
 `docs/action-live-test-checklist.md` and the coverage report `docs/action-coverage.md`, and seeds live
-status from the seat journals on this host. Each kind case carries a fingerprint of the source lines
-naming it: a pass earned under an older implementation reads `retest` and is offered again.
-Implementation status and live status are kept apart: an action is live-verified only by a confirmed
-receipt, under the current contract, in a real game.
+status from the seat journals on this host. Each kind case carries a contract digest
+(`civ7_observer.contract`) over every source region that decides the kind: its whole offer block,
+its whole `perform.js` branch (or the table branch that handles it), the host's bind and confirm blocks
+and the read-back signals those consult. The host stamps every receipt with that digest when the action
+is executed, and one evaluator (`civ7_observer.testing.evaluate`) serves the generator and the play-time
+ledger: a confirmed receipt of the case's variant stamped with the current digest passes; one stamped by
+a superseded implementation reads `retest`; one from before stamping reads `passed_historical`. Both are
+offered again; nothing is baselined at build time. Implementation status and live status are kept apart:
+an action is live-verified only by a stamped, confirmed receipt in a real game.
 
 Each seat turn, the driver picks a bounded number of open cases (two by default,
 `--test-opportunities` raises it) whose kinds that seat is being offered right now and puts a short
