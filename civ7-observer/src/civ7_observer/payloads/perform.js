@@ -735,6 +735,10 @@
       out[["Player3", "Amount2", "Unit", "City"].indexOf(second.parameterName) !== -1 ? second.parameterName : "ID2"] = ARG3;
       return out;
     };
+    // the project's own event among this seat's actions against them, counted BEFORE the send: a
+    // pre-existing event for the same project must not confirm a request that did nothing
+    const countEvents = () => { try { let n = 0; for (const ev of Game.Diplomacy.getPlayerEvents(ARG)) { if (ev && ev.initialPlayer === BOUND_PLAYER_ID && ev.actionType === ARG2) n++; } return n; } catch (e) { return null; } };
+    const eventsBefore = countEvents();
     let diploArgs = null;
     for (const shape of [withSecond({ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, Player2: ARG }), withSecond({ Amount: 1, Player1: BOUND_PLAYER_ID, Type: ARG2, ID: ARG })]) {
       const probe = Game.PlayerOperations.canStart(BOUND_PLAYER_ID, project.operationType, shape, false);
@@ -746,11 +750,13 @@
     let influenceAfter = null; try { const v = player.DiplomacyTreasury.diplomacyBalance; influenceAfter = typeof v === "number" ? Math.floor(v) : null; } catch (e) { influenceAfter = null; }
     let nowAtWar = null, nowAllied = null;
     try { nowAtWar = player.Diplomacy.isAtWarWith(ARG) === true; nowAllied = player.Diplomacy.hasAllied(ARG) === true; } catch (e) { nowAtWar = null; nowAllied = null; }
-    // the action's own event among this seat's actions against them: the identity a free project leaves
-    let eventsNow = null; try { eventsNow = 0; for (const ev of Game.Diplomacy.getPlayerEvents(ARG)) { if (ev && ev.initialPlayer === BOUND_PLAYER_ID && ev.actionType === ARG2) eventsNow++; } } catch (e) { eventsNow = null; }
+    const eventsNow = countEvents();
+    const startedNow = isInt(eventsBefore) && isInt(eventsNow) && eventsNow > eventsBefore;
+    // identity, not spending: a war or alliance is proven by the relationship, anything else by a new
+    // event of this project against this target; influence moving on its own proves nothing
     result.readback = { kind: KIND, arg: ARG, actionType: ARG2, secondary: second ? { parameter: second.parameterName, id: ARG3 } : null, influenceBefore: PRE, influence: influenceAfter,
-      wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied, events: eventsNow,
-      matches: (isInt(influenceAfter) && influenceAfter < PRE) || (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) || (isInt(eventsNow) && eventsNow > 0) };
+      wasAtWar: wasAtWar, atWar: nowAtWar, wasAllied: wasAllied, allied: nowAllied, eventsBefore: eventsBefore, events: eventsNow,
+      matches: (wasAtWar === false && nowAtWar === true) || (wasAllied === false && nowAllied === true) || startedNow };
     return JSON.stringify(result);
   }
   if (KIND === "RESPOND_DIPLOMATIC_ACTION") {
@@ -870,6 +876,7 @@
     let goldBefore = null; try { const g = player.Treasury.goldBalance; goldBefore = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldBefore = null; }
     if (goldBefore !== PRE) return refuse("ACTION_EXPIRED", "the seat's treasury changed since the purchase was offered");
     const bCityId = bcity.id;
+    let placedBefore = null; try { if (bcity.Constructibles && typeof bcity.Constructibles.getIds === "function") { placedBefore = false; for (const cid of bcity.Constructibles.getIds()) { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); if (inst && inst.type === ARG2 && inst.location && inst.location.x === cloc.x && inst.location.y === cloc.y) placedBefore = true; } } } catch (e) { placedBefore = null; }
     const cbuyArgs = { ConstructibleType: ARG2, X: cloc.x, Y: cloc.y };
     const cbcheck = Game.CityCommands.canStart(bCityId, CityCommandTypes.PURCHASE, cbuyArgs, false);
     if (!cbcheck || cbcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the purchase");
@@ -877,8 +884,12 @@
     result.outcome = "sent";
     let goldAfter = null; try { const g = player.Treasury.goldBalance; goldAfter = typeof g === "number" ? Math.floor(g) : null; } catch (e) { goldAfter = null; }
     // the building standing in the settlement is the identity proof; the treasury alone is not
-    let placed = null; try { if (bcity.Constructibles && typeof bcity.Constructibles.getIds === "function") { placed = false; for (const cid of bcity.Constructibles.getIds()) { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); if (inst && inst.type === ARG2) placed = true; } } } catch (e) { placed = null; }
-    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plotIndex: ARG3, goldBefore: PRE, gold: goldAfter, placed: placed, matches: isInt(goldAfter) && goldAfter < PRE && placed === true };
+    // the building of that type standing on the bought plot, absent before and present after; a
+    // building of the type elsewhere in the settlement is not this purchase
+    const atPlot = () => { try { if (!bcity.Constructibles || typeof bcity.Constructibles.getIds !== "function") return null; for (const cid of bcity.Constructibles.getIds()) { const inst = typeof Constructibles.getByComponentID === "function" ? Constructibles.getByComponentID(cid) : Constructibles.get(cid); if (inst && inst.type === ARG2 && inst.location && inst.location.x === cloc.x && inst.location.y === cloc.y) return true; } return false; } catch (e) { return null; } };
+    const placed = atPlot();
+    result.readback = { kind: KIND, arg: ARG, constructibleType: ARG2, plotIndex: ARG3, goldBefore: PRE, gold: goldAfter, placedBefore: placedBefore, placed: placed,
+      matches: placedBefore === false && placed === true };
     return JSON.stringify(result);
   }
   if (KIND === "UPGRADE_TOWN") {
@@ -915,11 +926,15 @@
     const buyArgs = { UnitType: ARG2 };
     const pcheck = Game.CityCommands.canStart(cityId, CityCommandTypes.PURCHASE, buyArgs, false);
     if (!pcheck || pcheck.Success !== true) return refuse("ACTION_NOT_STARTABLE", "native canStart refused the purchase");
+    const ofTypeCount = () => { try { return player.Units.getUnits().filter((u) => u && u.type === ARG2).length; } catch (e) { return null; } };
+    const ofTypeBefore = ofTypeCount();
     Game.CityCommands.sendRequest(cityId, CityCommandTypes.PURCHASE, buyArgs);
     result.outcome = "sent";
-    let after = null, ofType = null; try { const all = player.Units.getUnits(); after = all.length; ofType = all.filter((u) => u && u.type === ARG2).length; } catch (e) { after = null; ofType = null; }
-    // the roster growing is not proof of this purchase; one more unit of the bought type is
-    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, ofType: ofType, matches: isInt(after) && after > PRE && isInt(ofType) && ofType > 0 };
+    let after = null; try { after = player.Units.getUnits().length; } catch (e) { after = null; }
+    const ofType = ofTypeCount();
+    // the roster growing is not proof of this purchase; one more unit of the bought type than before is
+    result.readback = { kind: KIND, arg: ARG, unitType: ARG2, unitsBefore: PRE, units: after, ofTypeBefore: ofTypeBefore, ofType: ofType,
+      matches: isInt(ofTypeBefore) && isInt(ofType) && ofType > ofTypeBefore };
     return JSON.stringify(result);
   }
   if (KIND === "PRODUCE_PROJECT") {

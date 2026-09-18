@@ -17,8 +17,10 @@ Writes runs/agent-game/t<turn>-seat<N>.{system.md,transcript.jsonl,report.txt} a
 from __future__ import annotations
 
 import argparse
+import fcntl
 import json
 import os
+import signal
 import subprocess
 import sys
 import time
@@ -135,31 +137,58 @@ def _pid_alive(pid: int) -> bool:
     return True
 
 
-def acquire_controller(path: Path, *, pid: int | None = None, seats: list[int] | None = None) -> dict:
-    """Take the controller lock or raise RuntimeError naming the live holder. A lock whose holder is
-    dead is stale and is taken over; a lock that cannot be read is treated as held (never cleared)."""
-    pid = os.getpid() if pid is None else pid
-    if path.exists():
+class Controller:
+    """Ownership of the seats for one driver run: an OS advisory lock on the lock file, held open for
+    the run's lifetime. Two processes cannot both hold it however they interleave (the kernel decides),
+    a holder that dies releases it on its own, and the record inside names the holder for a human."""
+
+    def __init__(self, path: Path, *, seats: list[int] | None = None) -> None:
+        self.path, self.seats, self.fd, self.record = path, list(seats or []), None, None
+
+    def acquire(self) -> dict:
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        fd = os.open(self.path, os.O_RDWR | os.O_CREAT, 0o644)
         try:
-            held = json.loads(path.read_text(encoding="utf-8"))
-        except ValueError:
-            raise RuntimeError(f"controller lock {path} is unreadable; inspect it before starting another driver")
-        holder = held.get("pid")
-        if isinstance(holder, int) and holder != pid and _pid_alive(holder):
-            raise RuntimeError(f"another driver (pid {holder}, started {held.get('startedAt')}) owns the seats; stop it at a boundary first")
-    rec = {"pid": pid, "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "seats": list(seats or [])}
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(json.dumps(rec), encoding="utf-8")
-    return rec
+            fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        except OSError:
+            held = ""
+            try:
+                held = os.read(fd, 4096).decode("utf-8", errors="replace")
+            except OSError:
+                pass
+            os.close(fd)
+            try:
+                who = json.loads(held) if held.strip() else {}
+            except ValueError:
+                who = {"record": held[:200]}
+            raise RuntimeError(f"another driver owns the seats ({who.get('pid', 'unknown pid')}, started {who.get('startedAt', '?')}); stop it at a boundary first")
+        self.fd = fd
+        self.record = {"pid": os.getpid(), "startedAt": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "seats": self.seats}
+        os.ftruncate(fd, 0)
+        os.lseek(fd, 0, os.SEEK_SET)
+        os.write(fd, json.dumps(self.record).encode("utf-8"))
+        return self.record
+
+    def release(self) -> None:
+        if self.fd is None:
+            return
+        try:
+            os.ftruncate(self.fd, 0)
+            fcntl.flock(self.fd, fcntl.LOCK_UN)
+        finally:
+            os.close(self.fd)
+            self.fd = None
 
 
-def release_controller(path: Path, *, pid: int | None = None) -> None:
-    pid = os.getpid() if pid is None else pid
-    try:
-        if json.loads(path.read_text(encoding="utf-8")).get("pid") == pid:
-            path.unlink()
-    except (FileNotFoundError, ValueError):
-        pass
+def acquire_controller(path: Path, *, seats: list[int] | None = None) -> Controller:
+    """Take the controller lock or raise RuntimeError naming the live holder."""
+    c = Controller(path, seats=seats)
+    c.acquire()
+    return c
+
+
+def release_controller(controller: Controller) -> None:
+    controller.release()
 
 
 def stop_requested(path: Path) -> bool:
@@ -170,15 +199,49 @@ def stop_requested(path: Path) -> bool:
     return False
 
 
+def _end_group(proc: subprocess.Popen, *, grace: float = 3.0) -> None:
+    """Terminate the client and everything it started (its MCP servers included): the client runs as
+    the leader of its own process group, so the whole tree is addressed at once. TERM, a grace, KILL."""
+    try:
+        os.killpg(proc.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    deadline = time.monotonic() + grace
+    while time.monotonic() < deadline:
+        if proc.poll() is not None:
+            break
+        time.sleep(0.05)
+    try:
+        os.killpg(proc.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    try:
+        proc.wait(timeout=grace)
+    except subprocess.TimeoutExpired:
+        pass
+
+
 def run_child(cmd: list[str], *, transcript: Path, timeout: float, env: dict[str, str], cwd: Path) -> tuple[int, str, bool]:
-    """Run one seat's client process. Returns (exit code, stderr tail, timed out). A timeout kills the
-    child; -1 is its exit code here."""
+    """Run one seat's client process as its own process group. Returns (exit code, stderr tail, timed
+    out). On a timeout, or on the driver being interrupted, the client AND its descendants are ended
+    before this returns; -1 is the exit code for a timeout. Whatever the client dispatched before that
+    is on its journal and reconciled through the usual barrier, never resent."""
     with open(transcript, "w", encoding="utf-8") as out:
+        proc = subprocess.Popen(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=env, cwd=cwd, start_new_session=True)
         try:
-            proc = subprocess.run(cmd, stdout=out, stderr=subprocess.PIPE, text=True, env=env, timeout=timeout, cwd=cwd)
-            return proc.returncode, proc.stderr[-2000:], False
-        except subprocess.TimeoutExpired as exc:
-            return -1, f"timeout after {timeout}s: {str(exc.stderr or '')[-1000:]}", True
+            _, err = proc.communicate(timeout=timeout)
+            return proc.returncode, (err or "")[-2000:], False
+        except subprocess.TimeoutExpired:
+            _end_group(proc)
+            err = ""
+            try:
+                err = (proc.stderr.read() if proc.stderr else "") or ""
+            except (OSError, ValueError):
+                pass
+            return -1, f"timeout after {timeout}s: {err[-1000:]}", True
+        except BaseException:
+            _end_group(proc)
+            raise
 
 
 def classify_outcome(*, exit_code: int, timed_out: bool, ended: bool, unknown: list, result_msg: dict | None) -> tuple[str, str | None]:
@@ -355,14 +418,14 @@ def main() -> int:
     seats = list(args.seats)
     lock_path, stop_path = state_dir() / CONTROLLER_LOCK, state_dir() / STOP_FILE
     try:
-        acquire_controller(lock_path, seats=seats)
+        controller = acquire_controller(lock_path, seats=seats)
     except RuntimeError as exc:
         print(str(exc), flush=True)
         return 3
     try:
         return _run(args, seats, log, stop_path)
     finally:
-        release_controller(lock_path)
+        release_controller(controller)
 
 
 def _run(args, seats: list[int], log: Path, stop_path: Path) -> int:

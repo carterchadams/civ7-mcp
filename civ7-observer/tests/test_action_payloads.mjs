@@ -1246,7 +1246,14 @@ test("perform PURCHASE_UNIT re-checks the roster size and canStart, sends PURCHA
   const g = withPurchase(withUnits(world({ log }), [])); g._log = log;
   const r = runPerformArgs(g, "PURCHASE_UNIT", 65536, 99, 0, { pre: 0 });
   assert.equal(r.refused, null);
-  assert.deepEqual(r.readback, { kind: "PURCHASE_UNIT", arg: 65536, unitType: 99, unitsBefore: 0, units: 1, ofType: 1, matches: true }, "one more unit of the bought type is the proof");
+  assert.deepEqual(r.readback, { kind: "PURCHASE_UNIT", arg: 65536, unitType: 99, unitsBefore: 0, units: 1, ofTypeBefore: 0, ofType: 1, matches: true }, "one more unit of the bought type than before is the proof");
+  // a unit of another type arriving, with one of the bought type already present, is not this purchase
+  const wrong = withPurchase(world({ log: [] })); wrong._log = [];
+  let roster = [unit(1, { type: 99 })];
+  wrong.Players.get(1).Units = { getUnits: () => roster };
+  wrong.Game.CityCommands.sendRequest = () => { roster = [...roster, unit(2, { type: 777 })]; };
+  const rw = runPerformArgs(wrong, "PURCHASE_UNIT", 65536, 99, 0, { pre: 1 });
+  assert.deepEqual([rw.readback.ofTypeBefore, rw.readback.ofType, rw.readback.matches], [1, 1, false]);
   assert.ok(log.find((e) => e.startsWith("qsendRequest(") && e.includes('"UnitType":99')));
   for (const [label, mk, cid, ut, pre] of [
     ["unknown city", () => withPurchase(withUnits(world({ log: [] }), [])), 7, 99, 0],
@@ -1277,7 +1284,7 @@ test("perform of a war declaration reads the relationship back, since the treasu
 });
 
 test("an alliance that is never formed leaves the action unmatched even though the call went through", () => {
-  const g = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0 }); g._log = [];
+  const g = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0, eventOnSend: false }); g._log = [];
   const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9003, 0, { pre: 500 });
   assert.equal(r.outcome, "sent");
   assert.equal(r.readback.matches, false);
@@ -2339,7 +2346,7 @@ test("perform ATTACK refuses an unknown unit, a spent attack, a changed count an
 });
 
 // ---- diplomacy (the only place the payload looks past the bound seat, and only at met players)
-function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2", atWar = [], allied = [], warAfter = [], cancelOk = true, alliedAfter = null } = {}) {
+function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: "LOC_ABBASID" }, { id: 7, major: false, name: "LOC_INDEP" }], projects = null, spend = 33, acceptShape = "Player2", atWar = [], allied = [], warAfter = [], cancelOk = true, alliedAfter = null, events = [], eventOnSend = true } = {}) {
   const me = g.Players.get(1);
   me.DiplomacyTreasury = { diplomacyBalance: influence };
   me.Diplomacy = { hasMet: (id) => met.some((m) => m.id === id), isAtWarWith: (id) => atWar.includes(id), hasAllied: (id) => allied.includes(id) };
@@ -2355,8 +2362,10 @@ function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: 
     { actionType: 9003, actionTypeName: "DIPLOMACY_ACTION_DECLARE_WAR", actionDisplayName: "LOC_WAR", operationType: 557, actionGroup: 5, projectStatus: 1, targetList1: [{ targetID: 0, costYieldD: 0 }] },
     { actionType: 9004, actionTypeName: "DIPLOMACY_ACTION_BLOCKED", actionDisplayName: "LOC_BLOCKED", operationType: 558, actionGroup: 5, projectStatus: 2, targetList1: [{ targetID: 0, costYieldD: 40 }] },
   ];
+  const myEvents = events.slice();
   g.Game.Diplomacy = {
     getProjectDataForUI: (pid, target) => { g._log.push(`projects(${pid},${target})`); return rows.map((r) => ({ ...r, targetList1: r.targetList1.map((t) => ({ ...t, targetID: target })) })); },
+    getPlayerEvents: (pid) => myEvents.filter((e) => e.targetPlayer === undefined || e.targetPlayer === pid),
   };
   const inner = g.Game.PlayerOperations;
   g.Game.PlayerOperations = {
@@ -2373,6 +2382,7 @@ function withDiplomacy(g, { influence = 500, met = [{ id: 0, major: true, name: 
       if (args && args.Type !== undefined && args.Amount === 1) {
         g._log.push(`dsendRequest(${pid},${op},${JSON.stringify(args)})`);
         me.DiplomacyTreasury = { diplomacyBalance: influence - spend };
+        if (eventOnSend) myEvents.push({ uniqueID: 900 + myEvents.length, initialPlayer: 1, actionType: args.Type, targetPlayer: args.Player2 !== undefined ? args.Player2 : args.ID });
         if (warAfter.length) me.Diplomacy.isAtWarWith = (id) => warAfter.includes(id);
         return;
       }
@@ -2429,9 +2439,18 @@ test("perform START_DIPLOMATIC_ACTION takes the operation from the engine's own 
   const r = runPerformArgs(g, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual({ ...r.readback, events: undefined }, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, secondary: null, influenceBefore: 500, influence: 467,
-    wasAtWar: false, atWar: false, wasAllied: false, allied: false, matches: true, events: undefined });
-  assert.ok(r.readback.events === null || Number.isInteger(r.readback.events), "the action's own event count is read back");
+  assert.deepEqual(r.readback, { kind: "START_DIPLOMATIC_ACTION", arg: 0, actionType: 9001, secondary: null, influenceBefore: 500, influence: 467,
+    wasAtWar: false, atWar: false, wasAllied: false, allied: false, eventsBefore: 0, events: 1, matches: true }, "the project's own new event is the proof");
+  // a pre-existing event for the same project, and a send that did nothing, must not read as a match
+  const stale = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0, eventOnSend: false, events: [{ uniqueID: 1, initialPlayer: 1, actionType: 9001, targetPlayer: 0 }] }); stale._log = [];
+  const rs = runPerformArgs(stale, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
+  assert.deepEqual([rs.readback.eventsBefore, rs.readback.events, rs.readback.matches], [1, 1, false]);
+  // influence moving with no event is not a proof either; an event read that fails is no baseline
+  const spent = withDiplomacy(withUnits(world({ log: [] }), []), { eventOnSend: false }); spent._log = [];
+  assert.equal(runPerformArgs(spent, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 }).readback.matches, false);
+  const blind = withDiplomacy(withUnits(world({ log: [] }), [])); blind._log = []; blind.Game.Diplomacy.getPlayerEvents = () => { throw new Error("no events api"); };
+  const rb = runPerformArgs(blind, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
+  assert.deepEqual([rb.readback.eventsBefore, rb.readback.events, rb.readback.matches], [null, null, false]);
   const send = log.find((e) => e.startsWith("dsendRequest("));
   assert.ok(send.includes(",555,"), "the operation must be the one the listing gave for that project");
   assert.ok(send.includes('"Type":9001') && send.includes('"Player2":0'));
@@ -2459,7 +2478,7 @@ test("perform START_DIPLOMATIC_ACTION refuses an unmet target, itself, a stale i
     assert.ok(rr.refused, `${label}: expected refusal`);
     assert.ok(!l.some((e) => e.startsWith("dsendRequest")), `${label}: must not send`);
   }
-  const none = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0 }); none._log = [];
+  const none = withDiplomacy(withUnits(world({ log: [] }), []), { spend: 0, eventOnSend: false }); none._log = [];
   const rr = runPerformArgs(none, "START_DIPLOMATIC_ACTION", 0, 9001, 0, { pre: 500 });
   assert.equal(rr.outcome, "sent");
   assert.equal(rr.readback.matches, false);
@@ -2497,9 +2516,10 @@ function withGoldPurchases(g, { gold = 900, upgradeOk = true, isTown = true, upg
   const built = [];
   const gcity = g.Players.get(1).Cities.getCities()[0];
   gcity.Constructibles = { ...(gcity.Constructibles || {}), getIds: () => built.map((t, i) => ({ owner: 1, id: 7000 + i, type: 2 })) };
-  g.Constructibles = { get: (cid) => ({ type: built[cid.id - 7000] }) };
+  g.Constructibles = { get: (cid) => ({ type: built[cid.id - 7000], location: builtAt[cid.id - 7000] || { x: 3, y: 4 } }) };
+  const builtAt = [];
   const prevSend = g.Game.CityCommands.sendRequest;
-  g.Game.CityCommands.sendRequest = (cid, cmd, args) => { prevSend(cid, cmd, args); if (args && args.ConstructibleType !== undefined) built.push(args.ConstructibleType); };
+  g.Game.CityCommands.sendRequest = (cid, cmd, args) => { const before = me.Treasury.goldBalance; prevSend(cid, cmd, args); if (args && args.ConstructibleType !== undefined && me.Treasury.goldBalance !== before) { built.push(args.ConstructibleType); builtAt.push(g._buildElsewhere ? { x: 9, y: 9 } : { x: args.X, y: args.Y }); } };
   return g;
 }
 
@@ -2528,7 +2548,13 @@ test("perform PURCHASE_CONSTRUCTIBLE re-checks gold and canStart with the plot, 
   const r = runPerformArgs(g, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
   assert.equal(r.refused, null);
   assert.equal(r.outcome, "sent");
-  assert.deepEqual(r.readback, { kind: "PURCHASE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plotIndex: 403, goldBefore: 900, gold: 756, placed: true, matches: true }, "the building standing in the settlement, not the treasury alone");
+  assert.deepEqual(r.readback, { kind: "PURCHASE_CONSTRUCTIBLE", arg: 65536, constructibleType: 501, plotIndex: 403, goldBefore: 900, gold: 756, placedBefore: false, placed: true, matches: true }, "the building standing on the bought plot, absent before, not the treasury alone");
+  const elsewhere = withGoldPurchases(withUnits(world({ log: [] }), [])); elsewhere._log = []; elsewhere._buildElsewhere = true;
+  const re = runPerformArgs(elsewhere, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
+  assert.deepEqual([re.readback.placedBefore, re.readback.placed, re.readback.matches], [false, false, false], "a building of the type on another plot is not this purchase");
+  const blind = withGoldPurchases(withUnits(world({ log: [] }), [])); blind._log = []; delete blind.Players.get(1).Cities.getCities()[0].Constructibles;
+  const rbl = runPerformArgs(blind, "PURCHASE_CONSTRUCTIBLE", 65536, 501, 403, { pre: 900 });
+  assert.deepEqual([rbl.readback.placed, rbl.readback.matches], [null, false], "no plot list is no proof");
   assert.ok(log.find((e) => e.startsWith("psendRequest(") && e.includes('"ConstructibleType":501') && e.includes('"X":3') && e.includes('"Y":4')));
   assert.ok(!log.some((e) => e.startsWith("bsendRequest")), "buying must never touch the build queue");
 });

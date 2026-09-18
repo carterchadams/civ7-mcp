@@ -106,26 +106,60 @@ def test_the_driver_injects_testing_opportunities_and_grades_them_by_receipts(dr
 
 # ---- recovery and controller acceptance (work package E): the driver's own guarantees, with stubs
 
-def test_only_one_controller_owns_the_seats_and_a_dead_holder_is_taken_over(driver, tmp_path):
+def test_only_one_controller_owns_the_seats_however_two_starts_interleave(driver, tmp_path):
+    import multiprocessing as mp
     lock = tmp_path / "driver.lock"
-    first = driver.acquire_controller(lock, pid=os.getpid(), seats=[0, 1])
-    assert first["pid"] == os.getpid() and json.loads(lock.read_text())["seats"] == [0, 1]
-    # a second driver while the first is alive is refused, naming the holder
-    with pytest.raises(RuntimeError) as info:
-        driver.acquire_controller(lock, pid=os.getpid() + 100000, seats=[0, 1])
-    assert str(os.getpid()) in str(info.value)
-    # the holder's own re-acquire is fine (a restart in the same process); a dead holder is stale
-    driver.acquire_controller(lock, pid=os.getpid(), seats=[0])
-    lock.write_text(json.dumps({"pid": 2**22 + 12345, "startedAt": "x", "seats": []}))
-    assert driver.acquire_controller(lock, pid=os.getpid(), seats=[3])["seats"] == [3]
-    # an unreadable lock is never cleared silently
-    lock.write_text("{not json")
+    ctx = mp.get_context("fork")
+    barrier, queue = ctx.Barrier(2), ctx.Queue()
+
+    def race():
+        barrier.wait(timeout=5)   # both processes go for the lock at once
+        try:
+            c = driver.acquire_controller(lock, seats=[0, 1])
+            queue.put({"acquired": c.record["pid"]})
+            barrier.wait(timeout=5)   # the winner keeps holding while the loser reports
+            c.release()
+        except RuntimeError as exc:
+            queue.put({"refused": str(exc)})
+            try:
+                barrier.wait(timeout=5)
+            except Exception:
+                pass
+    workers = [ctx.Process(target=race) for _ in range(2)]
+    for w in workers:
+        w.start()
+    results = [queue.get(timeout=10) for _ in workers]
+    for w in workers:
+        w.join(timeout=5)
+    assert sum(1 for r in results if "acquired" in r) == 1 and sum(1 for r in results if "refused" in r) == 1, results
+    assert "owns the seats" in next(r["refused"] for r in results if "refused" in r)
+
+
+def test_a_dead_holder_releases_the_lock_and_a_release_never_clears_another_controllers_record(driver, tmp_path):
+    import multiprocessing as mp
+    lock = tmp_path / "driver.lock"
+    ctx = mp.get_context("fork")
+    ready = ctx.Event()
+
+    def hold_then_die():
+        driver.acquire_controller(lock, seats=[2])
+        ready.set()
+        os._exit(0)   # no release: the process simply dies holding the lock
+    p = ctx.Process(target=hold_then_die)
+    p.start()
+    assert ready.wait(timeout=5)
+    p.join(timeout=5)
+    mine = driver.acquire_controller(lock, seats=[3])
+    assert json.loads(lock.read_text())["seats"] == [3], "a dead holder's lock is simply free"
+    # a second controller object in this process is refused while the first holds
     with pytest.raises(RuntimeError):
-        driver.acquire_controller(lock, pid=os.getpid())
-    lock.write_text(json.dumps({"pid": os.getpid()}))
-    driver.release_controller(lock, pid=os.getpid())
-    assert not lock.exists()
-    driver.release_controller(lock, pid=os.getpid())   # releasing twice is harmless
+        driver.acquire_controller(lock, seats=[3])
+    other = driver.Controller(lock)
+    other.release()   # a controller that never acquired releases nothing
+    assert json.loads(lock.read_text())["seats"] == [3]
+    driver.release_controller(mine)
+    driver.release_controller(mine)   # twice is harmless
+    assert driver.acquire_controller(lock, seats=[0]).record["seats"] == [0]
 
 
 def test_a_stop_file_is_honoured_once_at_a_boundary(driver, tmp_path):
@@ -167,6 +201,23 @@ def test_the_child_runner_reports_exit_codes_and_kills_a_hung_client(driver, tmp
     assert (code, timed_out) == (-1, True) and "timeout after 1" in err and time.monotonic() - t0 < 10
     # what the client managed to write before it was killed stays on disk for the record
     assert '"assistant"' in (tmp_path / "t3.jsonl").read_text()
+
+
+def test_timing_out_the_client_ends_its_descendants_too(driver, tmp_path):
+    pid_file = tmp_path / "descendant.pid"
+    program = ("import subprocess,sys,time; from pathlib import Path; "
+               "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(30)'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL); "
+               f"Path({str(pid_file)!r}).write_text(str(p.pid)); time.sleep(30)")
+    code, err, timed_out = driver.run_child([sys.executable, "-c", program], transcript=tmp_path / "t4.jsonl", timeout=1, env=dict(os.environ), cwd=tmp_path)
+    assert (code, timed_out) == (-1, True)
+    descendant = int(pid_file.read_text())
+    deadline = time.monotonic() + 5
+    while time.monotonic() < deadline and driver._pid_alive(descendant):
+        time.sleep(0.05)
+    alive = driver._pid_alive(descendant)
+    if alive:
+        os.kill(descendant, 9)
+    assert not alive, "the client's own children (its MCP servers) must be gone before the driver moves on"
 
 
 def test_the_main_loop_stops_cleanly_when_the_game_is_gone_or_a_stop_is_requested(driver, tmp_path, monkeypatch):

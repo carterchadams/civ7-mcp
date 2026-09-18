@@ -1141,15 +1141,17 @@ class ActionRegistry:
                         # a free project: its own event among this seat's actions against them is the proof
                         if started:
                             effect = {"diplomaticProjectStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"], "identity": "event"}}
+                    elif expect == "influence":
+                        # a priced project: the same event identity; influence moving is corroboration, not proof
+                        if started:
+                            effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"], "identity": "event",
+                                                                  **({"influenceSpent": offer["pre"] - inf} if isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"] else {})}}
                     elif expect == "war":
                         if isinstance(state, dict) and state.get("atWar") is True:
                             effect = {"warDeclared": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"]}}
                     elif expect == "alliance":
                         if isinstance(state, dict) and state.get("allied") is True:
                             effect = {"allianceFormed": {"targetPlayerId": offer["arg"]}}
-                    elif isinstance(inf, int) and not isinstance(inf, bool) and inf < offer["pre"]:
-                        effect = {"diplomaticActionStarted": {"targetPlayerId": offer["arg"], "actionType": offer["arg2"], "identity": "event" if started else "influence",
-                                                             "influenceSpent": offer["pre"] - inf}}
                 elif kind in ("NAME_UNIT", "NAME_CITY"):
                     names = rb.get("unitNames" if kind == "NAME_UNIT" else "cityNames")
                     now = names.get(str(offer["arg"])) if isinstance(names, dict) else None
@@ -1204,13 +1206,14 @@ class ActionRegistry:
                     # says it was this. Both are required when the settlement's list is readable; when the
                     # engine gives no list the treasury stands alone, and the receipt says so.
                     gold = rb.get("goldBalance")
-                    built = rb.get("cityConstructibles")
-                    have = built.get(str(offer["arg"])) if isinstance(built, dict) else None
+                    at = rb.get("constructiblesAt")
+                    here = at.get(str(offer["arg3"])) if isinstance(at, dict) else None
                     paid = isinstance(gold, int) and not isinstance(gold, bool) and gold < offer["pre"]
-                    if paid and (have is None or offer["arg2"] in have):
+                    # the building of that type on the bought plot; a lighter treasury alone, or the type
+                    # elsewhere in the settlement, is not this purchase, and no plot list is no proof
+                    if paid and isinstance(here, list) and offer["arg2"] in here:
                         effect = {"constructiblePurchased": {"cityId": offer["arg"], "constructibleType": offer["arg2"],
-                                                            "plotIndex": offer["arg3"], "goldSpent": offer["pre"] - gold,
-                                                            "identity": "constructible" if have is not None else "treasuryOnly"}}
+                                                            "plotIndex": offer["arg3"], "goldSpent": offer["pre"] - gold, "identity": "constructibleAtPlot"}}
                 elif kind == "UPGRADE_TOWN":
                     flags = rb.get("townFlags")
                     if isinstance(flags, dict) and flags.get(str(offer["arg"])) is False:
@@ -1223,8 +1226,7 @@ class ActionRegistry:
                     count = rb.get("unitCount")
                     if isinstance(now, int) and not isinstance(now, bool) and isinstance(before, int) and now > before:
                         effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "ofType": now, "identity": "unitType"}}
-                    elif counts is None and isinstance(count, int) and not isinstance(count, bool) and count > offer["pre"]:
-                        effect = {"unitPurchased": {"cityId": offer["arg"], "unitType": offer["arg2"], "units": count, "identity": "rosterOnly"}}
+                    # no type count read is no proof: the roster growing could be anything finishing
                 elif kind == "CONSIDER_TOWN_PROJECT":
                     # this town's own notification gone, not every town's (live: six pending at once)
                     pending = rb.get("townFocusPending")
