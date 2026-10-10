@@ -1,6 +1,6 @@
 # Phase 2 live test results
 
-Plan: `plans/claude-phase-2.md`. Same environment as Phase 1 (native Linux build, snap Steam,
+Plan: `plans/v1-ideas/claude-phase-2.md`. Same environment as Phase 1 (native Linux build, snap Steam,
 buildid 24661151, CDP on 127.0.0.1:9444). Every mutation goes through `payloads/perform.js`
 and is journaled in `runs/actions.jsonl` (git-ignored; rows copied here verbatim).
 

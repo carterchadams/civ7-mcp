@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Translate the strategy guide into runtime skill cards for the runner.
 
-The guide (`plans/CIV7-AGENT-STRATEGY-GUIDE.md`) is a single reading document. The runner needs
+The guide (`plans/v1-done/CIV7-AGENT-STRATEGY-GUIDE.md`) is a single reading document. The runner needs
 small cards it can load one or two of per decision. This is a deterministic, idempotent
 translation: it parses the guide's structure and writes one card per skill, a rule index and a
 compact operating card. Re-running it on an unchanged guide rewrites identical bytes, so the
@@ -25,7 +25,7 @@ from pathlib import Path
 from typing import Any
 
 HERE = Path(__file__).resolve().parent
-DEFAULT_GUIDE = HERE.parent.parent / "plans" / "CIV7-AGENT-STRATEGY-GUIDE.md"
+DEFAULT_GUIDE = HERE.parent.parent / "plans" / "v1-done" / "CIV7-AGENT-STRATEGY-GUIDE.md"
 DEFAULT_OUT = HERE.parent / "src" / "civ7_observer" / "skills"
 
 ANCHOR = re.compile(r'^<a id="([^"]+)"></a>$')

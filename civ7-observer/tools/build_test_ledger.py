@@ -61,7 +61,7 @@ VARIANTS = {
                                 ("alliance", "allianceFormed", "form an alliance through a diplomatic action")],
 }
 
-# Family completion, per item of plans/remaining-player-actions-implementation.md. Each variant has a
+# Family completion, per item of plans/v1-ideas/remaining-player-actions-implementation.md. Each variant has a
 # disposition and the evidence behind it; a family is `implemented` only when no variant is partial.
 # Dispositions: implemented (kinds in the catalog), already_covered (reachable through another kind),
 # native_dormant (no player-facing call site in the shipped UI; evidence cited), excluded (a deliberate

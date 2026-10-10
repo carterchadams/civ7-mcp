@@ -12,7 +12,7 @@ import pytest
 
 ROOT = Path(__file__).resolve().parent.parent
 BUILDER = ROOT / "tools" / "build_skills.py"
-GUIDE = ROOT.parent / "plans" / "CIV7-AGENT-STRATEGY-GUIDE.md"
+GUIDE = ROOT.parent / "plans" / "v1-done" / "CIV7-AGENT-STRATEGY-GUIDE.md"
 SKILLS = ROOT / "src" / "civ7_observer" / "skills"
 
 pytestmark = pytest.mark.skipif(not GUIDE.exists(), reason="strategy guide is local, untracked material")

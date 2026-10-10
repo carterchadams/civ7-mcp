@@ -3,7 +3,7 @@
 What the harness guarantees when a seat turn goes wrong, how each guarantee is proven, and what is
 only observed or still open. Offline tests run with scripted sockets and stub processes; they prove
 the host's behaviour, not native semantics. Live rows cite the logs they come from. Written for
-work package E of `plans/complete-outstanding.md`; revision as of the commit that adds this file.
+work package E of `plans/v1-ideas/complete-outstanding.md`; revision as of the commit that adds this file.
 
 ## Recovery of a single action
 
