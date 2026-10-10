@@ -18,7 +18,7 @@ observation-only any more: `act perform` mutates the running game.
 |---|---|
 | read-only observation of one bound seat (settlements, units, technology, civics, visible map) | working, live-verified |
 | stdio MCP server exposing `get_observation` / `get_status` | working, live-verified |
-| constrained native actions: 125 public kinds across research, civics, production and purchase, settlement growth, units and armies, orders, movement, diplomacy, peace, religion, traditions, resources, towns, age transition and legacies, artifacts and great works, air and naval actions, tile work, naming (see `docs/action-coverage.md` for every kind) | working; 52 kinds have at least one confirmed receipt in a real game, 73 are offline-verified only (`docs/action-coverage.md`); destructive kinds are confirmation-gated |
+| constrained native actions: 125 public kinds across research, civics, production and purchase, settlement growth, units and armies, orders, movement, diplomacy, peace, religion, traditions, resources, towns, age transition and legacies, artifacts and great works, air and naval actions, tile work, naming (see `docs/action-coverage.md` for every kind) | working; 51 kinds have at least one confirmed receipt in a real game, all earned before receipts were stamped with a contract digest and so `passed_historical`; 74 are offline-verified only (`docs/action-coverage.md`); destructive kinds are confirmation-gated |
 | compact turn brief (`get_turn_brief`): the required decision, bounded options, every unit listed, explicit pause | working, live-verified (~4-5 KB) |
 | actions exposed over MCP (`--allow-actions`) | working, live-verified end to end with a real MCP client |
 | agent runner: a model plays one turn of one bound seat (`play`, direct API) | offline-tested only; the active path is the subscription driver above |
@@ -120,8 +120,9 @@ forward reload is not detected; after any load the host must be rebound explicit
    watches for a seat's turn or drives the hotseat curtain (agent seats play under it).
 2. Observations omit economy, resources, foreign entities, diplomacy and notifications, so the
    current offers are not sufficient decision context for good play.
-3. The action catalog has 125 public kinds; 52 have a confirmed receipt in a real game and 73 are
-   offline-verified only (`docs/action-coverage.md`). Of the remaining-actions plan's 28 families,
+3. The action catalog has 125 public kinds; 51 have a confirmed receipt in a real game (all
+   `passed_historical`, none yet re-earned under a stamped receipt) and 74 are offline-verified only
+   (`docs/action-coverage.md`). Of the remaining-actions plan's 28 families,
    26 are implemented and 2 are explicitly partial: sending peace **terms** or a counteroffer (the
    working-deal item API is known and inspected, sending awaits a war with a major), and unit swap
    (`UNITOPERATION_SWAP_UNITS`, not implemented). Native-dormant and already-covered variants are

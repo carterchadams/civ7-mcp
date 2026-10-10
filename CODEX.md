@@ -46,8 +46,8 @@ Review against the request, the code as it is, and the recorded evidence. Look h
 ## Reviewing code
 
 Review against the plan, the stated baseline commit and the tracked docs. Run the offline suites
-(`civ7-observer/run-tests.sh`; `npm run typecheck && npm test` in `civ7-plugin/`) against a clean
-archive of the commit under review, not the shared working tree. Look hardest at:
+(`civ7-observer/run-tests.sh`; `npm ci && npm run typecheck && npm test` in `civ7-plugin/`)
+against a clean archive of the commit under review, not the shared working tree. Look hardest at:
 
 - **False confirmation.** Any path where an action can be reported `confirmed` without a
   pre-dispatch baseline and a read-back that differs from it. Pre-existing state must never confirm

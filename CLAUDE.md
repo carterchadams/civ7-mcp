@@ -44,7 +44,7 @@ an obvious test.
    tests green and says in its subject what the system now does. Name the work package it closes
    (`... (Change 3)`, `... (work package A)`).
 5. **Ask Codex to review the code** against the plan and baseline commit. Findings come back
-   numbered and prioritised (R1… with P1/P2). Fix them in commits that cite the findings
+   numbered and prioritised (R1…, each P1 to P3). Fix them in commits that cite the findings
    (`Review R1-R4: ...`). Don't fold unrelated work into a review-fix commit.
 6. **Verify live, then record it.** Offline green is not done. Run the change against the real game
    (see *Testing*) and update `STATUS.md`, the coverage docs and the dated evidence. If something was
