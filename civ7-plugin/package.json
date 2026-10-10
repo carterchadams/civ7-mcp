@@ -3,8 +3,12 @@
   "version": "0.0.1",
   "private": true,
   "description": "Civilization VII game-owned MCP plugin (mod + thin local bridge). Step 0: development loop.",
+  "license": "MIT",
+  "author": "Carter C.H. Adams",
   "type": "module",
-  "engines": { "node": ">=22.18" },
+  "engines": {
+    "node": ">=22.18"
+  },
   "scripts": {
     "dev": "node dev/cli.ts",
     "build": "node dev/cli.ts build",

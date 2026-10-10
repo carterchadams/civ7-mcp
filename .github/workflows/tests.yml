@@ -3,7 +3,7 @@ on:
   push:
   pull_request:
 jobs:
-  test:
+  observer:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -19,3 +19,16 @@ jobs:
         run: |
           python -m venv /tmp/clean && /tmp/clean/bin/pip install -q ./civ7-observer
           cd / && /tmp/clean/bin/python -m civ7_observer doctor --json --port 1 --timeout 0.5 | grep -q DEBUGGER_UNAVAILABLE
+  plugin:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: civ7-plugin
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test

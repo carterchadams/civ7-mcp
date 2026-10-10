@@ -1,11 +1,13 @@
 [build-system]
-requires = ["setuptools>=68"]
+requires = ["setuptools>=77"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "civ7-observer"
 version = "0.1.0"
 description = "Local companion for one Civilization VII player via the Cohtml UI debugger (CDP): seat-bound observation plus a constrained native-action catalog."
+license = "MIT"
+authors = [{ name = "Carter C.H. Adams" }]
 requires-python = ">=3.12"
 dependencies = [
     "websocket-client>=1.7,<2",

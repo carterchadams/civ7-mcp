@@ -110,6 +110,7 @@ def _empty_record(case: dict[str, Any]) -> dict[str, Any]:
 
 
 class TestLedger:
+    __test__ = False  # a live-test ledger, not a pytest class
     def __init__(self, match: str, *, root: Path | None = None, definitions: list[dict[str, Any]] | None = None,
                  families: list[dict[str, Any]] | None = None) -> None:
         self.match = match
