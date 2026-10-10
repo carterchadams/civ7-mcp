@@ -1,0 +1,40 @@
+[
+  {
+    "cycle": 1,
+    "marker": "B",
+    "buildId": "20260918T015643Z-0582f98-B",
+    "ok": true,
+    "buildMs": 313,
+    "stageMs": 269,
+    "activateMs": 758,
+    "probeMs": 363,
+    "loads": 2,
+    "disposals": 1,
+    "incarnation": "mu6b407p-9w05vb",
+    "badge": {
+      "count": 1,
+      "styles": 1,
+      "background": "rgba(160, 64, 0, 1)"
+    },
+    "errors": []
+  },
+  {
+    "cycle": 2,
+    "marker": "A",
+    "buildId": "20260918T015645Z-0582f98-A",
+    "ok": true,
+    "buildMs": 327,
+    "stageMs": 264,
+    "activateMs": 756,
+    "probeMs": 363,
+    "loads": 3,
+    "disposals": 2,
+    "incarnation": "mu6b407p-9w05vb",
+    "badge": {
+      "count": 1,
+      "styles": 1,
+      "background": "rgba(0, 96, 160, 1)"
+    },
+    "errors": []
+  }
+]

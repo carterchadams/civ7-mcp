@@ -1,0 +1,25 @@
+{
+  "name": "civ7-plugin",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Civilization VII game-owned MCP plugin (mod + thin local bridge). Step 0: development loop.",
+  "type": "module",
+  "engines": { "node": ">=22.18" },
+  "scripts": {
+    "dev": "node dev/cli.ts",
+    "build": "node dev/cli.ts build",
+    "stage": "node dev/cli.ts stage",
+    "status": "node dev/cli.ts status",
+    "test": "node --test tests/",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.30.0",
+    "ws": "^8.21.3"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "@types/ws": "^8.5.0",
+    "typescript": "^5.9.0"
+  }
+}

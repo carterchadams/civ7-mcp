@@ -10,3 +10,5 @@ tmp/
 build/
 plans/
 review/
+node_modules/
+.claude/settings.local.json
