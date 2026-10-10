@@ -2,7 +2,7 @@
   "mcpServers": {
     "civ7": {
       "type": "stdio",
-      "command": "/home/redcartel/code/civ/.venv/bin/python",
+      "command": "../.venv/bin/python",
       "args": ["-m", "civ7_observer", "serve", "--player", "0", "--mode", "local-hotseat", "--allow-actions"]
     }
   }

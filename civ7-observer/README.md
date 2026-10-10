@@ -2,18 +2,18 @@
 
 Local companion for **one** Civilization VII player, reached through the game's Cohtml UI
 debugger (Chrome DevTools Protocol on `127.0.0.1:9444`). It reads that seat's state and can
-perform a small set of that seat's own native actions.
+perform a constrained catalog of that seat's own native actions.
 
-> **This package mutates a running game.** `act perform` sends native operations (research and
-> civic selection, unit skip and adjacent move, unit production, end turn) and keeps persistent
+> **This package mutates a running game.** `act perform` (and `perform_action` over MCP with
+> `--allow-actions`) sends native game operations, and the package keeps persistent
 > host state under `~/.local/state/civ7-observer/`. See [STATUS.md](STATUS.md) for the
 > authoritative capability list, limitations and state locations.
 
-Implemented so far: Change 1 (the **connection doctor**), Change 2 (the developer **capability
-probe** and the runtime contract in `docs/runtime-contract.md`), Change 3 (**snapshot** of owned settlements
-and units), Change 4 (technology and civics), Change 5 (the currently visible map with
-visibility-first filtering and anti-leak fixtures), and Change 6 (the narrow stdio MCP
-server and the isolated model demonstration).
+It covers a connection doctor, a developer capability probe, validated seat-bound observations
+(settlements, units, technology, civics, the currently visible map), a stdio MCP server, a
+constrained catalog of 125 native action kinds, a compact turn brief, and a hotseat driver in which
+Claude Code sessions play every seat. See [STATUS.md](STATUS.md) for what is live-verified and
+what is offline-tested only.
 
 ## Install (Linux, this repo)
 
@@ -132,13 +132,13 @@ session to the in-game realm and closes it, so a seat swap, reload, or shutdown 
 calls yields a typed error rather than stale data. Restart the server after loading a
 different save (the `sessionId` is per process).
 
-Register with a client using absolute paths:
+Register with a client using absolute paths (run from the repository root):
 
 ```bash
 claude mcp add --transport stdio civ7-observer -- \
-  /home/redcartel/code/civ/.venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
+  "$PWD/.venv/bin/python" -m civ7_observer serve --player 1 --mode local-hotseat
 codex mcp add civ7-observer -- \
-  /home/redcartel/code/civ/.venv/bin/python -m civ7_observer serve --player 1 --mode local-hotseat
+  "$PWD/.venv/bin/python" -m civ7_observer serve --player 1 --mode local-hotseat
 ```
 
 ### Isolated demonstration
